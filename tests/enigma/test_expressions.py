@@ -9,6 +9,10 @@ definitions prints a fortissimo in every part of every file.
 
 from __future__ import annotations
 
+from fractions import Fraction
+
+import pytest
+
 from finale_file_parser.enigma.document import (
     DetailsPool,
     EnigmaDocument,
@@ -169,6 +173,74 @@ def test_a_tempo_word_keeps_its_own_category_and_no_marking() -> None:
     assert found.category == "tempoMarks"
     assert found.marking is None
     assert found.velocity == 40
+    assert found.tempo is None, "An untyped playback value cannot establish a metronome marking"
+
+
+@pytest.mark.parametrize(
+    ("printed", "unit", "dots", "rate", "words"),
+    [
+        ("q = 82", Fraction(1, 4), 0, Fraction(82), ""),
+        ("Faster  q = 112", Fraction(1, 4), 0, Fraction(112), "Faster"),
+        ("Allegro (q = 120)", Fraction(1, 4), 0, Fraction(120), "Allegro"),
+        ("h = 60", Fraction(1, 2), 0, Fraction(60), ""),
+        ("e. = 80", Fraction(1, 8), 1, Fraction(80), ""),
+        ("quarter.. = 40", Fraction(1, 4), 2, Fraction(40), ""),
+        ("w = 20", Fraction(1), 0, Fraction(20), ""),
+        ("♩ = 82.5", Fraction(1, 4), 0, Fraction(165, 2), ""),
+        ("♪ = 160", Fraction(1, 8), 0, Fraction(160), ""),
+        ("𝅗𝅥 = 60", Fraction(1, 2), 0, Fraction(60), ""),
+        ("Q = 100 molto espressivo", Fraction(1, 4), 0, Fraction(100), "molto espressivo"),
+    ],
+)
+def test_explicit_metronome_marks_do_not_require_an_expression_category(
+    printed: str, unit: Fraction, dots: int, rate: Fraction, words: str
+) -> None:
+    """The legacy reader has no category or playType. Read the explicit text,
+    retain it, and do not mistake an unrelated definition value for the rate.
+    """
+    doc = document(definition(1, category_id=99, value=49), text(1, printed), assignment(1, 1))
+    (expression,) = expressions_by_measure(doc)[(1, 1)]
+    assert expression.text == printed
+    assert expression.category == ""
+    tempo = expression.tempo
+    assert tempo is not None
+    assert (tempo.beat_unit, tempo.dots, tempo.per_minute, tempo.words) == (unit, dots, rate, words)
+
+
+@pytest.mark.parametrize(
+    "printed",
+    [
+        "Allegro",
+        "x = 80",
+        "q = h",
+        "q = 80–100",
+        "q = 80 - 100",
+        "q = 80/3",
+        "q = 0",
+        "q = -80",
+        "q = 1001",
+        "q = 99999",
+        "q = 80.1234",
+        "q = 1e3",
+        "q = 80bpm",
+        "q = 80; h = 40",
+        "q.... = 80",
+    ],
+)
+def test_ambiguous_or_unsupported_tempo_text_stays_as_words(printed: str) -> None:
+    doc = document(
+        category(TEMPO_CATEGORY, "tempoMarks"),
+        definition(1, category_id=TEMPO_CATEGORY, value=80),
+        text(1, printed),
+        assignment(1, 1),
+    )
+    (expression,) = expressions_by_measure(doc)[(1, 1)]
+    assert expression.text == printed
+    assert expression.tempo is None
+
+
+def test_metronome_definitions_need_an_assignment_to_set_tempo() -> None:
+    assert expressions_by_measure(document(definition(1), text(1, "q = 82"))) == {}
 
 
 def test_a_part_linked_assignment_is_skipped() -> None:

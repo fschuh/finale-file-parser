@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import math
 import xml.etree.ElementTree as ET
+from decimal import Decimal
 from fractions import Fraction
 
 from finale_file_parser.errors import FinaleFileError
@@ -20,10 +21,12 @@ from finale_file_parser.ir import (
     Expression,
     Lyric,
     Measure,
+    NoteTies,
     Part,
     PartGroup,
     Pitch,
     Score,
+    Tempo,
     Voice,
 )
 
@@ -234,11 +237,13 @@ is for.
 def _append_expressions(element: ET.Element, measure: Measure) -> None:
     """Emit this staff's markings.
 
-    Three cases, and the third is why they are not all `<words>`:
+    Structured markings keep their notation and playback meaning:
 
     * a dynamic this project has named becomes a real `<dynamics>` element, so a
       consumer gets `<ff/>` rather than a character it would have to recognise;
-    * anything else that reads as words -- tempo marks, technique text -- is
+    * an explicit metronome marking becomes `<metronome>` and quarter-note
+      `<sound tempo="...">`, with any surrounding text emitted once;
+    * other readable text, including tempo words without an explicit rate, is
       emitted as `<words>`;
     * an unidentified music-font glyph is **dropped**, because printing it
       literally is worse than omitting it. The IR keeps it either way.
@@ -250,7 +255,9 @@ def _append_expressions(element: ET.Element, measure: Measure) -> None:
     split `ir` records.
     """
     for expression in measure.expressions:
-        if expression.is_rehearsal:
+        if expression.tempo is not None:
+            _append_tempo(element, expression.tempo)
+        elif expression.is_rehearsal:
             # `<rehearsal>`, not `<words>`: the two are different elements and a
             # consumer treats them differently -- a rehearsal mark is a
             # navigation target, and players jump to it.
@@ -270,6 +277,28 @@ def _append_expressions(element: ET.Element, measure: Measure) -> None:
             words.text = expression.text
 
 
+def _tempo_number(value: Fraction) -> str:
+    text = format(Decimal(value.numerator) / Decimal(value.denominator), "f")
+    return text.rstrip("0").rstrip(".") if "." in text else text
+
+
+def _append_tempo(element: ET.Element, tempo: Tempo) -> None:
+    if tempo.per_minute <= 0 or not 0 <= tempo.dots <= 3:
+        raise ExportError("tempo must have a positive rate and zero to three dots")
+    unit = _NOTE_TYPES.get(tempo.beat_unit.denominator)
+    if tempo.beat_unit.numerator != 1 or unit is None:
+        raise ExportError(f"tempo beat unit {tempo.beat_unit} has no MusicXML type")
+    direction = ET.SubElement(element, "direction", placement="above")
+    if tempo.words:
+        ET.SubElement(ET.SubElement(direction, "direction-type"), "words").text = tempo.words
+    metronome = ET.SubElement(ET.SubElement(direction, "direction-type"), "metronome")
+    ET.SubElement(metronome, "beat-unit").text = unit
+    for _ in range(tempo.dots):
+        ET.SubElement(metronome, "beat-unit-dot")
+    ET.SubElement(metronome, "per-minute").text = _tempo_number(tempo.per_minute)
+    ET.SubElement(direction, "sound", tempo=_tempo_number(tempo.quarter_bpm))
+
+
 def prints_as_words(expression: Expression) -> bool:
     """Whether this expression is emitted as `<words>`.
 
@@ -280,6 +309,8 @@ def prints_as_words(expression: Expression) -> bool:
     rule stated once is what makes that check mean anything. Whether the rule
     itself is right is pinned by the unit tests, not here.
     """
+    if expression.tempo is not None:
+        return bool(expression.tempo.words)
     return not expression.is_rehearsal and not expression.marking and not _is_glyph(expression.text)
 
 
@@ -398,11 +429,15 @@ def _append_attributes(
 
 
 def _append_event(element: ET.Element, event: Event, voice: Voice, divisions: int) -> None:
+    if event.note_ties and len(event.note_ties) != len(event.pitches):
+        raise ExportError("per-note tie flags must match the number of pitches")
+    legacy_ties = NoteTies(event.tie_start, event.tie_end)
     if event.is_rest:
-        _append_note(element, event, voice, divisions, pitch=None, chord=False)
+        _append_note(element, event, voice, divisions, pitch=None, chord=False, ties=legacy_ties)
         return
     for index, pitch in enumerate(event.pitches):
-        _append_note(element, event, voice, divisions, pitch=pitch, chord=bool(index))
+        ties = event.note_ties[index] if event.note_ties else legacy_ties
+        _append_note(element, event, voice, divisions, pitch=pitch, chord=bool(index), ties=ties)
 
 
 def _append_note(
@@ -413,6 +448,7 @@ def _append_note(
     *,
     pitch: Pitch | None,
     chord: bool,
+    ties: NoteTies,
 ) -> None:
     note = ET.SubElement(element, "note")
     # Schema order: grace, chord, pitch or rest, duration, tie, voice, type...
@@ -442,9 +478,9 @@ def _append_note(
     # <tie> is the sounding instruction; <tied> inside <notations> is the visual
     # slur. Both are required for a tie to survive a round trip through most
     # applications.
-    if event.tie_end:
+    if ties.stop:
         ET.SubElement(note, "tie", type="stop")
-    if event.tie_start:
+    if ties.start:
         ET.SubElement(note, "tie", type="start")
     ET.SubElement(note, "voice").text = str(voice.number)
     if not event.is_measure_rest:
@@ -463,21 +499,36 @@ def _append_note(
     if not chord:
         for beam in event.beams:
             ET.SubElement(note, "beam", number=str(beam.number)).text = beam.type
-    # One <notations> holds both, in schema order: tied before articulations.
+    # One <notations> holds the note's ties and the event's attachments.
     # A chord's marks belong to the event, so only its principal note carries
     # them -- repeating per pitch would print the staccato three times.
     marks = () if chord else event.articulations
     digits = () if chord else event.fingerings
-    if event.tie_start or event.tie_end or marks or digits:
+    ornaments = () if chord else event.ornaments
+    if ties.start or ties.stop or marks or digits or ornaments:
         notations = ET.SubElement(note, "notations")
-        if event.tie_end:
+        if ties.stop:
             ET.SubElement(notations, "tied", type="stop")
-        if event.tie_start:
+        if ties.start:
             ET.SubElement(notations, "tied", type="start")
         if marks:
             articulations = ET.SubElement(notations, "articulations")
             for name in marks:
                 ET.SubElement(articulations, name)
+        if ornaments:
+            ornament_group = ET.SubElement(notations, "ornaments")
+            for ornament in ornaments:
+                if ornament.kind != "upper-mordent":
+                    raise ExportError(f"unsupported ornament {ornament.kind!r}")
+                attributes = {"placement": "above", "start-note": "main"}
+                if ornament.auxiliary_semitones is not None:
+                    step = {1: "half", 2: "whole"}.get(ornament.auxiliary_semitones)
+                    if step is None:
+                        raise ExportError(
+                            "upper mordent auxiliary note must be one or two semitones"
+                        )
+                    attributes["trill-step"] = step
+                ET.SubElement(ornament_group, "inverted-mordent", attributes)
         if digits:
             # All of a chord's fingerings sit on its principal note rather than
             # one per pitch. Enigma attaches them to the entry, not to a note,

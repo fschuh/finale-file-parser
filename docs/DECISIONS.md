@@ -649,3 +649,27 @@ wrapping them, and the lower-level readers remain public for format research and
 **Consequence.** Ordinary callers and the CLI no longer know which parser branch a file needs, and
 a valid file with a misleading suffix still reaches the correct reader. The facade deliberately
 does not include export or file-writing policy: `to_musicxml` remains a separate edge operation.
+
+## 2026-10-08 — DECIDED: preserve individual ties and explicit performance notation in the IR
+
+**Context.** The approved Scars of Time investigation found that an event-wide tie
+flag was copied to every chord pitch, while upper mordents and explicit printed
+metronome rates were omitted. All ordinary source attacks matched the performance
+MIDI; replacing notated durations with expressive MIDI note lengths would discard
+the source notation.
+
+**Decision.** Extend the existing canonical IR with `NoteTies`, `Ornament` and
+`Tempo`. `Event.note_ties` is aligned with pitches and takes precedence during
+export. Retain `tie_start`/`tie_end` as aggregate summaries for compatibility, and
+retain their previous export behavior for authored events without individual
+flags. Preserve unmatched source ties. Ornaments stay attached to events rather
+than becoming additional written notes. `Expression.tempo` structures an explicit
+printed beat/rate while `Expression.text` retains the full source wording.
+
+**Consequence.** Both containers keep using one reader-to-IR-to-export path.
+Support the upper mordent at legacy glyph 109 with cross-font chart evidence and
+the local PDF/MIDI comparison; leave unknown glyphs unmapped. Infer no tempo from
+an untyped expression `value` or an undecoded legacy `playType`. Export explicit
+metronome notation and a correctly scaled quarter-note playback rate, leaving
+expressive performance timing to the consuming application. Existing callers
+using event-wide ties or plain expression text retain their behavior.

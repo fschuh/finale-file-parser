@@ -242,6 +242,23 @@ different types — conventional beats/beat-type versus Enigma's beats/division-
 deliberately *not* flattened into the package root for that reason; import them from
 `finale_file_parser.ir`.
 
+### Individual note ties in a chord
+
+`tieStart` and `tieEnd` belong to each source `note`, not its containing `entry`.
+The legacy entry reader already decodes them separately. Reducing them to `any(...)`
+on an IR event and applying that flag to every pitch invents ties on otherwise untied
+chord tones. The local Scars of Time comparison exposed four copied starts (upper
+staff, measures 52 and 56) and one copied stop (lower staff, measure 54); the PDF
+corroborates the partial upper-staff ties.
+
+`Event.note_ties` carries one `NoteTies(start, stop)` per pitch in the same order.
+Readers include explicit false flags. MusicXML emits both sounding `<tie>` and
+visual `<tied>` from these individual flags. `Event.tie_start` and `tie_end` remain
+aggregate summaries for existing callers; authored events with an empty `note_ties`
+retain their previous event-wide export behavior. A nonempty tuple of the wrong
+length raises `ExportError`. No pairing repair is attempted: the source can contain
+unmatched flags, as noted under "three things that are not invariants" below.
+
 ### Known format facts — clefs
 
 Enigma keeps a document-wide table of clef definitions (`clefOptions.clefDef`, **18 entries in every
@@ -929,14 +946,13 @@ sit at the same ASCII positions in every music font the corpus uses — Maestro,
 Broadway Copyist all write `.` staccato, `>` accent, `-` tenuto, `^` marcato, `,` breath mark — which
 is what makes reading them without resolving the font defensible.
 
-**Anything else produces nothing.** The corpus assigns 29 distinct characters; emitting a guess would
+**Other characters produce no articulation.** The corpus assigns 29 distinct characters; emitting a guess would
 put a wrong articulation on a real note, which is worse than leaving the note bare. Coverage is
-22,821 marks across 273 documents.
+22,821 marks across 273 documents. Separate resolvers handle evidenced fingerings and ornaments.
 
-**Fingerings are deliberately not read.** The corpus carries numerals 1–5 in a text font (Arial),
-which are fingerings rather than articulations — but telling those from a music-font numeral needs
-the font, and a `.mus` does not reliably give one (`fontMain`'s offset varies within a single era).
-Reading them would make the two containers disagree.
+Fingerings use numerals 1–5 rather than articulation names; their resolver and evidence are
+described above. A `.mus` does not reliably give the font (`fontMain`'s offset varies within
+a single era), so new glyph mappings still require independent evidence.
 
 On the `.mus` side: `articAssign` is details tag 1009 with the definition's cmper at payload +0;
 `articDef` is others tag 121 with `charMain` at +0 (2011, 48-byte payload) or +2 (2012, 60-byte) —
@@ -944,6 +960,57 @@ the same era split as the clef table. A `.mus` sometimes **repeats** an assignme
 entries; no `.musx` ever assigns the same `articDef` twice in 11,404 assignments, so the repeat is a
 storage artifact its reader drops. Both containers then agree on all 27,155 events of the 72 paired
 documents that carry articulations.
+
+### Known format facts — upper mordents
+
+`enigma/ornaments.py` follows the same `articAssign -> articDef -> charMain` join.
+Only assigned score records count; library entries alone and linked-part variants
+do not place ornaments. Glyph **109**, lowercase `m`, occupies the mordent position
+in Finale's official [Maestro](https://usermanuals.finalemusic.com/FinaleWin/Content/Finale/font-maestro.htm),
+[Engraver](https://usermanuals.finalemusic.com/FinaleWin/Content/Finale/font-engraver.htm), and
+[Broadway Copyist](https://usermanuals.finalemusic.com/FinaleWin/Content/Finale/font-broadway-copyist.htm)
+charts. No additional binary field or font offset is inferred.
+
+Independent local evidence: Scars of Time assigns definition 6, `charMain=109`,
+ten times, in upper-staff measures 11, 12, 17, 18, 19, 29, 30, 33, 34 and 56.
+The PDF shows the unstruck symbol; the performance MIDI plays main/upper/main at
+each placement. These explain 20 additional MIDI attacks, without adding written
+notes to the score. This score remains a local investigation input, not a licensed
+repository fixture; regression tests use authored synthetic fragments.
+
+The IR calls this `Ornament(kind="upper-mordent")`. MusicXML calls the unstruck,
+upper-neighbor symbol [`inverted-mordent`](https://www.w3.org/2021/06/musicxml40/musicxml-reference/elements/inverted-mordent/),
+whose naming differs from SMuFL. Emit it once on a chord's principal note, with
+`start-note="main"`. The written key and principal pitch determine the upper
+diatonic neighbor: `harmLev + 1`, `harmAlt = 0`, through the existing pitch speller
+and staff transposition. `auxiliary_semitones` records supported distances of one
+or two semitones, exported as `trill-step="half"` or `"whole"`. This matters for
+F# -> G and B -> C in E minor. Other distances remain unknown and leave the
+consumer's ornament playback defaults in effect. Auxiliary accidental signs and
+exact performance timing are not decoded. Unknown glyphs still produce no ornament.
+
+### Explicit metronome markings
+
+Assigned expression text can establish a metronome rate even when the legacy
+`.mus` lacks a decoded category or `playType`. Scars of Time prints `q = 82` in
+measure 1 and `Faster q = 112` in measure 20; the PDF and MIDI confirm both rates.
+The definition's `value` is an untyped playback number, also used for dynamics,
+so it is **not** used to infer tempo. The expression join and this distinction
+are documented in `docs/formats/expressions-and-dynamics.md`.
+
+`Expression.tempo` holds `Tempo(beat_unit, per_minute, dots, words)`. Beat units
+and rates use exact `Fraction`s; `Expression.text` retains the original wording.
+The reader recognizes one explicit whole/half/quarter/eighth beat-equals-number
+mark, using named units, `w/h/q/e` or the supported Unicode note symbols, with
+zero to three dots and a positive rate at most 1000. Ranges, note equivalences,
+multiple markings, unsupported symbols and tempo words alone remain text.
+
+MusicXML emits a [`metronome`](https://www.w3.org/2021/06/musicxml40/musicxml-reference/elements/metronome/)
+marking and [`sound tempo`](https://www.w3.org/2021/06/musicxml40/musicxml-reference/elements/sound/)
+in quarter notes per minute: `per_minute * beat_unit * dot_multiplier * 4`.
+Surrounding words such as `Faster` are emitted once; the printed equation is not
+duplicated as words. The performance MIDI's expressive tempo changes remain outside
+this explicit notation reading. No undecoded `playType` bits are guessed.
 
 ### Known format facts — lyrics
 

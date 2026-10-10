@@ -32,6 +32,7 @@ from finale_file_parser.enigma.location import effective_keys, locate_entries
 from finale_file_parser.enigma.lyrics import Lyric as EnigmaLyric
 from finale_file_parser.enigma.lyrics import lyrics_by_entry
 from finale_file_parser.enigma.music import read_entry
+from finale_file_parser.enigma.ornaments import ornaments_by_entry
 from finale_file_parser.enigma.pitch import StaffTransposition, read_transposition, spell_note
 from finale_file_parser.enigma.repeats import Repeats, repeats_for
 from finale_file_parser.enigma.text import file_info, staff_names
@@ -43,6 +44,8 @@ from finale_file_parser.ir import (
     Expression,
     Lyric,
     Measure,
+    NoteTies,
+    Ornament,
     Part,
     PartGroup,
     Pitch,
@@ -113,6 +116,7 @@ def build_score(document: EnigmaDocument) -> Score:
     lyrics = lyrics_by_entry(document)
     articulations = articulations_by_entry(document)
     fingerings = fingerings_by_entry(document)
+    ornaments = ornaments_by_entry(document)
 
     # One pass, in chain order, so a measure's notes come out in playing order
     # rather than document order.
@@ -141,6 +145,7 @@ def build_score(document: EnigmaDocument) -> Score:
                     lyrics=lyrics.get(entnum, ()),
                     articulations=articulations.get(entnum, ()),
                     fingerings=fingerings.get(entnum, ()),
+                    ornaments=ornaments.get(entnum, ()),
                 )
             )
 
@@ -383,6 +388,7 @@ def _event(
     lyrics: tuple[EnigmaLyric, ...] = (),
     articulations: tuple[str, ...] = (),
     fingerings: tuple[str, ...] = (),
+    ornaments: tuple[Ornament, ...] = (),
 ) -> Event:
     entry = read_entry(record)
     key = decode_key(key_raw)
@@ -399,6 +405,25 @@ def _event(
     # A ratio of 1 means no tuplet; recording it anyway would make every note
     # carry a pointless <time-modification>.
     ratio = duration / written if written and duration != written else None
+    if ornaments and entry.notes:
+        main = spell_note(entry.notes[0], key, transposition).written
+        upper = spell_note(
+            replace(entry.notes[0], harm_lev=entry.notes[0].harm_lev + 1, harm_alt=0),
+            key,
+            transposition,
+        ).written
+        semitones = {"C": 0, "D": 2, "E": 4, "F": 5, "G": 7, "A": 9, "B": 11}
+        distance = (
+            12 * (upper.octave - main.octave)
+            + semitones[upper.letter]
+            - semitones[main.letter]
+            + upper.alteration
+            - main.alteration
+        )
+        ornaments = tuple(
+            replace(ornament, auxiliary_semitones=distance if distance in (1, 2) else None)
+            for ornament in ornaments
+        )
     return Event(
         duration=duration,
         written_duration=written,
@@ -406,6 +431,7 @@ def _event(
         dots=entry.duration.dots,
         tie_start=any(note.tie_start for note in entry.notes),
         tie_end=any(note.tie_end for note in entry.notes),
+        note_ties=tuple(NoteTies(note.tie_start, note.tie_end) for note in entry.notes),
         tuplet_ratio=ratio,
         is_grace="graceNote" in record.fields,
         # Verse order, so a multi-verse note emits its lyrics top to bottom.
@@ -420,6 +446,7 @@ def _event(
         ),
         articulations=articulations,
         fingerings=fingerings,
+        ornaments=ornaments,
     )
 
 

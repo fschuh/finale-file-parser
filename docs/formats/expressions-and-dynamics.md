@@ -111,6 +111,14 @@ expression*. In `tempoMarks` the same field holds beats per minute, and the
 words confirm it: `Adagio` 40, `Moderato` 108, `Allegro` 120, each matching the
 `q = …` printed in its own text.
 
+The reader now structures **explicit printed metronome marks** independently of
+`value`: an assigned `q = 82` or `Faster q = 112` gets `Expression.tempo`, while
+its original text and untyped playback number remain available. This also works
+for legacy `.mus` expressions whose category and `playType` are not decoded.
+Tempo words without a numeric beat marking do not gain an inferred playback rate.
+Supported beat units, conservative parsing limits and MusicXML playback units
+are described in `docs/ARCHITECTURE.md` under "Explicit metronome markings".
+
 ## Which expressions a score actually places
 
 The table above is the **library** every document ships. What a score *uses* is a

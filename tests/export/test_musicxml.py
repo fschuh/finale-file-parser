@@ -16,10 +16,13 @@ from finale_file_parser.ir import (
     Expression,
     Lyric,
     Measure,
+    NoteTies,
+    Ornament,
     Part,
     PartGroup,
     Pitch,
     Score,
+    Tempo,
     TimeSignature,
     Voice,
 )
@@ -124,6 +127,144 @@ def test_ties_emit_both_sound_and_notation() -> None:
     assert note is not None
     assert {t.get("type") for t in note.findall("tie")} == {"start", "stop"}
     assert {t.get("type") for t in note.findall("./notations/tied")} == {"start", "stop"}
+
+
+def test_a_chord_can_have_different_ties_on_each_pitch() -> None:
+    root = _tree(
+        _score(
+            _note(
+                pitches=(Pitch("C", 4, 0), Pitch("E", 4, 0), Pitch("G", 4, 0)),
+                tie_start=True,
+                tie_end=True,
+                note_ties=(NoteTies(), NoteTies(stop=True), NoteTies(start=True, stop=True)),
+            )
+        )
+    )
+    notes = root.findall("./part/measure/note")
+    expected = [[], ["stop"], ["stop", "start"]]
+    assert [[tie.get("type") for tie in note.findall("tie")] for note in notes] == expected
+    assert [
+        [tie.get("type") for tie in note.findall("./notations/tied")] for note in notes
+    ] == expected
+
+
+def test_explicit_false_note_ties_override_the_legacy_flags() -> None:
+    root = _tree(_score(_note(tie_start=True, tie_end=True, note_ties=(NoteTies(),))))
+    assert root.findall(".//tie") == []
+    assert root.findall(".//tied") == []
+
+
+def test_authored_chords_without_note_ties_keep_the_legacy_behavior() -> None:
+    root = _tree(_score(_note(pitches=(Pitch("C", 4, 0), Pitch("E", 4, 0)), tie_start=True)))
+    assert len(root.findall(".//tie[@type='start']")) == 2
+    assert len(root.findall(".//tied[@type='start']")) == 2
+
+
+def test_per_note_tie_flags_must_match_the_pitches() -> None:
+    with pytest.raises(ExportError, match="tie flags must match"):
+        to_musicxml(_score(_note(note_ties=(NoteTies(), NoteTies()))))
+
+
+@pytest.mark.parametrize(("distance", "step"), [(None, None), (1, "half"), (2, "whole")])
+def test_upper_mordent_uses_the_unstruck_musicxml_symbol(
+    distance: int | None, step: str | None
+) -> None:
+    root = _tree(_score(_note(ornaments=(Ornament("upper-mordent", distance),))))
+    ornament = root.find(".//notations/ornaments/inverted-mordent")
+    assert ornament is not None
+    assert ornament.get("start-note") == "main"
+    assert ornament.get("trill-step") == step
+    assert root.findall(".//mordent") == []
+
+
+def test_chord_ornaments_appear_once_alongside_other_notations() -> None:
+    root = _tree(
+        _score(
+            _note(
+                pitches=(Pitch("C", 4, 0), Pitch("E", 4, 0)),
+                note_ties=(NoteTies(start=True), NoteTies()),
+                articulations=("staccato",),
+                fingerings=("1",),
+                ornaments=(Ornament("upper-mordent", 2),),
+            )
+        )
+    )
+    notes = root.findall("./part/measure/note")
+    assert len(notes[0].findall("notations")) == 1
+    assert notes[1].find("notations") is None
+    assert len(root.findall(".//inverted-mordent")) == 1
+    assert root.find(".//tied") is not None
+    assert root.find(".//staccato") is not None
+    assert root.findtext(".//fingering") == "1"
+
+
+@pytest.mark.parametrize("ornament", [Ornament("unknown"), Ornament("upper-mordent", 3)])
+def test_unsupported_ornaments_raise(ornament: Ornament) -> None:
+    with pytest.raises(ExportError, match="ornament|auxiliary"):
+        to_musicxml(_score(_note(ornaments=(ornament,))))
+
+
+@pytest.mark.parametrize(
+    ("unit", "dots", "rate", "expected_unit", "expected_rate", "expected_bpm"),
+    [
+        (QUARTER, 0, Fraction(120), "quarter", "120", "120"),
+        (Fraction(1, 2), 0, Fraction(60), "half", "60", "120"),
+        (EIGHTH, 1, Fraction(80), "eighth", "80", "60"),
+        (QUARTER, 2, Fraction(40), "quarter", "40", "70"),
+        (QUARTER, 0, Fraction(165, 2), "quarter", "82.5", "82.5"),
+    ],
+)
+def test_metronome_marking_emits_quarter_note_playback_tempo(
+    unit: Fraction,
+    dots: int,
+    rate: Fraction,
+    expected_unit: str,
+    expected_rate: str,
+    expected_bpm: str,
+) -> None:
+    expression = Expression(
+        text="source marking", category="tempoMarks", tempo=Tempo(unit, rate, dots)
+    )
+    root = _tree(_score(_note(), expressions=(expression,)))
+    metronome = root.find(".//metronome")
+    assert metronome is not None
+    assert metronome.findtext("beat-unit") == expected_unit
+    assert len(metronome.findall("beat-unit-dot")) == dots
+    assert metronome.findtext("per-minute") == expected_rate
+    sound = root.find(".//sound")
+    assert sound is not None
+    assert sound.get("tempo") == expected_bpm
+    assert root.findall(".//words") == []
+    assert not prints_as_words(expression)
+
+
+def test_tempo_words_do_not_duplicate_the_metronome_marking() -> None:
+    expression = Expression(
+        text="Faster q = 112",
+        category="tempoMarks",
+        tempo=Tempo(QUARTER, Fraction(112), words="Faster"),
+    )
+    root = _tree(_score(_note(), expressions=(expression,)))
+    assert [words.text for words in root.findall(".//words")] == ["Faster"]
+    assert root.findtext(".//metronome/per-minute") == "112"
+    assert prints_as_words(expression)
+
+
+@pytest.mark.parametrize(
+    "tempo",
+    [
+        Tempo(QUARTER, Fraction(0)),
+        Tempo(QUARTER, Fraction(-1)),
+        Tempo(QUARTER, Fraction(80), dots=-1),
+        Tempo(QUARTER, Fraction(80), dots=4),
+        Tempo(Fraction(3, 8), Fraction(80)),
+    ],
+)
+def test_invalid_metronome_markings_raise(tempo: Tempo) -> None:
+    with pytest.raises(ExportError, match="tempo"):
+        to_musicxml(
+            _score(_note(), expressions=(Expression(text="tempo", category="", tempo=tempo),))
+        )
 
 
 def test_dotted_note_type_is_the_undotted_base() -> None:

@@ -116,6 +116,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
+from fractions import Fraction
 
 from finale_file_parser.enigma.document import EnigmaDocument, Record, field_int
 from finale_file_parser.enigma.text import plain_text
@@ -124,7 +125,7 @@ from finale_file_parser.formats.dynamics import (
     described_dynamic,
     dynamic_for,
 )
-from finale_file_parser.ir import Expression
+from finale_file_parser.ir import Expression, Tempo
 
 __all__ = ["SCORE_WIDE_STAFF", "expressions_by_measure"]
 
@@ -168,6 +169,56 @@ saying whether the font is a music one, and it carries no `fontName` records to
 resolve the id against. That is why the description is the primary signal -- a
 `.mus` dynamic is named from `descStr` alone.
 """
+
+
+_TEMPO = re.compile(
+    r"(?<!\w)(?P<unit>quarter|half|eighth|whole|[qhew♩♪𝅘𝅥𝅗𝅥𝅝])"
+    r"(?P<dots>\.{0,3})\s*=\s*(?P<bpm>\d{1,4}(?:\.\d{1,3})?)"
+    r"(?![\w./]|\s*[-–]\s*\d)",
+    re.IGNORECASE,
+)
+"""An explicit beat = number, not a tempo word or an untyped playback value.
+
+The legacy `.mus` cannot identify playType. Its printed q = 82 / q = 112 marks
+are independent evidence, and agree with the performance MIDI. Keep ranges,
+equivalences and unknown symbols as words instead of inventing a playback rate.
+"""
+
+_TEMPO_UNITS = {
+    "quarter": Fraction(1, 4),
+    "q": Fraction(1, 4),
+    "♩": Fraction(1, 4),
+    "𝅘𝅥": Fraction(1, 4),
+    "half": Fraction(1, 2),
+    "h": Fraction(1, 2),
+    "𝅗𝅥": Fraction(1, 2),
+    "eighth": Fraction(1, 8),
+    "e": Fraction(1, 8),
+    "♪": Fraction(1, 8),
+    "whole": Fraction(1),
+    "w": Fraction(1),
+    "𝅝": Fraction(1),
+}
+
+
+def _tempo(text: str) -> Tempo | None:
+    matches = _TEMPO.finditer(text)
+    match = next(matches, None)
+    if match is None or next(matches, None) is not None:
+        return None
+    per_minute = Fraction(match["bpm"])
+    if not 0 < per_minute <= 1000:
+        return None
+    start, end = match.span()
+    before, after = text[:start].rstrip(), text[end:].lstrip()
+    if before.endswith("(") and after.startswith(")"):
+        before, after = before[:-1].rstrip(), after[1:].lstrip()
+    return Tempo(
+        beat_unit=_TEMPO_UNITS[match["unit"].lower()],
+        per_minute=per_minute,
+        dots=len(match["dots"]),
+        words=" ".join(piece for piece in (before, after) if piece),
+    )
 
 
 def expressions_by_measure(
@@ -231,6 +282,7 @@ def expressions_by_measure(
                 score_wide=staff == SCORE_WIDE_STAFF,
                 is_rehearsal=label is not None,
                 layer=field_int(record.fields.get("layer")),
+                tempo=_tempo(printed) if marking is None and label is None else None,
             )
         )
     return {where: tuple(items) for where, items in out.items()}

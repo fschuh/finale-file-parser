@@ -26,10 +26,13 @@ __all__ = [
     "Expression",
     "Lyric",
     "Measure",
+    "NoteTies",
+    "Ornament",
     "Part",
     "PartGroup",
     "Pitch",
     "Score",
+    "Tempo",
     "TimeSignature",
     "Voice",
 ]
@@ -47,6 +50,43 @@ class Pitch:
 
     alteration: int
     """Semitones from the natural: -1 flat, 0 natural, +1 sharp."""
+
+
+@dataclass(frozen=True)
+class NoteTies:
+    """Tie flags for one pitched note, including unmatched source flags."""
+
+    start: bool = False
+    stop: bool = False
+
+
+@dataclass(frozen=True)
+class Ornament:
+    """An ornament attached to an event, rather than additional written notes."""
+
+    kind: str
+    """Currently ``upper-mordent``: main note, upper neighbor, main note."""
+
+    auxiliary_semitones: int | None = None
+    """Distance to the auxiliary note when established by the key. None when unknown."""
+
+
+@dataclass(frozen=True)
+class Tempo:
+    """An explicit metronome marking, independent of the output format."""
+
+    beat_unit: Fraction
+    """Undotted beat length as a fraction of a whole note."""
+
+    per_minute: Fraction
+    dots: int = 0
+    words: str = ""
+    """Surrounding words, e.g. ``Faster``, without duplicating the metronome marking."""
+
+    @property
+    def quarter_bpm(self) -> Fraction:
+        """Playback rate in quarter notes per minute."""
+        return self.per_minute * self.beat_unit * (2 - Fraction(1, 2**self.dots)) * 4
 
 
 @dataclass(frozen=True)
@@ -146,6 +186,16 @@ class Event:
     articulations: tuple[str, ...] = ()
     """MusicXML articulation names -- "staccato", "accent", "tenuto",
     "strong-accent", "breath-mark" -- in document order."""
+
+    note_ties: tuple[NoteTies, ...] = ()
+    """One set of flags per pitch. Readers supply these, including explicit false flags.
+
+    When present these override the legacy event-wide ``tie_start``/``tie_end``
+    fields during export. Those fields remain aggregate summaries for existing
+    callers; an authored event without ``note_ties`` keeps their old behavior.
+    """
+
+    ornaments: tuple[Ornament, ...] = ()
 
     @property
     def is_rest(self) -> bool:
@@ -249,6 +299,9 @@ class Expression:
     that. What the staff list actually selects is not decoded -- see
     `to_ir._place_score_wide`.
     """
+
+    tempo: Tempo | None = None
+    """An explicit metronome marking; ``text`` still retains the source wording."""
 
 
 @dataclass(frozen=True)
