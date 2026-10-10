@@ -103,6 +103,23 @@ def test_grace_notes_do_not_affect_divisions() -> None:
     assert root.findtext("./part/measure/attributes/divisions") == "1"
 
 
+@pytest.mark.parametrize(
+    ("slash", "attrs"), [(None, {}), (False, {"slash": "no"}), (True, {"slash": "yes"})]
+)
+def test_grace_slash_preserves_known_style_and_leaves_unknown_style_unspecified(
+    slash: bool | None, attrs: dict[str, str]
+) -> None:
+    root = _tree(_score(_note(duration=Fraction(0), is_grace=True, grace_slash=slash), _note()))
+    element = root.find(".//grace")
+    assert element is not None and element.attrib == attrs
+    note = root.find("./part/measure/note")
+    assert note is not None and note.find("duration") is None
+
+
+def test_grace_slash_is_ignored_on_an_ordinary_authored_event() -> None:
+    assert _tree(_score(_note(grace_slash=True))).find(".//grace") is None
+
+
 def test_chord_marks_only_the_notes_after_the_first() -> None:
     root = _tree(_score(_note(pitches=(Pitch("C", 4, 0), Pitch("E", 4, 1), Pitch("G", 4, 0)))))
     notes = root.findall("./part/measure/note")

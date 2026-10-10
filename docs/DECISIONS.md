@@ -692,3 +692,35 @@ for inspection links. Written and metric durations stay unchanged. Finale's Huma
 Playback stretching is not a fixed fermata duration and is not reconstructed from
 the MIDI. Additional shapes and automatic alternate-glyph placement require their
 own format evidence.
+
+## 2026-10-10 — DECIDED: preserve source grace slashes after resolving beaming
+
+**Context.** The local Scars of Time PDF has twenty slashed single graces, while
+the previous reader/IR/export wrote bare `<grace/>`. MuseScore imports those
+single eighths as long appoggiaturas. The user approved tracing and preserving
+Finale's global and individual slash settings with "proceed". Published PDK
+definitions and read-only inspection of released RGP Lua 0.79 establish the
+legacy option and flag locations; the evidence is in `docs/ARCHITECTURE.md`.
+
+**Decision.** Append optional `Event.grace_slash` to the existing canonical IR.
+Normalize the global setting to the same `graceNoteOptions` field for both
+containers, and preserve the individual extended flag. Resolve the displayed
+slash after grouping grace beams separately from ordinary beams: only flagged,
+unbeamed graces can be slashed, enabled globally or individually. Export a known
+style using MusicXML `slash="yes|no"`; leave unknown style unspecified.
+
+**Consequence.** Source-driven regeneration restores all twenty slashes and
+keeps the four beamed graces unslashed, without score-specific rules or altered
+metric durations. Authored synthetic regressions cover both legacy byte orders,
+XML input, global/individual settings, malformed layouts and beam separation.
+The original local score remains an investigation input, not a cleared fixture.
+
+## 2026-10-10 — OPEN: grace playback duration and Human Playback interchange
+
+The preference map also identifies the legacy grace playback duration; Scars
+stores 128 EDU. It is not propagated through the IR or exported in this change.
+The inspected MuseScore importer reads steal-time attributes for placement but
+does not retain their percentages for duration. Restoring the source slashes
+changes its grace classification but does not recreate Finale's measured
+77–80 ms performance automatically. A policy for optional performance timing,
+including player compatibility and Human Playback behavior, remains open.

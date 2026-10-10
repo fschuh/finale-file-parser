@@ -26,6 +26,7 @@ from finale_file_parser.enigma.document import EnigmaDocument, Record
 from finale_file_parser.enigma.expressions import SCORE_WIDE_STAFF, expressions_by_measure
 from finale_file_parser.enigma.fermatas import fermatas_by_entry
 from finale_file_parser.enigma.fingerings import fingerings_by_entry
+from finale_file_parser.enigma.graces import grace_slash, slash_flagged_grace_notes
 from finale_file_parser.enigma.groups import staff_groups, staff_order
 from finale_file_parser.enigma.jumps import jumps_by_measure
 from finale_file_parser.enigma.key import Mode, decode_key
@@ -120,6 +121,7 @@ def build_score(document: EnigmaDocument) -> Score:
     fingerings = fingerings_by_entry(document)
     ornaments = ornaments_by_entry(document)
     fermatas = fermatas_by_entry(document)
+    always_slash = slash_flagged_grace_notes(document)
 
     # One pass, in chain order, so a measure's notes come out in playing order
     # rather than document order.
@@ -155,6 +157,13 @@ def build_score(document: EnigmaDocument) -> Score:
 
     for cell in cells.values():
         _apply_beams(cell)
+        for layer, events in cell.events_by_layer.items():
+            cell.events_by_layer[layer] = [
+                replace(event, grace_slash=grace_slash(event, always_slash))
+                if event.is_grace
+                else event
+                for event in events
+            ]
 
     signatures = time_signatures(document)
     clef_table = clef_definitions(document)
@@ -362,6 +371,7 @@ def _apply_beams(cell: _Cell) -> None:
                 dots=event.dots,
                 is_rest=event.is_rest,
                 starts_group=starts,
+                is_grace=event.is_grace,
             )
             for event, starts in zip(events, flags, strict=True)
         ]
@@ -439,6 +449,9 @@ def _event(
         note_ties=tuple(NoteTies(note.tie_start, note.tie_end) for note in entry.notes),
         tuplet_ratio=ratio,
         is_grace="graceNote" in record.fields,
+        grace_slash=True
+        if "graceNote" in record.fields and "slashGrace" in record.fields
+        else None,
         # Verse order, so a multi-verse note emits its lyrics top to bottom.
         lyrics=tuple(
             Lyric(

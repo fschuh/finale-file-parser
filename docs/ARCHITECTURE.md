@@ -1010,6 +1010,79 @@ Empty content means the normal rounded shape in the
 Notes and rests retain their metric and written durations; a hold symbol does
 not specify a fixed playback stretch or an inferred tempo curve.
 
+### Known format facts — grace-note slashes
+
+Finale has a document-wide
+[Always Slash Flagged Grace Notes setting](https://usermanuals.finalemusic.com/Finale2010Mac/Content/Finale/IDD_GRACENOTEOPTIONS.htm)
+and an individual entry flag. The published
+[entry getter](https://pdk.finalelua.com/ff__noteframe_8h_source.html#l01845)
+names `XEF_SLASHGRACE`; the
+[preference getter](https://pdk.finalelua.com/ff__prefs_8h_source.html#l02846)
+names `graceAlwaysSlash`. Read-only inspection of Robert G. Patterson and
+Jari Williamsson's released [RGP Lua 0.79](https://robertgpatterson.com/-fininfo/-rgplua/rgplua.html)
+establishes their legacy locations:
+
+| Field | Stored location | Interpretation |
+| --- | --- | --- |
+| Individual `slashGrace` | entry slot +22, u16 extended flags, mask **0x0100** | Presence enables slashing eligible graces. |
+| `slashFlaggedGraceNotes` | ETF **`^44(65534)`**, incidence 0, word 4 (zero-based), payload **+8 u16**; zlib-era numeric tag **58** | Nonzero enables automatic slashing. |
+
+Both words use the document's byte order. `FCNoteEntry::GetGraceNoteSlash` reads
+bit 0 of the runtime extended word's high byte; the adjacent SmartShape getter
+reads mask 0x20 from its low byte. `FCMiscDocPrefs` stores `graceAlwaysSlash` at
+offset 34 in the **assembled PDK preference structure**. Its location map selects
+`^44`, word 4, size 2, with no conversion or minimum-version restriction. That
+structure offset is not a file offset. The numeric tag follows the existing
+`^95 -> 109` mapping: numeric ETF preference tags become tag +14 in the zlib pool.
+
+Reproduction: the inspected `RGPLuaFin26Mac.zip` has SHA-256
+`513a926c66a53e39d6a2c3ccce0d318bd6084116c634f790adaeb543abbb6fd1`;
+its `RGPLua.bundle/Contents/MacOS/RGPLua` executable has SHA-256
+`8060b4416da8671b527ec0eb681d7b95e1dbcbf5c0acbc60168e3fc634a8fc48`.
+In the x86_64 slice at file +0x4000, the slash getter is at VM 0x467efa and
+`__FCPrefsBase::MapPrefStruct` at 0x4f0a4e. The latter selects a 50-record,
+24-byte-stride miscellaneous-preferences map at VM 0x704a90 (file 0x708a90);
+record 17 maps structure offset 34 to `^44`, incidence 0, word 4. The binary
+was never executed and no binary or implementation code is vendored. See
+`docs/REFERENCES.md` for attribution and the released binary's CC BY 4.0 license.
+
+The adapters translate the evidenced **12-byte option incidence** into
+`graceNoteOptions`: presence of `slashFlaggedGraceNotes` means true, an empty
+record means confirmed false, and an absent or unsupported payload leaves the
+setting unknown. Linked-part preferences do not override score preferences.
+The entry reader surfaces `slashGrace` independently of ordinary entry flags.
+EnigmaXML already uses the same names, corroborated by
+[musxdom's options](https://github.com/openmusx/musxdom/blob/faf0a0156f4073142fe96022f9644a05fb774581/src/musx/dom/Options.h)
+and [entry semantics](https://github.com/openmusx/musxdom/blob/faf0a0156f4073142fe96022f9644a05fb774581/src/musx/dom/Entries.cpp#L1279).
+
+`enigma/beams.py` groups consecutive grace entries separately from ordinary
+entries; ordinary beams can span intervening graces. `enigma/graces.py` resolves
+the source style after beaming: a non-rest grace with an eighth-or-shorter base
+value and no beam is slashed when either setting enables it. Beamed and unflagged
+graces remain unslashed. Manual expression-based slashes and hidden-entry beam
+exceptions are not decoded here. `Event.grace_slash` appends an optional boolean
+to the canonical IR: true/false exports `<grace slash="yes|no"/>`, and unknown
+retains a bare `<grace/>`. Written and metric durations are unchanged.
+
+Local evidence: Scars of Time tag 58 has payload
+`000000000000070001000200`, so automatic slashing is enabled. None of its 24
+graces has the individual flag. Source-derived output nevertheless restores
+the PDF's twenty slashed singles (nineteen upper-staff from m28 onward, one
+lower-staff at m19) and preserves four unslashed beamed graces in m7/m8.
+Authored regressions cover both byte orders, all three legacy layouts, XML input,
+individual/global precedence, missing settings, malformed layouts and beam separation.
+No licensed-corpus sweep has run for this change; that corpus is absent locally.
+
+The same PDK map places `gracePlaybackDur` (assembled offset 32) in `^27`, word 4,
+zlib tag 41 payload +8. Scars stores **128 EDU**, but this playback preference is
+not yet propagated or exported. The inspected
+[MuseScore importer](https://github.com/musescore/MuseScore/blob/78f0c2195f2505a1374eda52f13644d2a35838d2/src/importexport/musicxml/internal/import/importmusicxmlpass2.cpp#L6578)
+maps an unslashed eighth to an appoggiatura and `slash="yes"` to an acciaccatura;
+its steal-time attributes do not retain the percentages as playback duration.
+Restoring source notation therefore does not promise Finale's exact Human
+Playback timing. The user confirmed the regenerated MusicXML works in MuseScore
+on 2026-10-10; import/audio has not been run in this environment.
+
 ### Known format facts — upper mordents
 
 `enigma/ornaments.py` follows the same `articAssign -> articDef -> charMain` join.

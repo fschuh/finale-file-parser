@@ -45,6 +45,7 @@ __all__ = [
     "OPTIONS_CMPER",
     "TAG_ARTIC_DEF",
     "TAG_CLEF_OPTIONS",
+    "TAG_GRACE_SLASH_OPTIONS",
     "TAG_INST_USED",
     "TAG_FRAME_SPEC",
     "TAG_MEAS_EXPR_ASSIGN",
@@ -186,6 +187,14 @@ TAG_CLEF_OPTIONS = 109
 An `others` record rather than a pool of its own: Enigma's document-wide options
 live in this pool under the `OPTIONS_CMPER` sentinel, and `EnigmaDocument` keeps
 them in `options` only because EnigmaXML puts them in a separate element.
+"""
+
+TAG_GRACE_SLASH_OPTIONS = 58
+"""Preference ^44, whose fifth u16 is Always Slash Flagged Grace Notes.
+
+The numeric tag is 44 + 14, as for the existing ^95 / tag 109 clef table.
+RGP Lua 0.79's preference-location map independently identifies ^44, incidence
+0, word 4. See docs/ARCHITECTURE.md for the evidence and scope.
 """
 
 OPTIONS_CMPER = 0xFFFE

@@ -133,6 +133,11 @@ limit is verified by mutation, because no real corpus archive trips one.
 - [x] **Explicit metronome rates** — assigned printed beat/rate markings become
       structured IR tempo, MusicXML metronome notation and quarter-note playback
       tempo. Untyped playback values and expressive timing remain uninterpreted.
+- [x] **Grace-note slashes** — document and individual settings resolve through
+      the IR and MusicXML after separating grace beams from ordinary beams.
+      Published PDK/RGP Lua evidence establishes the legacy fields; authored
+      regressions cover both byte orders. Unknown styles remain unspecified;
+      exact performance timing and licensed-corpus validation remain outstanding.
 - [x] **2011-era `.mus` title, composer and copyright** — tagged text kinds 1, 2 and 3 become the
       same `fileInfo` records used by `.musx`, then reach `Score` through the existing path. The DCL
       cohort carries no `fileInfo` sections and remains metadata-empty.

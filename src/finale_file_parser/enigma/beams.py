@@ -8,6 +8,10 @@ beamable entries belong to the group opened by the last entry carrying the bit.
 Confirmed against the corpus: a measure of eight eighth notes carries the bit on
 the first and the fifth, which is exactly two groups of four.
 
+Grace groups contain only consecutive graces and end at the next ordinary
+entry. Ordinary groups can span intervening graces. Keeping the two separate
+also determines which graces have a flag to slash; see docs/ARCHITECTURE.md.
+
 MusicXML asks for more than the grouping. Each note carries one `<beam>` per
 beam level -- an eighth has one, a sixteenth two, a thirty-second three -- and
 each says whether that level begins, continues or ends there. Where a level
@@ -45,6 +49,9 @@ class BeamedNote:
     starts_group: bool
     """Enigma's `beam` bit: this entry opens a new group."""
 
+    is_grace: bool = False
+    """Grace beams join consecutive graces, separately from ordinary beams."""
+
 
 def beams_for(notes: Sequence[BeamedNote]) -> list[tuple[Beam, ...]]:
     """Beams for each note of one (staff, measure, layer), in playing order.
@@ -68,7 +75,20 @@ def _groups(notes: Sequence[BeamedNote]) -> list[list[int]]:
     """Indices of the notes in each beam group, in order."""
     groups: list[list[int]] = []
     current: list[int] = []
+    graces: list[int] = []
     for index, note in enumerate(notes):
+        if note.is_grace:
+            if not _beamable(note):
+                graces = []
+                continue
+            if note.starts_group or not graces:
+                graces = []
+                groups.append(graces)
+            graces.append(index)
+            continue
+        # An ordinary beam can span intervening graces, but the grace run ends
+        # at the next ordinary entry. Neither group includes the other's notes.
+        graces = []
         if not _beamable(note):
             current = []
             continue

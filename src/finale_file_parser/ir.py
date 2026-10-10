@@ -209,6 +209,14 @@ class Event:
     fermatas: tuple[Fermata, ...] = ()
     """Hold symbols attached to this note, chord or rest in source order."""
 
+    grace_slash: bool | None = None
+    """The resolved grace-note slash: True slashed, False unslashed, None unknown.
+
+    Describes notation, independently of playback duration. Ignored for ordinary
+    events; None retains the exporter's bare grace element for authored scores
+    or a source whose slash settings could not be read.
+    """
+
     @property
     def is_rest(self) -> bool:
         return not self.pitches

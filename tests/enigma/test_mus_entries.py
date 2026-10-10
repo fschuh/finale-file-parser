@@ -32,7 +32,9 @@ def _slot(entnum: int, index: int, payload: bytes) -> bytes:
     return entnum.to_bytes(4, "little") + index.to_bytes(2, "little") + payload
 
 
-def _entry_slot(entnum: int, *, dura: int, flag: int, notes: list[tuple[int, int]]) -> bytes:
+def _entry_slot(
+    entnum: int, *, dura: int, flag: int, notes: list[tuple[int, int]], extended: int = 0
+) -> bytes:
     """First slot of an entry, carrying up to two notes."""
     body = (
         (0).to_bytes(4, "little")  # prev
@@ -40,7 +42,7 @@ def _entry_slot(entnum: int, *, dura: int, flag: int, notes: list[tuple[int, int
         + dura.to_bytes(2, "little")
         + (0).to_bytes(2, "little")  # pos
         + flag.to_bytes(4, "little")
-        + (0).to_bytes(2, "little")  # extended flag
+        + extended.to_bytes(2, "little")
         + len(notes).to_bytes(2, "little")
     )
     for tcd, note_flag in notes[:2]:
@@ -264,7 +266,9 @@ def test_the_dcl_fixture_builder_stores_what_it_claims() -> None:
     assert blast.blast_decompress(_dcl_literal_stream(raw), 0, 1 << 20) == raw
 
 
-def _be_entry_slot(entnum: int, *, dura: int, flag: int, notes: list[tuple[int, int]]) -> bytes:
+def _be_entry_slot(
+    entnum: int, *, dura: int, flag: int, notes: list[tuple[int, int]], extended: int = 0
+) -> bytes:
     """The same slot as `_entry_slot`, written big-endian."""
     body = (
         (0).to_bytes(4, "big")
@@ -272,7 +276,7 @@ def _be_entry_slot(entnum: int, *, dura: int, flag: int, notes: list[tuple[int, 
         + dura.to_bytes(2, "big")
         + (0).to_bytes(2, "big")
         + flag.to_bytes(4, "big")
-        + (0).to_bytes(2, "big")
+        + extended.to_bytes(2, "big")
         + len(notes).to_bytes(2, "big")
     )
     for tcd, note_flag in notes[:2]:
@@ -299,6 +303,31 @@ def test_reads_a_big_endian_entry_pool(tmp_path: Path) -> None:
     assert entries[0].entnum == 1
     assert entries[0].duration.base is NoteValue.QUARTER
     assert entries[0].notes[0].harm_lev == 6
+
+
+@pytest.mark.parametrize("order", ["little", "big"])
+@pytest.mark.parametrize(
+    ("extended", "slashed"),
+    [(0x0080, False), (0x00A0, False), (0x0100, True), (0x0180, True), (0x0200, False)],
+)
+def test_the_individual_grace_slash_comes_from_the_extended_word(
+    tmp_path: Path, order: ByteOrder, extended: int, slashed: bool
+) -> None:
+    """Authored slots distinguish the slash from neighboring extended flags."""
+    slot = _entry_slot if order == "little" else _be_entry_slot
+    pool = slot(
+        1,
+        dura=512,
+        flag=SETBIT | NOTEBIT | 0x00800000,
+        notes=[(0x0000, SETBIT)],
+        extended=extended,
+    )
+    path = tmp_path / "grace.mus"
+    path.write_bytes(_dcl_file(pool, order))
+    record = read_mus_entry_records(path)[0]
+    assert "graceNote" in record.fields
+    assert ("slashGrace" in record.fields) is slashed
+    assert record.fields["dura"] == "512"
 
 
 def test_a_labelled_entry_pool_is_used_even_when_it_is_small(tmp_path: Path) -> None:

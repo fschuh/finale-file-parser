@@ -90,6 +90,12 @@ on 30,819 of 30,820 corpus entries."""
 _GRACENOTE = 0x00800000
 """eeppd.txt: set for grace notes. Surfaced as a `graceNote` field so the
 duration model gives them zero sounded time, as it does for a `.musx`."""
+_SLASHGRACE = 0x0100
+"""The extended entry flag for `slashGrace`, at slot +22 (not the entry flag).
+
+Confirmed by the published FCNoteEntry getter and read-only inspection of RGP
+Lua 0.79's corresponding getter. See docs/ARCHITECTURE.md, grace-note slashes.
+"""
 _TIE_START = 0x40000000
 _TIE_END = 0x20000000
 
@@ -303,6 +309,8 @@ def _entry_record(stream: bytes, offset: int, stored_count: int, order: ByteOrde
     if flag & _GRACENOTE:
         # Presence is the signal, as it is in EnigmaXML's `<graceNote/>`.
         fields["graceNote"] = ""
+    if _u16(stream, offset + 22, order) & _SLASHGRACE:
+        fields["slashGrace"] = ""
     notes = tuple(_note_record(stream, o, order) for o in _note_offsets(offset, note_count))
     if notes:
         fields["note"] = notes if len(notes) > 1 else notes[0]

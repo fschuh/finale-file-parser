@@ -51,9 +51,12 @@ entry here that supports them.
 **musxdom**
 
 - https://github.com/rpatters1/musxdom
+- Current repository: https://github.com/openmusx/musxdom
 - C++17 object model for the EnigmaXML (`.musx`) format.
 - https://rpatters1.github.io/musxdom/
 - MIT License
+- Grace option names and flagged/unbeamed slash semantics checked at commit
+  `faf0a0156f4073142fe96022f9644a05fb774581`, `src/musx/dom/Options.h` and `Entries.cpp`.
 
 **zlib `contrib/blast`** — Mark Adler
 
@@ -137,4 +140,18 @@ entry here that supports them.
 - https://finalelua.com/
 - https://pdk.finalelua.com/
 - https://github.com/finale-lua/lua-scripts
-- CC0-1.0 License
+- The `lua-scripts` repository is CC0-1.0; that license statement does not cover
+  the separate plugin binary or all PDK documentation.
+
+**RGP Lua 0.79** — Robert G. Patterson and Jari Williamsson
+
+- Author's release page: https://robertgpatterson.com/-fininfo/-rgplua/rgplua.html
+- Inspected download: https://robertgpatterson.com/-fininfo/-rgplua/-download/RGPLuaFin26Mac.zip
+- The release's binary runtime license is **CC BY 4.0**, copyright 2021–2024
+  Robert G. Patterson and Jari Williamsson. Read solely as research evidence;
+  no binary or implementation code is copied into this repository.
+- Published API documentation: https://pdk.finalelua.com/ff__prefs_8h_source.html
+  and https://pdk.finalelua.com/ff__noteframe_8h_source.html
+- The released preference-location map and individual entry getter establish
+  the legacy grace fields. Hashes and reproducible offsets, with their scope,
+  are recorded in `docs/ARCHITECTURE.md`.

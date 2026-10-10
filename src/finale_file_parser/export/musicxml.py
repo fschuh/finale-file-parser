@@ -455,7 +455,9 @@ def _append_note(
     # A grace note takes no metric time, and the schema requires duration > 0, so
     # it is expressed by omitting duration rather than by writing zero.
     if event.is_grace:
-        ET.SubElement(note, "grace")
+        grace = ET.SubElement(note, "grace")
+        if event.grace_slash is not None:
+            grace.set("slash", "yes" if event.grace_slash else "no")
     if chord:
         ET.SubElement(note, "chord")
     if pitch is None:

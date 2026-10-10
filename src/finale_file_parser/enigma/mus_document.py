@@ -24,6 +24,7 @@ Translated:
 | others | `measSpec` (176) | `keySig.key`, `beats`, `divbeat`, the +10 flags byte |
 | details | `gfhold` (1044) | `clefID`, `frame1`, `frame2` |
 | options | `clefOptions` (109) | the clef table: `adjust`, `clefChar`, `clefYDisp`, `shapeID` |
+| options | `graceNoteOptions` (58 / ETF `^44`) | `slashFlaggedGraceNotes` |
 | details | `tupletDef` (1072) | `symbolicNum`, `symbolicDur`, `refNum`, `refDur` |
 | others | `staffSpec` (231) | `transposition.keysig.adjust` only — see below |
 | others | `instUsed` (159) | `inst` per 24-byte slot — the staff layout order |
@@ -40,8 +41,9 @@ Translated:
 | others | `textExprDef` (241) | `textIDKey`, `value`, `descStr` |
 | others | `measExprAssign` (177) | `textExprID`, `staffAssign`, offsets; per 24-byte slot |
 
-Every field above is confirmed against paired `.musx` files; see
-`docs/formats/mus-binary-notes.md` for the evidence behind each.
+Most fields above are confirmed against paired `.musx` files; see
+`docs/formats/mus-binary-notes.md`. Grace slashes are established by published
+PDK definitions and read-only inspection of RGP Lua; see `docs/ARCHITECTURE.md`.
 """
 
 from __future__ import annotations
@@ -76,6 +78,7 @@ from finale_file_parser.enigma.mus_others import (
     TAG_ARTIC_DEF,
     TAG_CLEF_OPTIONS,
     TAG_FRAME_SPEC,
+    TAG_GRACE_SLASH_OPTIONS,
     TAG_INST_USED,
     TAG_MEAS_EXPR_ASSIGN,
     TAG_MEAS_SPEC,
@@ -578,21 +581,27 @@ identity above: these are the 2011 era's own 18-byte entries."""
 
 
 def _rows_options(rows: MusRows) -> list[Record]:
-    """The document-wide options the 2001-2005 reader can translate: the clef
-    table, so far -- and, until this, nothing at all."""
+    """The clef table and flagged-grace slash setting, in the file's byte order."""
+    out: list[Record] = []
+    slash = rows.others.get(("44", OPTIONS_CMPER))
+    if slash is not None:
+        option = _grace_slash_options(slash.payload, rows.byte_order)
+        if option is not None:
+            out.append(option)
     record = rows.others.get((_ROWS_CLEF_OPTIONS, OPTIONS_CMPER))
     if record is None or not record.payload:
-        return []
+        return out
     if len(record.payload) % _ROWS_CLEF_STRIDE:
         # The stride is known; a payload that is not a whole number of entries
         # means this is not the table after all. Emit nothing rather than a
         # mis-strided one, which would produce plausible wrong clefs.
-        return []
+        return out
     definitions = tuple(
         _clef_def(record.payload[at : at + _ROWS_CLEF_STRIDE], _ROWS_CLEF_STRIDE, rows.byte_order)
         for at in range(0, len(record.payload), _ROWS_CLEF_STRIDE)
     )
-    return [Record(tag="clefOptions", attrs={}, text="", fields={"clefDef": definitions})]
+    out.append(Record(tag="clefOptions", attrs={}, text="", fields={"clefDef": definitions}))
+    return out
 
 
 def _rows_others(rows: MusRows, frames: dict[int, tuple[int, int, int | None]]) -> list[Record]:
@@ -724,10 +733,21 @@ def _banner_year(path: str | os.PathLike[str]) -> int | None:
 
 
 def _options_records(records: tuple[MusOther, ...], year: int | None) -> list[Record]:
-    """The document-wide options this can translate: the clef table, so far."""
+    """The clef table and flagged-grace slash setting for the zlib era."""
+    out: list[Record] = []
+    for record in records:
+        if (
+            record.tag == TAG_GRACE_SLASH_OPTIONS
+            and record.cmper == OPTIONS_CMPER
+            and not record.part
+        ):
+            option = _grace_slash_options(record.payload)
+            if option is not None:
+                out.append(option)
+                break
     stride = _CLEF_ENTRY_STRIDE.get(year or 0)
     if stride is None:
-        return []
+        return out
     for record in records:
         if record.tag != TAG_CLEF_OPTIONS or record.cmper != OPTIONS_CMPER:
             continue
@@ -740,8 +760,23 @@ def _options_records(records: tuple[MusOther, ...], year: int | None) -> list[Re
             _clef_def(record.payload[at : at + stride], stride)
             for at in range(0, len(record.payload), stride)
         )
-        return [Record(tag="clefOptions", attrs={}, text="", fields={"clefDef": definitions})]
-    return []
+        out.append(Record(tag="clefOptions", attrs={}, text="", fields={"clefDef": definitions}))
+        break
+    return out
+
+
+def _grace_slash_options(payload: bytes, order: ByteOrder = "little") -> Record | None:
+    """Preference ^44, incidence 0, word 4; only the evidenced 12-byte layout.
+
+    An empty options record represents a confirmed false flag, just as EnigmaXML
+    omits a false boolean. An absent or malformed record supplies no setting.
+    """
+    if len(payload) != 12:
+        return None
+    fields: dict[str, str | tuple[str, ...] | Record | tuple[Record, ...]] = {}
+    if int.from_bytes(payload[8:10], order):
+        fields["slashFlaggedGraceNotes"] = ""
+    return Record(tag="graceNoteOptions", attrs={}, text="", fields=fields)
 
 
 def _clef_def(entry: bytes, stride: int, order: ByteOrder = "little") -> Record:
