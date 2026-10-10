@@ -641,11 +641,13 @@ Where the join does not resolve — a 2001-2005 file, whose tree is built from E
 reference renders as plain text rather than pointing at a record that merely looks right.
 
 One trap is worth stating outright, because two of the three tags would join wrongly without it:
-`inci` does not mean the same thing on both sides. `articAssign` carries the raw record's incidence
-verbatim; `tupletDef` carries no `inci` at all; and `lyrDataVerse`'s is a synthetic per-entry
-counter assigned while one raw record is expanded into several verse records, so it must never be
-matched against a raw incidence. The join therefore matches on the full triple only where one
-genuinely exists, and otherwise falls back to the first record of that tag on that entry.
+`inci` does not mean the same thing on both sides. Unpacking `articAssign` can create several
+identities from one raw row: the adapter keeps their incidences unique and retains the raw
+incidence as its own `sourceInci` metadata attribute. The report uses `sourceInci` for the join,
+falling back to `inci` for older documents without that metadata. `tupletDef` carries no `inci`
+at all; and `lyrDataVerse`'s is a synthetic per-entry counter assigned while one raw record is
+expanded into several verse records. The join matches on the full triple where a raw incidence
+exists, and otherwise falls back to the first record of that tag on that entry.
 
 ### The pattern that reads a `.mus`'s pools in a hex editor
 
@@ -948,7 +950,8 @@ is what makes reading them without resolving the font defensible.
 
 **Other characters produce no articulation.** The corpus assigns 29 distinct characters; emitting a guess would
 put a wrong articulation on a real note, which is worse than leaving the note bare. Coverage is
-22,821 marks across 273 documents. Separate resolvers handle evidenced fingerings and ornaments.
+22,821 marks across 273 documents. Separate resolvers handle evidenced fingerings, ornaments
+and fermatas.
 
 Fingerings use numerals 1–5 rather than articulation names; their resolver and evidence are
 described above. A `.mus` does not reliably give the font (`fontMain`'s offset varies within
@@ -960,6 +963,52 @@ the same era split as the clef table. A `.mus` sometimes **repeats** an assignme
 entries; no `.musx` ever assigns the same `articDef` twice in 11,404 assignments, so the repeat is a
 storage artifact its reader drops. Both containers then agree on all 27,155 events of the 72 paired
 documents that carry articulations.
+
+**Packed articulation assignments (fixed 2026-10-08).**
+The local Scars of Time `.mus` contains 225 tag-1009 payloads of 20 bytes and six
+of 40 bytes. The longer payloads hold two consecutive 20-byte assignment groups,
+each beginning with the existing `articDef` u16 reference. On entry 114 (lower
+staff, measure 5, beat 3), payload +0 is definition 5 (`charMain=103`, arpeggio)
+and +20 is definition 14 (`charMain=85`, uppercase U). Finale's
+[Maestro chart](https://usermanuals.finalemusic.com/FinaleWin/Content/Finale/font-maestro.htm)
+identifies U as an above-note fermata, matching the original PDF on that chord.
+All six trailing groups resolve to existing definitions: 14, 2, 1, 7, 1 and 7.
+The former `_details_records` read only +0, discarding those trailing marks.
+`_artic_records` now splits all complete 20-byte groups, preserving their order
+and the existing per-entry/definition deduplication. Empty payloads or partial
+groups raise `CorruptScoreError` instead of silently dropping a marking.
+Each emitted incidence is at least the raw incidence and the next available
+incidence on that entry, avoiding collisions with following raw records;
+`sourceInci` retains the raw row for report links. This is adapter metadata,
+not a newly decoded file field.
+
+No other fields in these groups have been newly interpreted. The local export
+recovers the fermata and two supported accents; the remaining pedal assignments
+reach the normalized document but still need a pedal resolver/exporter. Authored
+synthetic tests cover multiple groups, repeated definitions, identity collisions,
+partial groups and the full reader-to-export path. The licensed corpus is absent
+in this checkout, so a new sweep over its era variants remains outstanding.
+
+### Known format facts — fermatas
+
+`enigma/fermatas.py` uses the existing `articAssign -> articDef -> charMain` join.
+Only assigned score records place symbols; unused definitions and linked-part
+variants do not. Glyph **85**, uppercase `U`, is a normal upright fermata;
+glyph **117**, lowercase `u`, is its inverted counterpart. The positions agree
+in Finale's official [Maestro](https://usermanuals.finalemusic.com/FinaleWin/Content/Finale/font-maestro.htm),
+[Engraver](https://usermanuals.finalemusic.com/FinaleWin/Content/Finale/font-engraver.htm), and
+[Broadway Copyist](https://usermanuals.finalemusic.com/FinaleWin/Content/Finale/font-broadway-copyist.htm)
+charts. The packed assignment on Scars entry 114 and the PDF's above-note symbol
+independently confirm the upright mapping. Unknown shapes, font-specific glyphs
+and automatic alternate-glyph placement are not inferred.
+
+`Event.fermatas` carries immutable `Fermata(inverted=False|True)` objects through
+the canonical IR. MusicXML emits an empty `<fermata type="upright|inverted"/>`
+directly inside the note's `<notations>`, once on a chord's principal note.
+Empty content means the normal rounded shape in the
+[MusicXML reference](https://www.w3.org/2021/06/musicxml40/musicxml-reference/elements/fermata/).
+Notes and rests retain their metric and written durations; a hold symbol does
+not specify a fixed playback stretch or an inferred tempo curve.
 
 ### Known format facts — upper mordents
 

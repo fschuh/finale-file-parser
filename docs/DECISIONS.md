@@ -673,3 +673,22 @@ an untyped expression `value` or an undecoded legacy `playType`. Export explicit
 metronome notation and a correctly scaled quarter-note playback rate, leaving
 expressive performance timing to the consuming application. Existing callers
 using event-wide ties or plain expression text retain their behavior.
+
+## 2026-10-08 — DECIDED: fermatas are event notation with no inferred hold duration
+
+**Context.** The user requested fermata export after the local investigation
+confirmed an assigned above-note fermata in a trailing 20-byte `.mus` articulation
+group. Its absence involved both losing that group and having no IR/export support.
+
+**Decision.** Extend the canonical IR with an immutable `Fermata` carrying the
+normal symbol's orientation, and append `Event.fermatas` without changing existing
+positional fields. Resolve the two legacy glyphs documented consistently across
+Maestro, Engraver and Broadway Copyist, using only assigned score definitions.
+Export the symbol once per event in MusicXML note notations, including rests.
+
+**Consequence.** The same resolver serves normalized `.mus` and `.musx` documents.
+Packed `.mus` assignments receive unique identities and retain source-row metadata
+for inspection links. Written and metric durations stay unchanged. Finale's Human
+Playback stretching is not a fixed fermata duration and is not reconstructed from
+the MIDI. Additional shapes and automatic alternate-glyph placement require their
+own format evidence.

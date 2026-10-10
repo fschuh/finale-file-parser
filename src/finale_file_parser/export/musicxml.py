@@ -505,12 +505,15 @@ def _append_note(
     marks = () if chord else event.articulations
     digits = () if chord else event.fingerings
     ornaments = () if chord else event.ornaments
-    if ties.start or ties.stop or marks or digits or ornaments:
+    fermatas = () if chord else event.fermatas
+    if ties.start or ties.stop or marks or digits or ornaments or fermatas:
         notations = ET.SubElement(note, "notations")
         if ties.stop:
             ET.SubElement(notations, "tied", type="stop")
         if ties.start:
             ET.SubElement(notations, "tied", type="start")
+        for fermata in fermatas:
+            ET.SubElement(notations, "fermata", type="inverted" if fermata.inverted else "upright")
         if marks:
             articulations = ET.SubElement(notations, "articulations")
             for name in marks:

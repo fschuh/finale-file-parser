@@ -805,6 +805,21 @@ def test_a_mus_reference_points_at_the_numeric_row_the_tree_rendered() -> None:
     assert references[0]["tree_key"] == "(cmper1 0, cmper2 501, inci 0)"
 
 
+def test_unpacked_articulations_link_to_their_source_incidence() -> None:
+    """Synthetic identities must not send a packed mark to the following raw row."""
+    references = _retargeted(
+        (_raw(TAG_ARTIC_ASSIGN, 501, 3), _raw(TAG_ARTIC_ASSIGN, 501, 4)),
+        _named("articAssign", entnum="501", inci="3", sourceInci="3"),
+        _named("articAssign", entnum="501", inci="4", sourceInci="3"),
+        _named("articAssign", entnum="501", inci="5", sourceInci="4"),
+    )
+    assert [reference["tree_key"] for reference in references] == [
+        "(cmper1 0, cmper2 501, inci 3)",
+        "(cmper1 0, cmper2 501, inci 3)",
+        "(cmper1 0, cmper2 501, inci 4)",
+    ]
+
+
 def test_a_tuplet_reference_carries_no_inci_and_still_finds_its_row() -> None:
     """`tupletDef` is emitted with no `inci` attribute at all, so it can only
     ever match on the entry."""

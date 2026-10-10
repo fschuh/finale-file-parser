@@ -14,6 +14,7 @@ from finale_file_parser.ir import (
     Ending,
     Event,
     Expression,
+    Fermata,
     Lyric,
     Measure,
     NoteTies,
@@ -413,6 +414,51 @@ def test_a_chord_carries_its_articulation_once() -> None:
         )
     )
     assert to_musicxml(score).decode().count("<staccato />") == 1
+
+
+def test_a_fermata_shares_notations_with_ties_and_other_chord_attachments() -> None:
+    root = _tree(
+        _score(
+            _note(
+                pitches=(Pitch("C", 4, 0), Pitch("E", 4, 0)),
+                note_ties=(NoteTies(start=True), NoteTies()),
+                fermatas=(Fermata(),),
+                articulations=("accent",),
+                ornaments=(Ornament("upper-mordent"),),
+                fingerings=("1", "3"),
+                lyrics=(Lyric(1, "ah"),),
+            )
+        )
+    )
+    notes = root.findall(".//note")
+    assert len(notes[0].findall("notations")) == 1
+    notations = notes[0].find("notations")
+    assert notations is not None
+    assert [child.tag for child in notations] == [
+        "tied",
+        "fermata",
+        "articulations",
+        "ornaments",
+        "technical",
+    ]
+    assert len(root.findall(".//fermata")) == 1
+    fermata = notations.find("fermata")
+    assert fermata is not None
+    assert fermata.get("type") == "upright"
+    assert notes[1].find("notations") is None
+    assert [child.tag for child in notes[0]][-2:] == ["notations", "lyric"]
+
+
+def test_a_measure_rest_can_carry_an_inverted_fermata() -> None:
+    root = _tree(
+        _score(_note(pitches=(), is_measure_rest=True, fermatas=(Fermata(inverted=True),)))
+    )
+    note = root.find(".//note")
+    assert note is not None
+    assert note.find("rest[@measure='yes']") is not None
+    assert note.find("notations/fermata[@type='inverted']") is not None
+    assert note.findtext("duration") == "1"
+    assert note.find("type") is None
 
 
 def test_beams_are_emitted_with_their_level() -> None:

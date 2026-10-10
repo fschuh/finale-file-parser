@@ -24,6 +24,7 @@ __all__ = [
     "Ending",
     "Event",
     "Expression",
+    "Fermata",
     "Lyric",
     "Measure",
     "NoteTies",
@@ -69,6 +70,14 @@ class Ornament:
 
     auxiliary_semitones: int | None = None
     """Distance to the auxiliary note when established by the key. None when unknown."""
+
+
+@dataclass(frozen=True)
+class Fermata:
+    """A normal rounded hold symbol, without an inferred playback duration."""
+
+    inverted: bool = False
+    """False for the upright, above-note symbol; True for the below-note symbol."""
 
 
 @dataclass(frozen=True)
@@ -196,6 +205,9 @@ class Event:
     """
 
     ornaments: tuple[Ornament, ...] = ()
+
+    fermatas: tuple[Fermata, ...] = ()
+    """Hold symbols attached to this note, chord or rest in source order."""
 
     @property
     def is_rest(self) -> bool:

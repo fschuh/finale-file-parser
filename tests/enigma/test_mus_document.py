@@ -14,6 +14,7 @@ from fractions import Fraction
 from pathlib import Path
 
 import pytest
+from defusedxml import ElementTree as DET
 
 from finale_file_parser.enigma import mus_details
 from finale_file_parser.enigma import mus_document as adapter
@@ -21,6 +22,7 @@ from finale_file_parser.enigma.articulations import articulations_by_entry
 from finale_file_parser.enigma.clef import ClefSign, clef_definitions
 from finale_file_parser.enigma.document import Record
 from finale_file_parser.enigma.groups import staff_order
+from finale_file_parser.enigma.models import CorruptScoreError
 from finale_file_parser.enigma.mus_details import (
     TAG_ARTIC_ASSIGN,
     TAG_LYRIC_VERSE,
@@ -38,6 +40,8 @@ from finale_file_parser.enigma.mus_others import (
 from finale_file_parser.enigma.pitch import read_transposition
 from finale_file_parser.enigma.to_ir import build_score
 from finale_file_parser.enigma.tuplet import tuplets_by_entry
+from finale_file_parser.export.musicxml import to_musicxml
+from finale_file_parser.ir import Fermata
 
 PATH = "unused.mus"
 """Every reader is stubbed, so no file is ever opened."""
@@ -462,6 +466,82 @@ def test_two_different_articulations_on_one_entry_both_survive(
         ),
     )
     assert articulations_by_entry(read_mus_document(PATH)) == {9: ("staccato", "accent")}
+
+
+def artic_assign_payload(*definitions: int) -> bytes:
+    """Authored 20-byte assignment groups, with uninterpreted bytes left empty."""
+    return b"".join(definition.to_bytes(2, "little") + bytes(18) for definition in definitions)
+
+
+def test_a_packed_assignment_preserves_the_second_definition(
+    pools: Callable[..., None],
+) -> None:
+    pools(details=(MusDetailRecord(TAG_ARTIC_ASSIGN, 0, 9, 0, artic_assign_payload(1, 2)),))
+    assignments = read_mus_document(PATH).details.of_tag("articAssign")
+    assert [record.fields["articDef"] for record in assignments] == ["1", "2"]
+
+
+def test_a_fermata_in_a_packed_mus_assignment_reaches_musicxml(
+    pools: Callable[..., None],
+) -> None:
+    """An authored C/E chord exercises the binary adapter -> IR -> XML path."""
+    notes = tuple(
+        Record(tag="note", attrs={}, text="", fields={"harmLev": str(level), "harmAlt": "0"})
+        for level in (0, 2)
+    )
+    entry = Record(
+        tag="entry",
+        attrs={"entnum": "9", "prev": "0", "next": "0"},
+        text="",
+        fields={"dura": "1024", "numNotes": "2", "note": notes},
+    )
+    pools(
+        others=(
+            MusOther(FRAME_SPEC, 3, 0, entry_pair(9, 9)),
+            MusOther(MEAS_SPEC, 1, 0, meas_spec_payload(305, 0, 1, 1024)),
+            MusOther(TAG_ARTIC_DEF, 1, 0, artic_def_payload(103)),
+            MusOther(TAG_ARTIC_DEF, 2, 0, artic_def_payload(85, length=60)),
+        ),
+        details=(
+            MusDetailRecord(GFHOLD, 1, 1, 0, gfhold_payload(0, 3)),
+            MusDetailRecord(TAG_ARTIC_ASSIGN, 0, 9, 0, artic_assign_payload(1, 2)),
+        ),
+        entries=(entry,),
+    )
+    score = build_score(read_mus_document(PATH))
+    event = score.parts[0].measures[0].voices[0].events[0]
+    assert event.fermatas == (Fermata(),)
+    root = DET.fromstring(to_musicxml(score))
+    assert len(root.findall(".//fermata[@type='upright']")) == 1
+    assert [note.findtext("pitch/step") for note in root.findall(".//note")] == ["C", "E"]
+
+
+def test_packed_and_separate_assignments_keep_unique_identities_and_source_rows(
+    pools: Callable[..., None],
+) -> None:
+    """A following raw incidence can equal a packed group's synthetic incidence."""
+    pools(
+        details=(
+            MusDetailRecord(TAG_ARTIC_ASSIGN, 0, 9, 4, artic_assign_payload(1, 2, 1)),
+            MusDetailRecord(TAG_ARTIC_ASSIGN, 0, 9, 5, artic_assign_payload(2, 3)),
+        )
+    )
+    document = read_mus_document(PATH)
+    assignments = document.details.of_tag("articAssign")
+    assert [record.fields["articDef"] for record in assignments] == ["1", "2", "3"]
+    assert [record.attrs["inci"] for record in assignments] == ["4", "5", "6"]
+    assert [record.attrs["sourceInci"] for record in assignments] == ["4", "4", "5"]
+    for incidence, assignment in zip((4, 5, 6), assignments, strict=True):
+        assert document.details.for_entry("articAssign", 9, incidence) is assignment
+
+
+@pytest.mark.parametrize("length", [0, 1, 2, 19, 21, 39, 41])
+def test_an_incomplete_articulation_assignment_group_is_rejected(
+    pools: Callable[..., None], length: int
+) -> None:
+    pools(details=(MusDetailRecord(TAG_ARTIC_ASSIGN, 0, 9, 0, bytes(length)),))
+    with pytest.raises(CorruptScoreError, match="articAssign.*20-byte"):
+        read_mus_document(PATH)
 
 
 def test_an_articulation_definition_of_unknown_length_is_skipped(

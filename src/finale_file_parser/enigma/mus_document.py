@@ -248,7 +248,10 @@ record -- 4,841 at 48 bytes, all 2011, and 311 at 60, all 2012.
 """
 
 _ARTIC_DEF_REFERENCE = 0
-"""Where an `articAssign` payload names its definition."""
+"""Where an `articAssign` group names its definition."""
+
+_ARTIC_GROUP = 20
+"""Bytes per assignment group; a payload can hold several (ARCHITECTURE.md)."""
 
 _LYRIC_GROUP = 20
 """Bytes per verse assignment inside a `lyrDataVerse` payload."""
@@ -1166,10 +1169,50 @@ def _lyric_records(
     return out
 
 
+def _artic_records(
+    record: MusDetailRecord,
+    incidences: dict[int, int],
+    emitted: set[tuple[int, int]],
+) -> list[Record]:
+    entnum = entry_key(record)
+    length = len(record.payload)
+    if not length or length % _ARTIC_GROUP:
+        raise CorruptScoreError(
+            f"articAssign on entry {entnum} has {length} bytes; expected complete 20-byte groups"
+        )
+    out: list[Record] = []
+    for at in range(0, length, _ARTIC_GROUP):
+        definition = _u16(record.payload, at + _ARTIC_DEF_REFERENCE)
+        # A `.mus` repeats assignments; emit each definition only once per
+        # entry, whether repeated in a packed group or a separate record.
+        identity = (entnum, definition)
+        if identity in emitted:
+            continue
+        emitted.add(identity)
+        # Splitting one raw row creates several identities. Keep them unique,
+        # and retain the source incidence so report links still find that row.
+        incidence = max(incidences.get(entnum, 0), record.inci)
+        out.append(
+            Record(
+                tag="articAssign",
+                attrs={
+                    "entnum": str(entnum),
+                    "inci": str(incidence),
+                    "sourceInci": str(record.inci),
+                },
+                text="",
+                fields={"articDef": str(definition)},
+            )
+        )
+        incidences[entnum] = incidence + 1
+    return out
+
+
 def _details_records(records: tuple[MusDetailRecord, ...]) -> list[Record]:
     out: list[Record] = []
     lyric_incidence: dict[int, int] = {}
     lyric_seen: set[tuple[int, int]] = set()
+    artic_incidence: dict[int, int] = {}
     artic_seen: set[tuple[int, int]] = set()
     for record in records:
         if record.tag == TAG_GFHOLD and len(record.payload) >= 10:
@@ -1181,24 +1224,8 @@ def _details_records(records: tuple[MusDetailRecord, ...]) -> list[Record]:
                     fields=_gfhold(record.payload),
                 )
             )
-        elif record.tag == TAG_ARTIC_ASSIGN and len(record.payload) >= 2:
-            entnum = entry_key(record)
-            definition = _u16(record.payload, _ARTIC_DEF_REFERENCE)
-            # A `.mus` repeats an assignment the way it repeats a lyric: 23
-            # corpus entries carry the same articDef twice. No `.musx` ever
-            # does (0 of 11,404), so a repeat is a storage artifact and
-            # emitting it would print the accent twice.
-            if (entnum, definition) in artic_seen:
-                continue
-            artic_seen.add((entnum, definition))
-            out.append(
-                Record(
-                    tag="articAssign",
-                    attrs={"entnum": str(entnum), "inci": str(record.inci)},
-                    text="",
-                    fields={"articDef": str(definition)},
-                )
-            )
+        elif record.tag == TAG_ARTIC_ASSIGN:
+            out.extend(_artic_records(record, artic_incidence, artic_seen))
         elif record.tag == TAG_LYRIC_VERSE:
             out.extend(_lyric_records(record, lyric_incidence, lyric_seen))
         elif record.tag == TAG_STAFF_GROUP and len(record.payload) >= _GROUP_BARLINE_BYTE + 1:

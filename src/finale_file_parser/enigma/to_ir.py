@@ -24,6 +24,7 @@ from finale_file_parser.enigma.clef import (
 )
 from finale_file_parser.enigma.document import EnigmaDocument, Record
 from finale_file_parser.enigma.expressions import SCORE_WIDE_STAFF, expressions_by_measure
+from finale_file_parser.enigma.fermatas import fermatas_by_entry
 from finale_file_parser.enigma.fingerings import fingerings_by_entry
 from finale_file_parser.enigma.groups import staff_groups, staff_order
 from finale_file_parser.enigma.jumps import jumps_by_measure
@@ -42,6 +43,7 @@ from finale_file_parser.enigma.tuplet import entry_chain, sounded_durations, tup
 from finale_file_parser.ir import (
     Event,
     Expression,
+    Fermata,
     Lyric,
     Measure,
     NoteTies,
@@ -117,6 +119,7 @@ def build_score(document: EnigmaDocument) -> Score:
     articulations = articulations_by_entry(document)
     fingerings = fingerings_by_entry(document)
     ornaments = ornaments_by_entry(document)
+    fermatas = fermatas_by_entry(document)
 
     # One pass, in chain order, so a measure's notes come out in playing order
     # rather than document order.
@@ -146,6 +149,7 @@ def build_score(document: EnigmaDocument) -> Score:
                     articulations=articulations.get(entnum, ()),
                     fingerings=fingerings.get(entnum, ()),
                     ornaments=ornaments.get(entnum, ()),
+                    fermatas=fermatas.get(entnum, ()),
                 )
             )
 
@@ -389,6 +393,7 @@ def _event(
     articulations: tuple[str, ...] = (),
     fingerings: tuple[str, ...] = (),
     ornaments: tuple[Ornament, ...] = (),
+    fermatas: tuple[Fermata, ...] = (),
 ) -> Event:
     entry = read_entry(record)
     key = decode_key(key_raw)
@@ -447,6 +452,7 @@ def _event(
         articulations=articulations,
         fingerings=fingerings,
         ornaments=ornaments,
+        fermatas=fermatas,
     )
 
 

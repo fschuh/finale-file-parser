@@ -5,13 +5,15 @@ No music from the local Scars of Time investigation is used as a fixture here.
 
 from __future__ import annotations
 
+from fractions import Fraction
+
 import pytest
 from defusedxml import ElementTree as DET
 
 from finale_file_parser.enigma.document import parse_enigma
 from finale_file_parser.enigma.to_ir import build_score
 from finale_file_parser.export.musicxml import to_musicxml
-from finale_file_parser.ir import NoteTies, Ornament, Score
+from finale_file_parser.ir import Fermata, NoteTies, Ornament, Score
 
 
 def _score(
@@ -133,3 +135,54 @@ def test_unsupported_or_unassigned_ornaments_do_not_reach_the_score(
     event = score.parts[0].measures[0].voices[0].events[0]
     assert event.ornaments == ()
     assert DET.fromstring(to_musicxml(score)).find(".//ornaments") is None
+
+
+_FERMATA_DEF = '<articDef cmper="1"><charMain>85</charMain><charAlt>117</charAlt></articDef>'
+_FERMATA_ASSIGN = '<articAssign entnum="1" inci="0"><articDef>1</articDef></articAssign>'
+
+
+@pytest.mark.parametrize(
+    ("character", "inverted", "xml_type"), [(85, False, "upright"), (117, True, "inverted")]
+)
+@pytest.mark.parametrize("levels", [(0,), (0, 2, 4), ()])
+def test_assigned_fermatas_reach_notes_chords_and_rests_without_changing_rhythm(
+    character: int, inverted: bool, xml_type: str, levels: tuple[int, ...]
+) -> None:
+    score = _score(
+        *(_note(level) for level in levels),
+        others=_FERMATA_DEF.replace("<charMain>85", f"<charMain>{character}"),
+        details=_FERMATA_ASSIGN,
+    )
+    event = score.parts[0].measures[0].voices[0].events[0]
+    assert event.fermatas == (Fermata(inverted=inverted),)
+    assert event.duration == event.written_duration == Fraction(1, 4)
+    root = DET.fromstring(to_musicxml(score))
+    notes = root.findall("./part/measure/note")
+    assert len(notes) == max(1, len(levels))
+    fermatas = root.findall(".//fermata")
+    assert len(fermatas) == 1
+    assert notes[0].find("notations/fermata") is fermatas[0]
+    assert fermatas[0].get("type") == xml_type
+    assert not fermatas[0].text  # Empty content is the normal rounded shape.
+    assert [note.findtext("duration") for note in notes] == ["1"] * len(notes)
+    assert root.find(".//sound") is None
+
+
+@pytest.mark.parametrize(
+    ("definition", "assignment"),
+    [
+        (_FERMATA_DEF, ""),
+        ("", _FERMATA_ASSIGN),
+        (_FERMATA_DEF.replace("<charMain>85", "<charMain>217"), _FERMATA_ASSIGN),
+        (_FERMATA_DEF.replace('cmper="1"', 'cmper="1" part="1"'), _FERMATA_ASSIGN),
+        (_FERMATA_DEF, _FERMATA_ASSIGN.replace('entnum="1"', 'entnum="1" part="1"')),
+        (_FERMATA_DEF, _FERMATA_ASSIGN.replace("<articDef>1", "<articDef>invalid")),
+    ],
+)
+def test_unsupported_or_unassigned_fermatas_do_not_reach_the_score(
+    definition: str, assignment: str
+) -> None:
+    score = _score(_note(0), others=definition, details=assignment)
+    event = score.parts[0].measures[0].voices[0].events[0]
+    assert event.fermatas == ()
+    assert DET.fromstring(to_musicxml(score)).find(".//fermata") is None
