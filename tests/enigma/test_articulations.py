@@ -71,7 +71,7 @@ def test_each_known_character_resolves(character: int, name: str) -> None:
 
 
 def test_an_unknown_character_produces_nothing() -> None:
-    """The corpus assigns 29 distinct characters and the table knows five. A
+    """Only independently evidenced characters are recognized. A
     guess would print the wrong mark on a real note, which is worse than a bare
     one."""
     doc = document(definitions={1: 217}, assignments=((7, 1),))
@@ -81,6 +81,17 @@ def test_an_unknown_character_produces_nothing() -> None:
 def test_an_entry_can_carry_several_marks() -> None:
     doc = document(definitions={1: 46, 2: 62}, assignments=((7, 1), (7, 2)))
     assert articulations_by_entry(doc) == {7: ("staccato", "accent")}
+
+
+@pytest.mark.parametrize("character", [249, 223])
+def test_combined_accent_staccato_retains_both_components(character: int) -> None:
+    doc = document(definitions={1: character}, assignments=((7, 1),))
+    assert articulations_by_entry(doc) == {7: ("accent", "staccato")}
+
+
+def test_a_combined_glyph_expands_in_assignment_order() -> None:
+    doc = document(definitions={1: 45, 2: 249, 3: 44}, assignments=((7, 1), (7, 2), (7, 3)))
+    assert articulations_by_entry(doc) == {7: ("tenuto", "accent", "staccato", "breath-mark")}
 
 
 def test_an_assignment_naming_a_missing_definition_is_dropped() -> None:

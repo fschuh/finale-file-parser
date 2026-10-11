@@ -948,6 +948,20 @@ sit at the same ASCII positions in every music font the corpus uses — Maestro,
 Broadway Copyist all write `.` staccato, `>` accent, `-` tenuto, `^` marcato, `,` breath mark — which
 is what makes reading them without resolving the font defensible.
 
+Two extended characters also have cross-font evidence: **249** (above-note form)
+and **223** (below-note form) both mean **accent with staccato**, in Finale's
+official [Maestro](https://usermanuals.finalemusic.com/FinaleWin/Content/Finale/font-maestro.htm),
+[Engraver](https://usermanuals.finalemusic.com/FinaleWin/Content/Finale/font-engraver.htm)
+and [Broadway Copyist](https://usermanuals.finalemusic.com/FinaleWin/Content/Finale/font-broadway-copyist.htm)
+charts (read 2026-10-11). Each expands to `("accent", "staccato")` in the existing
+`Event.articulations` tuple. The public single-character table stays unchanged;
+the resolver handles these composite glyphs separately and in assignment order.
+MusicXML's [articulations](https://www.w3.org/2021/06/musicxml40/musicxml-reference/elements/articulations/)
+container permits both children on one note. The exporter already emits each
+event's marks once on a chord's principal note, so no new IR type or exporter
+path is needed. This recovers semantic marks; manual placement and automatic
+alternate-glyph selection remain outside the resolver.
+
 **Other characters produce no articulation.** The corpus assigns 29 distinct characters; emitting a guess would
 put a wrong articulation on a real note, which is worse than leaving the note bare. Coverage is
 22,821 marks across 273 documents. Separate resolvers handle evidenced fingerings, ornaments
@@ -1016,6 +1030,31 @@ the separate `sfz`, without the two accents. Forty-seven pedal assignments
 also carry the bit; they remain outside the current notation resolvers.
 This does not change the meaning of visible accent glyph 62 or convert it to
 a dynamic. Authored tests exercise each resolver and hidden/visible duplicates.
+
+**Combined accent/staccato recovery (fixed 2026-10-11).** A fresh local audit
+finds **25 visible assignments** of Scars definition **8**, `charMain=249`,
+on lower-staff events in m20–35 and m55. At m28, entry **764** is at EDU0
+(beat 1), and **769** at EDU2048 (beat 3). The previous resolver recognized
+only single-component characters, dropping both the accent and staccato dot.
+Raw definition/assignment joins independently match the new IR and XML
+locations for all 25 events. The two hidden plain accents at m59, entries
+1005 and 1251, remain hidden; `sfz` remains an independent expression.
+
+The corrected MusicXML adds exactly **25 accents and 25 staccatos**. Removing
+only those new articulation groups reproduces the complete prior score tree
+and all metric note onsets, including all 928 pitches, 87 slurs, eight dynamics,
+two hairpins and their three recovered positioning attributes. Original input
+and unrelated `uv.lock` hashes are unchanged. Official MusicXML 4.0 schema
+validation passes; Verovio imports 25 `acc` and 171 `stacc` articulations and
+87 slurs across three visually inspected pages, including the m28 and m55
+accents. `make check` passes lint/format/strict typing and
+**1,785 tests** (seven skipped), including **13 new authored cases**. New cases
+cover both glyph forms, visibility/linked-part filtering, assignment order,
+both binary era layouts, packed duplicate assignments, unaffected following
+notes and emitting both components only once per chord. Nine cases failed
+against the previous resolver before the fix. No supplied score becomes a
+fixture. MuseScore runtime and the licensed corpus remain unavailable here;
+its inspected 4.7.5 importer recognizes both standard articulation names.
 
 ### Known format facts — arpeggios and their vertical extent
 

@@ -131,6 +131,15 @@ entry here that supports them.
 - Specification repository: https://github.com/w3c/smufl
 - W3C Music Notation Community Group.
 
+**Legacy Finale articulation character charts** — MakeMusic
+
+- Official [Maestro](https://usermanuals.finalemusic.com/FinaleWin/Content/Finale/font-maestro.htm),
+  [Engraver](https://usermanuals.finalemusic.com/FinaleWin/Content/Finale/font-engraver.htm)
+  and [Broadway Copyist](https://usermanuals.finalemusic.com/FinaleWin/Content/Finale/font-broadway-copyist.htm)
+  charts independently identify 249/223 as the two accent-with-staccato variants.
+- Read 2026-10-11 for the combined articulation mapping. No fonts or chart
+  images are copied into the repository; other combinations are not inferred.
+
 ## Tools
 
 **Finale PDK Framework / Finale Lua**

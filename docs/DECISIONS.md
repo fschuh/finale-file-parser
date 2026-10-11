@@ -10,6 +10,24 @@ and resolved ones **DECIDED**.
 
 ---
 
+## 2026-10-11 — DECIDED: expand combined accent/staccato glyphs into existing articulations
+
+**Context.** Scars' missing bass-clef accents are visible assignments of a
+single glyph containing both an accent and a staccato dot. Finale's three
+relevant font charts agree on characters 249 and 223 for the two variants.
+
+**Decision.** Resolve either glyph to `("accent", "staccato")` in the existing
+canonical event tuple, retaining source assignment order. Keep the public
+single-component mapping unchanged. The existing MusicXML exporter emits
+both elements once on a chord's principal note. Preserve visibility filtering
+and binary duplicate-assignment handling; infer neither velocity nor timing
+from the recovered marks.
+
+**Consequence.** All 25 local composite marks regain both components without
+changing notes or other notation. Shape glyphs and further combinations require
+separate evidence. Manual coordinates and alternate-glyph placement remain
+outside this semantic mapping. Evidence is in `docs/ARCHITECTURE.md`.
+
 ## 2026-10-11 — DECIDED: retain hairpin endpoint X adjustments independently of time
 
 **Context.** The user approved recovering the m51 hairpin's source inset.

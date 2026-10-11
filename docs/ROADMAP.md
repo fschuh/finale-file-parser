@@ -172,8 +172,11 @@ limit is verified by mutation, because no real corpus archive trips one.
 - [x] **Lyrics** — `enigma/lyrics.py`, both containers, schema-validated. 12,912 syllables
       across 85 corpus documents.
 - [x] **Articulations** — `enigma/articulations.py`, both containers. 22,821 marks across 273
-      documents, from the five music-font characters with cross-font evidence; fingerings and the
-      evidenced ornaments/fermatas/arpeggios have separate resolvers; remaining characters are not guessed at.
+      documents in the original sample, from five single-component music-font
+      characters with cross-font evidence. Combined accent/staccato glyphs249/223
+      now expand to both standard marks, recovering25 local Scars assignments.
+      Fingerings and evidenced ornaments/fermatas/arpeggios have separate
+      resolvers; remaining characters are not guessed at.
 - [x] **Beams** — `enigma/beams.py`, both containers. 84,593 beams across 366 documents, with
       secondary beams and hooks; Enigma stores only a "starts a group" bit, so the rest is derived.
 - [x] **Repeats** — `enigma/repeats.py`, both containers. Forward and backward repeat barlines,

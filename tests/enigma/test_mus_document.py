@@ -474,6 +474,73 @@ def artic_assign_payload(*definitions: int) -> bytes:
     return b"".join(definition.to_bytes(2, "little") + bytes(18) for definition in definitions)
 
 
+@pytest.mark.parametrize("character", [249, 223])
+@pytest.mark.parametrize("length", [48, 60])
+def test_binary_combined_articulation_exports_both_marks_once_on_its_chord(
+    pools: Callable[..., None], character: int, length: int
+) -> None:
+    """Authored C/E then D quarters exercise the entire join in both era layouts."""
+    notes = tuple(
+        Record(tag="note", attrs={}, text="", fields={"harmLev": str(level), "harmAlt": "0"})
+        for level in (0, 2)
+    )
+    hidden_accent = bytearray(artic_assign_payload(2))
+    hidden_accent[10:12] = b"\x01\x00"
+    pools(
+        year=2011 if length == 48 else 2012,
+        others=(
+            MusOther(FRAME_SPEC, 3, 0, entry_pair(9, 10)),
+            MusOther(MEAS_SPEC, 1, 0, meas_spec_payload(305, 0, 2, 1024)),
+            MusOther(TAG_ARTIC_DEF, 1, 0, artic_def_payload(character, length=length)),
+            MusOther(TAG_ARTIC_DEF, 2, 0, artic_def_payload(62, length=length)),
+        ),
+        details=(
+            MusDetailRecord(GFHOLD, 1, 1, 0, gfhold_payload(0, 3)),
+            MusDetailRecord(
+                TAG_ARTIC_ASSIGN,
+                0,
+                9,
+                0,
+                artic_assign_payload(1) + bytes(hidden_accent) + artic_assign_payload(1),
+            ),
+        ),
+        entries=(
+            Record(
+                tag="entry",
+                attrs={"entnum": "9", "prev": "0", "next": "10"},
+                text="",
+                fields={"dura": "1024", "numNotes": "2", "note": notes},
+            ),
+            Record(
+                tag="entry",
+                attrs={"entnum": "10", "prev": "9", "next": "0"},
+                text="",
+                fields={
+                    "dura": "1024",
+                    "numNotes": "1",
+                    "note": Record(
+                        tag="note", attrs={}, text="", fields={"harmLev": "1", "harmAlt": "0"}
+                    ),
+                },
+            ),
+        ),
+    )
+    score = build_score(read_mus_document(PATH))
+    first, following = score.parts[0].measures[0].voices[0].events
+    assert first.articulations == ("accent", "staccato")
+    assert following.articulations == ()
+    assert (first.duration, following.duration) == (Fraction(1, 4), Fraction(1, 4))
+    root = DET.fromstring(to_musicxml(score))
+    exported = root.findall(".//note")
+    assert [n.findtext("pitch/step") for n in exported] == ["C", "E", "D"]
+    assert [n.findtext("duration") for n in exported] == ["1", "1", "1"]
+    assert exported[1].find("chord") is not None
+    marks = exported[0].find("notations/articulations")
+    assert marks is not None and [mark.tag for mark in marks] == ["accent", "staccato"]
+    assert len(root.findall(".//accent")) == len(root.findall(".//staccato")) == 1
+    assert all(n.find("notations/articulations") is None for n in exported[1:])
+
+
 def test_a_packed_assignment_preserves_the_second_definition(
     pools: Callable[..., None],
 ) -> None:

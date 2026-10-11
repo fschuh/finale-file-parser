@@ -12,15 +12,17 @@ music font the corpus uses -- Maestro, Engraver Font Set and Broadway Copyist
 each write staccato as `.`, accent as `>`, tenuto as `-` and marcato as `^` --
 which is what makes reading them without resolving the font defensible.
 
-**Anything not in that table produces nothing.** The corpus assigns 29 distinct
+The same fonts also use characters 249 and 223 for an accent combined with
+staccato. Each of those expands to both MusicXML articulation names; their
+above/below variants do not change the meaning. See ARCHITECTURE for the charts.
+
+**Anything outside the evidenced mappings produces nothing.** The corpus assigns 29 distinct
 characters, and the rest are either marks with no MusicXML equivalent or
 symbols this project has no evidence for. Emitting a guess would put a wrong
 articulation on a note, which is worse than leaving the note bare.
 
-Not handled, and deliberately: **fingerings**. The corpus carries numerals 1-5
-in a text font (Arial), which are fingerings rather than articulations -- but
-telling them apart from a music-font numeral needs the font, and a `.mus` does
-not reliably give one. Reading them would make the two containers disagree.
+Fingerings have a separate resolver; numeral glyphs do not become articulation
+names here.
 """
 
 from __future__ import annotations
@@ -51,15 +53,26 @@ from the corpus.
 because a comma is the breath mark in every music font here.
 """
 
+_COMBINED_ARTICULATIONS = {
+    249: ("accent", "staccato"),  # above-note form
+    223: ("accent", "staccato"),  # below-note form
+}
+"""Cross-font combined glyphs; see the chart evidence in ARCHITECTURE."""
+
+
+def _articulation_names(character: int) -> tuple[str, ...]:
+    name = ARTICULATION_CHARACTERS.get(character)
+    return (name,) if name is not None else _COMBINED_ARTICULATIONS.get(character, ())
+
 
 def articulations_by_entry(document: EnigmaDocument) -> dict[int, tuple[str, ...]]:
     """MusicXML articulation names, grouped by the entry they are attached to.
 
     An entry can carry several -- a staccato and an accent, say -- and order
-    follows the document. It never carries the *same* mark twice: no `.musx` in
-    the corpus does that in 11,404 assignments. A `.mus` repeats one 23 times,
-    which its reader drops as a storage artifact rather than this layer
-    collapsing marks it cannot distinguish from deliberate ones.
+    follows the document, expanding a combined glyph at its assignment. A
+    `.mus` repeats one assignment 23 times in the corpus, which its reader
+    drops as a storage artifact. This layer does not collapse distinct source
+    assignments.
     """
     characters = _definitions(document)
     out: dict[int, list[str]] = {}
@@ -70,10 +83,10 @@ def articulations_by_entry(document: EnigmaDocument) -> dict[int, tuple[str, ...
         definition = field_int(record.fields.get(_DEFINITION))
         if entnum is None or definition is None:
             continue
-        name = ARTICULATION_CHARACTERS.get(characters.get(definition, -1))
-        if name is None:
+        names = _articulation_names(characters.get(definition, -1))
+        if not names:
             continue
-        out.setdefault(entnum, []).append(name)
+        out.setdefault(entnum, []).extend(names)
     return {entnum: tuple(names) for entnum, names in out.items()}
 
 

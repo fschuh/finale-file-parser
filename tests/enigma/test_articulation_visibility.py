@@ -11,20 +11,22 @@ from finale_file_parser.export.musicxml import to_musicxml
 
 
 @pytest.mark.parametrize(
-    ("character", "symbol"),
+    ("character", "symbols"),
     [
-        (46, "staccato"),
-        (62, "accent"),
-        (49, "fingering"),
-        (85, "fermata"),
-        (117, "fermata"),
-        (109, "inverted-mordent"),
-        (103, "arpeggiate"),
+        (46, ("staccato",)),
+        (62, ("accent",)),
+        (249, ("accent", "staccato")),
+        (223, ("accent", "staccato")),
+        (49, ("fingering",)),
+        (85, ("fermata",)),
+        (117, ("fermata",)),
+        (109, ("inverted-mordent",)),
+        (103, ("arpeggiate",)),
     ],
 )
 @pytest.mark.parametrize("visibility", ["visible", "hidden", "linked-part"])
 def test_only_visible_score_assignments_print_their_symbols(
-    character: int, symbol: str, visibility: str
+    character: int, symbols: tuple[str, ...], visibility: str
 ) -> None:
     """Each symbol is assigned to one C quarter; no external score is a fixture."""
     attributes = ' part="1"' if visibility == "linked-part" else ""
@@ -49,6 +51,7 @@ def test_only_visible_score_assignments_print_their_symbols(
         </finale>""".encode()
     )
     root = DET.fromstring(to_musicxml(build_score(document)))
-    assert len(root.findall(f".//{symbol}")) == (1 if visibility == "visible" else 0)
+    for symbol in symbols:
+        assert len(root.findall(f".//{symbol}")) == (1 if visibility == "visible" else 0)
     (note,) = root.findall(".//note")
     assert (note.findtext("pitch/step"), note.findtext("duration")) == ("C", "1")
