@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import math
 import xml.etree.ElementTree as ET
-from dataclasses import replace
+from dataclasses import dataclass, replace
 from decimal import Decimal
 from fractions import Fraction
 
@@ -20,6 +20,7 @@ from finale_file_parser.ir import (
     Ending,
     Event,
     Expression,
+    Hairpin,
     Lyric,
     Measure,
     NoteTies,
@@ -62,6 +63,19 @@ _MAX_DIVISIONS = 1_000_000
 """Guard against a pathological duration forcing an absurd divisions value."""
 
 _ArpeggioNumbers = dict[tuple[str, int, int, int], tuple[str, ...]]
+
+_MAX_WEDGE_NUMBER = 16
+"""MusicXML's number-level bound, not a limit on the number of score hairpins."""
+
+
+@dataclass(frozen=True)
+class _Wedge:
+    offset: Fraction
+    kind: str
+    number: str
+
+
+_HairpinDirections = dict[tuple[str, int], tuple[_Wedge, ...]]
 
 
 class ExportError(FinaleFileError):
@@ -176,7 +190,7 @@ def _append_identification(root: ET.Element, score: Score) -> None:
 
 
 def _divisions_for(part: Part) -> int:
-    """Divisions per quarter note that make every duration in `part` an integer.
+    """Divisions per quarter making note durations and hairpin offsets exact.
 
     MusicXML durations are integers, so the denominators have to be cleared. A
     triplet eighth is 1/12 of a whole note, which needs divisions divisible by 3 --
@@ -191,6 +205,9 @@ def _divisions_for(part: Part) -> int:
                 # duration is a fraction of a whole note; a quarter is 1/4, so
                 # duration * 4 * divisions must be a whole number.
                 denominator = math.lcm(denominator, (event.duration * 4).denominator)
+    for hairpin in part.hairpins:
+        for offset in (hairpin.start_offset, hairpin.end_offset):
+            denominator = math.lcm(denominator, (offset * 4).denominator)
     if denominator > _MAX_DIVISIONS:
         raise ExportError(f"durations require {denominator} divisions per quarter; refusing")
     return denominator
@@ -228,9 +245,12 @@ def _append_part(
     *,
     divisions: int | None = None,
     arpeggio_numbers: _ArpeggioNumbers | None = None,
+    hairpin_directions: _HairpinDirections | None = None,
 ) -> None:
     element = ET.SubElement(root, "part", id=part.id)
     divisions = _divisions_for(part) if divisions is None else divisions
+    if hairpin_directions is None:
+        hairpin_directions = _hairpin_directions((part,))
     first = True
     for measure in part.measures:
         _append_measure(
@@ -240,6 +260,7 @@ def _append_part(
             emit_divisions=first,
             part_id=part.id,
             arpeggio_numbers=arpeggio_numbers,
+            wedges=hairpin_directions.get((part.id, measure.number), ()),
         )
         first = False
 
@@ -340,9 +361,16 @@ def _append_multistaff_part(
         raise ExportError(f"durations require {divisions} divisions per quarter; refusing")
     temporary = ET.Element("parts")
     arpeggio_numbers = _arpeggio_numbers(parts)
+    hairpin_directions = _hairpin_directions(parts)
     next_voice = 1
     for staff, part in enumerate(parts, start=1):
-        _append_part(temporary, part, divisions=divisions, arpeggio_numbers=arpeggio_numbers)
+        _append_part(
+            temporary,
+            part,
+            divisions=divisions,
+            arpeggio_numbers=arpeggio_numbers,
+            hairpin_directions=hairpin_directions,
+        )
         voices = sorted({voice.number for measure in part.measures for voice in measure.voices})
         voice_ids = {str(voice): str(next_voice + index) for index, voice in enumerate(voices)}
         next_voice += len(voices)
@@ -464,6 +492,110 @@ _DYNAMICS_PLACEMENT = "below"
 """Where dynamics are engraved, and where a reader expects them. Tempo and
 technique words go above; dynamics do not."""
 
+
+def _hairpin_measure_positions(part: Part) -> dict[int, tuple[int, Fraction]]:
+    """Existing measure indices and bounds, without expanding span-supplied ids."""
+    result: dict[int, tuple[int, Fraction]] = {}
+    signature_length = Fraction(1)
+    for index, measure in enumerate(part.measures):
+        if measure.number in result:
+            raise ExportError("hairpins require unique measure numbers within a part")
+        if measure.time is not None:
+            signature_length = Fraction(measure.time.beats, measure.time.beat_type)
+        written_length = max(
+            (
+                sum((event.duration for event in voice.events if not event.is_grace), Fraction(0))
+                for voice in measure.voices
+            ),
+            default=Fraction(0),
+        )
+        result[measure.number] = index, max(signature_length, written_length)
+    return result
+
+
+def _hairpin_endpoints(
+    span: Hairpin, positions: dict[int, tuple[int, Fraction]]
+) -> tuple[int, int]:
+    if span.kind not in {"crescendo", "diminuendo"}:
+        raise ExportError(f"unsupported hairpin kind {span.kind!r}")
+    indices = []
+    for measure, offset in (
+        (span.start_measure, span.start_offset),
+        (span.end_measure, span.end_offset),
+    ):
+        position = positions.get(measure)
+        if position is None:
+            raise ExportError(f"hairpin refers to missing measure {measure}")
+        index, length = position
+        if not 0 <= offset <= length:
+            raise ExportError(f"hairpin offset {offset} is outside measure {measure}")
+        indices.append(index)
+    start, end = indices
+    if (end, span.end_offset) <= (start, span.start_offset):
+        raise ExportError("hairpin end must follow its start")
+    return start, end
+
+
+def _hairpin_directions(parts: tuple[Part, ...]) -> _HairpinDirections:
+    """Pair spans with numbers in the order their endpoints enter the XML.
+
+    Staff projection writes each measure staff by staff. Musical-time-only
+    numbering can reuse a still-open number in that document order, so staff
+    index precedes offset here. The offsets themselves preserve musical time.
+    """
+    endpoints: list[tuple[int, int, Fraction, int, int, Hairpin]] = []
+    for staff, part in enumerate(parts):
+        if not part.hairpins:
+            continue
+        positions = _hairpin_measure_positions(part)
+        for index, span in enumerate(part.hairpins):
+            start, end = _hairpin_endpoints(span, positions)
+            endpoints.append((start, staff, span.start_offset, 1, index, span))
+            endpoints.append((end, staff, span.end_offset, 0, index, span))
+    active: dict[tuple[int, int], str] = {}
+    result: dict[tuple[str, int], list[_Wedge]] = {}
+    for _, staff, offset, starting, index, span in sorted(endpoints, key=lambda item: item[:5]):
+        key = staff, index
+        if starting:
+            number = next(
+                (
+                    str(value)
+                    for value in range(1, _MAX_WEDGE_NUMBER + 1)
+                    if str(value) not in active.values()
+                ),
+                None,
+            )
+            if number is None:
+                raise ExportError("more than 16 hairpins overlap in MusicXML document order")
+            active[key] = number
+        else:
+            number = active.pop(key)
+        measure = span.start_measure if starting else span.end_measure
+        result.setdefault((parts[staff].id, measure), []).append(
+            _Wedge(offset, span.kind if starting else "stop", number)
+        )
+    return {key: tuple(directions) for key, directions in result.items()}
+
+
+def _append_wedges(element: ET.Element, wedges: tuple[_Wedge, ...], divisions: int) -> None:
+    """Directions are emitted at cursor zero; offsets never advance the notes."""
+    # Leave the optional spread to the reader's style. MuseScore treats the
+    # crescendo start's spread as overall height (despite MusicXML ignoring it
+    # at the closed tip), so an explicit zero collapses the whole hairpin.
+    # Source geometry is not decoded; see ARCHITECTURE for the importer evidence.
+    for wedge in wedges:
+        direction = ET.SubElement(element, "direction", placement=_DYNAMICS_PLACEMENT)
+        ET.SubElement(
+            ET.SubElement(direction, "direction-type"),
+            "wedge",
+            type=wedge.kind,
+            number=wedge.number,
+        )
+        ET.SubElement(direction, "offset", sound="yes").text = str(
+            _duration_in_divisions(wedge.offset, divisions)
+        )
+
+
 _MAX_GLYPH = 2
 """Text this short with no letters or digits is a music-font character rather
 than words. Printing it literally puts an A-umlaut in the score where a
@@ -574,6 +706,7 @@ def _append_measure(
     emit_divisions: bool,
     part_id: str = "",
     arpeggio_numbers: _ArpeggioNumbers | None = None,
+    wedges: tuple[_Wedge, ...] = (),
 ) -> None:
     element = ET.SubElement(parent, "measure", number=str(measure.number))
     _append_barline(element, measure, "left")
@@ -584,6 +717,7 @@ def _append_measure(
         direction = ET.SubElement(element, "direction", placement="above")
         ET.SubElement(ET.SubElement(direction, "direction-type"), "words").text = words
     _append_expressions(element, measure)
+    _append_wedges(element, wedges, divisions)
 
     for index, voice in enumerate(measure.voices):
         if index:

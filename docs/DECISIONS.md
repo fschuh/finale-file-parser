@@ -10,6 +10,32 @@ and resolved ones **DECIDED**.
 
 ---
 
+## 2026-10-10 — DECIDED: preserve hairpins as exact spans on canonical staff-parts
+
+**Context.** The user requested Scars' missing crescendo hairpins and approved
+the implementation plan. Its SmartShape definitions and measure assignments
+store kind, staff and exact endpoints; the adapter previously dropped them.
+These markings span time and cannot be represented by a measure-start word.
+
+**Decision.** Append immutable `Hairpin` spans to `Part`, with kind and start/end
+measure numbers plus whole-note `Fraction` offsets. The part retains the source
+staff identity. Resolve only assigned, visible preset measure-based crescendos
+and diminuendos; exclude linked-part copies and unsupported attachment modes.
+Keep the existing normalization and canonical `Score` pipeline for both formats.
+
+**Consequence.** MusicXML emits paired numbered wedges below the staff, with
+exact offsets and divisions that include endpoint denominators. Allocate/reuse
+numbers in XML document order, including staff projection, so offsets and
+overlapping spans survive cursor backups. Invalid positions and excess document
+overlaps raise clear errors. This adds no guessed velocity curve or Finale
+layout reconstruction. Omit optional wedge spreads and use the reader's style:
+the user found MuseScore interprets the initial spread0 as overall zero height,
+ignoring the stop's spread15. Its importer corroborates this behavior; schema
+and Verovio validation alone did not detect it. Pairing/timing are unchanged.
+Cross-staff endpoints, custom/entry/lyric-based shapes
+and the older DCL shape encoding remain separate work; byte/API evidence and
+validation are in `docs/ARCHITECTURE.md`.
+
 ## 2026-10-10 — DECIDED: recover source dynamics and honor hidden articulation assignments
 
 **Context.** Scars' assigned dynamics were missing because its Finale-2012

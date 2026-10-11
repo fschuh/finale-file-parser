@@ -155,10 +155,28 @@ entry here that supports them.
   plus https://pdk.finalelua.com/ff__entrydetails_8h_source.html (articulation
   positioning/copy endpoints and visibility) and https://pdk.finalelua.com/ff__other_8h_source.html
   (staff-list geometry and Unicode text-expression era types).
+  SmartShape structs, flags, enums and termination-segment getters:
+  https://pdk.finalelua.com/ff__smartshapes_8h_source.html . Normalized field names
+  are corroborated by musxdom's `FieldPopulatorsOthers.cpp` (main branch inspected
+  2026-10-10), independently of the PDK/runtime byte layout.
 - The released preference-location map and individual entry getter establish
   the legacy grace fields. Articulation getters and staff-list accessors also
   establish positioning words and staff distance used for arpeggio connections.
   The visibility getter/setter identify the inverse hide bit; the text-expression
   description getter establishes the Finale-2012 Unicode decoding path.
+  SmartShape and termination-segment getters independently corroborate hairpin
+  attachment modes, visibility and staff/measure/EDU offsets.
   Hashes and reproducible offsets, with their scope,
   are recorded in `docs/ARCHITECTURE.md`.
+
+**MuseScore Studio MusicXML importer** — MuseScore Limited and contributors
+
+- Public repository: https://github.com/musescore/MuseScore
+- Inspected file: `src/importexport/musicxml/internal/import/importmusicxmlpass2.cpp`,
+  commit `78f0c2195f2505a1374eda52f13644d2a35838d2`.
+- The inspected file's SPDX header is **GPL-3.0-only**, with
+  `MuseScore-Studio-CLA-applies`. Read solely to establish interoperability
+  behavior; no implementation code is copied into this repository.
+- Its wedge importer applies a start spread to overall hairpin height and does
+  not read the stop spread. Omission of optional spread avoids collapsing
+  crescendos to flat lines. Evidence/hash are in `docs/ARCHITECTURE.md`.

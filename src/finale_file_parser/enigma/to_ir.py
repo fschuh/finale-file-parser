@@ -29,6 +29,7 @@ from finale_file_parser.enigma.fermatas import fermatas_by_entry
 from finale_file_parser.enigma.fingerings import fingerings_by_entry
 from finale_file_parser.enigma.graces import grace_slash, slash_flagged_grace_notes
 from finale_file_parser.enigma.groups import staff_groups, staff_order
+from finale_file_parser.enigma.hairpins import hairpins_by_staff
 from finale_file_parser.enigma.jumps import jumps_by_measure
 from finale_file_parser.enigma.key import Mode, decode_key
 from finale_file_parser.enigma.location import effective_keys, locate_entries
@@ -186,6 +187,7 @@ def build_score(document: EnigmaDocument) -> Score:
     directions = jumps_by_measure(document)
     barlines = barline_styles(document)
     expressions = expressions_by_measure(document)
+    hairpins = hairpins_by_staff(document)
 
     staves = _ordered_staves(document, {staff for staff, _ in cells})
     keys = effective_keys(document)
@@ -217,6 +219,7 @@ def build_score(document: EnigmaDocument) -> Score:
                 )
                 for index, number in enumerate(numbers)
             ),
+            hairpins=hairpins.get(staff, ()),
         )
         for staff in staves
     ]

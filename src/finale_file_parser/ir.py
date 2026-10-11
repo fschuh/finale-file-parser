@@ -26,6 +26,7 @@ __all__ = [
     "Event",
     "Expression",
     "Fermata",
+    "Hairpin",
     "Lyric",
     "Measure",
     "NoteTies",
@@ -392,12 +393,33 @@ class Measure:
 
 
 @dataclass(frozen=True)
+class Hairpin:
+    """A crescendo or diminuendo spanning exact positions on one staff-part.
+
+    Offsets are fractions of a whole note from the beginning of the named
+    measure, including its end. A complete span keeps pairing independent of
+    the output format's numbering or note placement.
+    """
+
+    kind: str
+    """``crescendo`` or ``diminuendo``."""
+
+    start_measure: int
+    start_offset: Fraction
+    end_measure: int
+    end_offset: Fraction
+
+
+@dataclass(frozen=True)
 class Part:
     """One instrumental part."""
 
     id: str
     name: str
     measures: tuple[Measure, ...] = ()
+
+    hairpins: tuple[Hairpin, ...] = ()
+    """Dynamic spans on this staff, without inferred playback velocities."""
 
 
 @dataclass(frozen=True)

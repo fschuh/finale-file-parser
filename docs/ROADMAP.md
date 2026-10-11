@@ -141,6 +141,13 @@ limit is verified by mutation, because no real corpus archive trips one.
 - [x] **Unicode dynamics and `sfz`** — Finale-2012 numeric expression descriptions
       decode as UTF-16LE; complete graded names and evidenced attack glyphs reach
       the existing IR/MusicXML path. All eight local Scars dynamics are restored.
+- [x] **Measure-based hairpins** — visible assigned preset SmartShape crescendos
+      and diminuendos carry exact staff/measure offsets through `Part.hairpins`.
+      Numeric `.mus` tags217/218 share the `.musx` resolver; paired MusicXML
+      wedges retain fractional positions, cross-measure spans and overlap
+      numbers during staff projection. Both Scars crescendos are recovered.
+      Cross-staff/custom/entry/lyric-based shapes, DCL-era shape records and
+      exact Finale layout/playback curves remain unsupported.
 - [x] **Articulation assignment visibility** — legacy group +10 bit0 becomes `hide`;
       all articulation-derived resolvers skip hidden and linked-part assignments.
       Visible duplicates survive hidden copies. The two hidden Scars m59 accents

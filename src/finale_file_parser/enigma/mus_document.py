@@ -40,6 +40,8 @@ Translated:
 | texts | `fileInfo` | title (1), composer (2), copyright (3) |
 | others | `textExprDef` (241) | `textIDKey`, `value`, `descStr` |
 | others | `measExprAssign` (177) | `textExprID`, `staffAssign`, offsets; per 24-byte slot |
+| others | `smartShape` (217) | type, attachment mode, visibility, endpoints |
+| others | `smartShapeMeasMark` (218) | `shapeNum`, `centerShapeNum`; per 12-byte slot |
 
 Most fields above are confirmed against paired `.musx` files; see
 `docs/formats/mus-binary-notes.md`. Grace slashes are established by published
@@ -85,6 +87,8 @@ from finale_file_parser.enigma.mus_others import (
     TAG_REPEAT_BACK,
     TAG_REPEAT_ENDING_START,
     TAG_REPEAT_PASS_LIST,
+    TAG_SMART_SHAPE,
+    TAG_SMART_SHAPE_MEAS_MARK,
     TAG_STAFF_SPEC,
     TAG_TEXT_EXPR_DEF,
     MusOther,
@@ -911,6 +915,58 @@ def _s16(data: bytes, offset: int) -> int:
     return value - 0x10000 if value >= 0x8000 else value
 
 
+_SMART_SHAPE_SIZE = 96
+_SMART_SHAPE_MARK_SLOT = 12
+_SMART_SHAPE_ENTRY_BASED = 0x40000000
+_SMART_SHAPE_LYRIC_BASED = 0x10000000
+_SMART_SHAPE_PRESET = 0x00008000
+_SMART_SHAPE_TYPES = {2: "decresc", 3: "cresc", 15: "slurAuto"}
+"""Published PDK structs/flags, corroborated by getters; see ARCHITECTURE."""
+
+
+def _smart_shape_endpoint(payload: bytes, at: int, name: str, *, entry_based: bool) -> Record:
+    """The evidenced 8-byte endpoint inside a bounds-checked 30-byte segment."""
+    endpoint = Record(
+        tag="endPt",
+        attrs={},
+        text="",
+        fields={
+            "inst": str(_s16(payload, at)),
+            "meas": str(_s16(payload, at + 2)),
+            "entryNum" if entry_based else "edu": str(
+                int.from_bytes(payload[at + 4 : at + 8], "little", signed=True)
+            ),
+        },
+    )
+    return Record(tag=name, attrs={}, text="", fields={"endPt": endpoint})
+
+
+def _smart_shape(payload: bytes, attrs: dict[str, str]) -> Record:
+    if len(payload) != _SMART_SHAPE_SIZE:
+        raise CorruptScoreError(
+            f"smartShape {attrs['cmper']}: expected {_SMART_SHAPE_SIZE} bytes, got {len(payload)}"
+        )
+    flags = _u32(payload, 2)
+    entry_based = bool(flags & _SMART_SHAPE_ENTRY_BASED)
+    shape_type = _s16(payload, 0)
+    fields: dict[str, str | tuple[str, ...] | Record | tuple[Record, ...]] = {
+        "shapeType": _SMART_SHAPE_TYPES.get(shape_type, str(shape_type)),
+        "startTermSeg": _smart_shape_endpoint(payload, 6, "startTermSeg", entry_based=entry_based),
+        "endTermSeg": _smart_shape_endpoint(payload, 36, "endTermSeg", entry_based=entry_based),
+    }
+    for flag, name in (
+        (_SMART_SHAPE_ENTRY_BASED, "entryBased"),
+        (_SMART_SHAPE_LYRIC_BASED, "lyricBased"),
+    ):
+        if flags & flag:
+            fields[name] = ""
+    if not flags & _SMART_SHAPE_PRESET:
+        fields["noPresetShape"] = ""
+    if _u16(payload, 82) & 1:
+        fields["hidden"] = ""
+    return Record(tag="smartShape", attrs=attrs, text="", fields=fields)
+
+
 def _others_records(
     records: tuple[MusOther, ...], fallback: str, *, year: int | None = None
 ) -> list[Record]:
@@ -921,7 +977,27 @@ def _others_records(
             # A part-variant record; `part` absent means the score record, which
             # is the convention every downstream module filters on.
             attrs["part"] = str(record.part)
-        if record.tag == TAG_FRAME_SPEC and len(record.payload) >= _ROW_DATA:
+        if record.tag == TAG_SMART_SHAPE:
+            out.append(_smart_shape(record.payload, attrs))
+        elif record.tag == TAG_SMART_SHAPE_MEAS_MARK:
+            if not record.payload or len(record.payload) % _SMART_SHAPE_MARK_SLOT:
+                raise CorruptScoreError(
+                    f"smartShapeMeasMark {record.cmper}: expected complete "
+                    f"{_SMART_SHAPE_MARK_SLOT}-byte slots, got {len(record.payload)} bytes"
+                )
+            for inci, at in enumerate(range(0, len(record.payload), _SMART_SHAPE_MARK_SLOT)):
+                out.append(
+                    Record(
+                        tag="smartShapeMeasMark",
+                        attrs={**attrs, "inci": str(inci)},
+                        text="",
+                        fields={
+                            "shapeNum": str(_u16(record.payload, at)),
+                            "centerShapeNum": str(_u16(record.payload, at + 2)),
+                        },
+                    )
+                )
+        elif record.tag == TAG_FRAME_SPEC and len(record.payload) >= _ROW_DATA:
             # The pair is in the record's LAST incidence, exactly as in the
             # 2001-2005 era: a frameSpec carrying a `startTime` is 24 bytes, the
             # start time block first. Reading +0 regardless took the start time

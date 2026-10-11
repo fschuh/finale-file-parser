@@ -50,6 +50,8 @@ __all__ = [
     "TAG_FRAME_SPEC",
     "TAG_MEAS_EXPR_ASSIGN",
     "TAG_MEAS_SPEC",
+    "TAG_SMART_SHAPE",
+    "TAG_SMART_SHAPE_MEAS_MARK",
     "TAG_STAFF_SPEC",
     "TAG_TEXT_EXPR_DEF",
     "MusOther",
@@ -72,6 +74,11 @@ TAG_FRAME_SPEC = 146
 """`frameSpec` — confirmed by payload, not only by key sequence."""
 TAG_MEAS_SPEC = 176
 """`measSpec` — confirmed by payload, not only by key sequence."""
+
+TAG_SMART_SHAPE = 217
+"""`smartShape` — published PDK layout and RGP Lua getters; see ARCHITECTURE."""
+TAG_SMART_SHAPE_MEAS_MARK = 218
+"""`smartShapeMeasMark` — packed 12-byte measure assignments to smart shapes."""
 
 TAG_STAFF_SPEC = 231
 """`staffSpec` — confirmed by payload (rest offsets, staff lines, repeat-dot

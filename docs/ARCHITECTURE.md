@@ -1267,6 +1267,113 @@ Verovio checks cover this local input; authored regression fragments cover
 Unicode, malformed data, attack ambiguity and assignment visibility. Historical
 corpus counts above are not remeasured: the licensed corpus is absent here.
 
+### Known format facts — crescendo and diminuendo hairpins
+
+Finale stores these dynamics as **SmartShapes**, separately from text
+expressions and articulations. In normalized EnigmaXML, a `smartShape` definition
+has `shapeType=cresc|decresc`, `startTermSeg.endPt` and `endTermSeg.endPt`.
+Each endpoint names `inst` (staff), `meas` and `edu`; a `smartShapeMeasMark`
+assignment references its `shapeNum`. The definition alone does not place a
+mark. Multiple measure assignments still reference one complete span.
+
+`enigma/hairpins.py` joins score assignments to visible preset measure-based
+definitions. `hidden`, `noPresetShape`, `entryBased`, `lyricBased` and linked-part
+records are excluded. An endpoint's EDU defaults to zero only when omitted;
+malformed/negative values or missing staff/measure/endpoint records raise
+`CorruptScoreError`. EDU must fit its signed 32-bit source field. Equal or
+reversed endpoints are rejected. Cross-staff endpoints remain unsupported and
+do not become a misleading single-staff mark. Automatic slurs and other shape
+kinds remain distinct and are not rendered by this resolver.
+
+The numeric `.mus` pool uses **others tag217** for SmartShape definitions and
+**tag218** for measure marks. The evidenced shape payload is **96 bytes**: the
+documented 92-byte structure followed by four bytes of padding. Assignment
+payloads are arrays of **12-byte** slots, with `u16+0 shapeNum` and
+`u16+2 centerShapeNum`; the other eight bytes are not interpreted. The measure
+is the record's `cmper`, and normalized `inci` is the slot index. Reject
+unrecognized definition lengths and incomplete/empty assignment arrays before
+reading fields, rather than silently truncating them.
+
+| Shape payload offset | Type | Meaning |
+| --- | --- | --- |
+| +0 | signed i16 | shape type: 2 diminuendo, 3 crescendo, 15 automatic slur |
+| +2 | u32 | attachment/preset flags |
+| +6 / +36 | 30-byte segment | left / right termination segment |
+| +6 / +36 | signed i16 | endpoint staff |
+| +8 / +38 | signed i16 | endpoint measure |
+| +10 / +40 | signed i32 | EDU for measure-based shapes, entry number when entry-based |
+| +82 | u16 | `flag2`; bit0 hides the shape |
+
+Flags **0x40000000** and **0x10000000** identify entry-based and lyric-based
+attachments; **0x00008000** selects a preset shape. Clear preset means the type
+must not be mistaken for a standard crescendo/diminuendo. The adapter names the
+three evidenced enum values above, retains other types numerically, distinguishes
+`entryNum` from `edu`, and keeps these filters in the normalized record. Only the
+numeric-pool encoding is decoded here; no DCL-era row layout is inferred.
+
+Evidence: published PDK
+[SmartShape structs, flags and accessors](https://pdk.finalelua.com/ff__smartshapes_8h_source.html)
+define the endpoint/segment layout, enum values and inverse `flag2` visibility.
+The MIT-licensed musxdom
+[field map](https://github.com/openmusx/musxdom/blob/main/src/musx/factory/FieldPopulatorsOthers.cpp)
+(inspected 2026-10-10) corroborates the normalized field names. Independently,
+read-only inspection of the released RGP Lua0.79 x86_64 binary identified above
+places the shape at object **+0x38**: `GetShapeType` VM **0x2c5fce** reads there,
+`GetEntryBased` **0x2c7d68** tests bit6 at +0x3d, and `GetVisible` **0x2c92b6**
+tests bit0 at +0x8a. Subtracting the structure base gives the serialized offsets.
+Left/right termination getters at **0x2c99d8 / 0x2c98c6** use object
+**+0x3e / +0x5c**, corroborating segment **+6 / +36**. Segment staff, measure and
+position getters at **0x2c05ec / 0x2c0cce / 0x2bf10a** read signed words at
+segment +0/+2 and the 32-bit value at +4. No plugin implementation is copied
+or executed; release hash and attribution remain those documented above.
+
+Canonical `Part.hairpins` holds immutable `Hairpin(kind, start_measure,
+start_offset, end_measure, end_offset)` objects. Offsets are exact whole-note
+fractions, independent of notes or XML numbering. Export uses paired
+[`wedge`](https://www.w3.org/2021/06/musicxml40/musicxml-reference/elements/wedge/)
+directions and
+[`offset`](https://www.w3.org/2021/06/musicxml40/musicxml-reference/elements/offset/)
+values relative to the start-of-measure cursor, with `sound=yes`. They never
+advance that cursor. Include endpoint denominators when choosing divisions,
+preserving sub-beat positions. Numbers are allocated/reused in actual XML
+document order, staff by staff within each measure, and obey the schema's
+1–16 overlap bound. Stops precede starts at a shared position. Staff projection
+retains the assigned staff and offsets after its backups. Missing measures,
+ambiguous duplicate measure numbers, out-of-bounds offsets and reversed spans
+raise `ExportError`. Leave the optional `spread` attribute unspecified, so
+the reader's style controls the opening; Finale's opening geometry is not decoded.
+
+MuseScore compatibility evidence: the first export specified closed/open spreads
+of0/15, which passes schema validation and draws correctly in Verovio. The user
+reported flat lines in MuseScore. Its
+[pinned wedge importer](https://github.com/musescore/MuseScore/blob/78f0c2195f2505a1374eda52f13644d2a35838d2/src/importexport/musicxml/internal/import/importmusicxmlpass2.cpp#L5470)
+sets the **whole hairpin height** from the start's spread when layout import is
+enabled, and does not read spread at the stop. A crescendo start with spread0
+therefore collapses both lines, even though the MusicXML specification says
+to ignore spread at that closed tip. Omit this optional geometry for both kinds,
+preserving type, pairing and exact offsets. Regression cases now prohibit height
+overrides. The public source was re-fetched read-only on2026-10-10; SHA256 is
+`b91458504310c6c570eb7439f2404248390f4c1671122d9da9d50d662f39f05d`.
+No MuseScore implementation code is copied or executed. Schema/Verovio rendering
+alone does not validate MuseScore's import behavior; runtime verification is
+still unavailable here.
+
+Local evidence: Scars contains **two unique visible crescendos on staff1**:
+shape94 spans **m51 EDU0..4096** and shape36 spans **m58 EDU0..3584** (last eighth
+onset). Shape94 has an identical linked-part copy. Both score shapes carry
+flags **0x8600**, visible flag2=0 and explicit tag218 assignments; the PDF's
+last page independently shows both. All90 raw shapes normalize (87 automatic
+slurs plus these three records), and58 assignment arrays split into118 slots.
+No diminuendo is assigned in this input. Its corrected export gains exactly
+four wedge directions, and every other score-tree node and note onset matches
+the prior dynamics-corrected file. Authored XML/binary/export regressions cover
+both kinds, packed groups, hidden/linked/unused records, malformed input,
+fractional/end-of-bar/cross-measure positions, overlap numbering and staff
+projection. Official MusicXML4.0 schema validation and all three visually
+inspected Verovio pages confirm two printed crescendos. `make check` passes
+lint/format/strict types and1,680 tests (seven skipped), including69 new
+authored cases. The licensed corpus and MuseScore runtime remain unavailable here.
+
 ### Explicit metronome markings
 
 Assigned expression text can establish a metronome rate even when the legacy
