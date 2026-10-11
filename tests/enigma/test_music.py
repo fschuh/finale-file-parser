@@ -29,6 +29,7 @@ def _entry(dura: str, notes: tuple[Record, ...] = (), **extra: str) -> Record:
         "isValid": "",
     }
     if notes:
+        fields["isNote"] = ""
         fields["note"] = notes if len(notes) > 1 else notes[0]
     fields.update(extra)
     return Record(tag="entry", attrs={"entnum": "1"}, text="", fields=fields)
@@ -64,6 +65,48 @@ def test_rest_has_no_notes() -> None:
     entry = read_entry(_entry("1024"))
     assert entry.is_rest is True
     assert entry.notes == ()
+
+
+def test_positioned_xml_rest_keeps_its_record_without_a_musical_pitch() -> None:
+    """Authored normalized source: a valid rest has drawing data, not isNote."""
+    record = Record(
+        tag="entry",
+        attrs={"entnum": "7"},
+        text="",
+        fields={"dura": "512", "numNotes": "1", "isValid": "", "note": _note("6")},
+    )
+    entry = read_entry(record)
+    assert entry.is_rest
+    assert entry.notes == ()
+    assert entry.duration.whole_notes == Fraction(1, 8)
+    assert record.fields["note"] == _note("6")
+
+
+def test_an_xml_note_remains_pitched_when_floatrest_is_set() -> None:
+    entry = read_entry(_entry("512", (_note("3"),), floatRest=""))
+    assert not entry.is_rest
+    assert [n.harm_lev for n in entry.notes] == [3]
+
+
+def test_minimal_authored_records_without_source_flags_keep_count_semantics() -> None:
+    record = Record(
+        tag="entry",
+        attrs={"entnum": "8"},
+        text="",
+        fields={"dura": "1024", "numNotes": "1", "note": _note("0")},
+    )
+    assert not read_entry(record).is_rest
+
+
+def test_a_positioned_rest_still_validates_its_stored_count() -> None:
+    record = Record(
+        tag="entry",
+        attrs={"entnum": "9"},
+        text="",
+        fields={"dura": "512", "numNotes": "2", "isValid": "", "note": _note("0")},
+    )
+    with pytest.raises(MalformedEntryError, match="numNotes"):
+        read_entry(record)
 
 
 def test_chord_multiple_notes() -> None:

@@ -79,10 +79,9 @@ _MAX_NOTES = 12
 _SETBIT = 0x80000000
 """Set on every legal entry and every legal note record."""
 _NOTEBIT = 0x40000000
-"""Set for a note, clear for a rest -- but see `_entry_record`: NOTEBIT alone
-does not decide whether an entry has pitch content."""
+"""Set for a musical note, clear for a rest, independently of stored records."""
 _FLOATREST = 0x01000000
-"""A "floating" rest: it sits at the staff midline and has no pitch content."""
+"""Rest positioning: clear means the stored note record supplies its position."""
 _BEATBIT = 0x00000800
 """eeppd.txt: "used to determine beaming". The entry starts a beam group;
 EnigmaXML surfaces the same bit as a `beam` field. Matches the paired `.musx`
@@ -284,16 +283,9 @@ def _note_offsets(base: int, count: int) -> list[int]:
 
 def _entry_record(stream: bytes, offset: int, stored_count: int, order: ByteOrder) -> Record:
     flag = _u32(stream, offset + 18, order)
-    # FLOATREST decides, not NOTEBIT. Three cases, all observed in the corpus:
-    #   * ordinary note      NOTEBIT set                  -> notes = stored count
-    #   * floating rest      FLOATREST set, NOTEBIT clear -> a placeholder note
-    #     record is stored with a count of 1, but there is no pitch content and
-    #     .musx reports zero notes
-    #   * positioned rest    both clear                   -> eeppd.txt: moving a
-    #     rest off the midline clears FLOATREST and adds a real note record for
-    #     the vertical position, which .musx surfaces as one note
-    # Using NOTEBIT instead mis-classifies the third case (74 corpus entries).
-    note_count = 0 if flag & _FLOATREST else stored_count
+    # Stored records also contain rest-position geometry. Keep them in the raw
+    # document; read_entry uses isNote to select musical pitches. FLOATREST is
+    # independent and can even be set on a pitched entry.
     edu = _u16(stream, offset + 14, order)
     # Fail here rather than in `read_entry`, so the message names the entry.
     try:
@@ -302,8 +294,13 @@ def _entry_record(stream: bytes, offset: int, stored_count: int, order: ByteOrde
         raise CorruptScoreError(f"entry {_u32(stream, offset, order)}: bad duration {edu}") from exc
     fields: dict[str, str | tuple[str, ...] | Record | tuple[Record, ...]] = {
         "dura": str(edu),
-        "numNotes": str(note_count),
+        "numNotes": str(stored_count),
+        "isValid": "",
     }
+    if flag & _NOTEBIT:
+        fields["isNote"] = ""
+    if flag & _FLOATREST:
+        fields["floatRest"] = ""
     if flag & _BEATBIT:
         fields["beam"] = ""
     if flag & _GRACENOTE:
@@ -311,7 +308,7 @@ def _entry_record(stream: bytes, offset: int, stored_count: int, order: ByteOrde
         fields["graceNote"] = ""
     if _u16(stream, offset + 22, order) & _SLASHGRACE:
         fields["slashGrace"] = ""
-    notes = tuple(_note_record(stream, o, order) for o in _note_offsets(offset, note_count))
+    notes = tuple(_note_record(stream, o, order) for o in _note_offsets(offset, stored_count))
     if notes:
         fields["note"] = notes if len(notes) > 1 else notes[0]
     return Record(

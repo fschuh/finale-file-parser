@@ -113,7 +113,11 @@ def read_entry(record: Record) -> Entry:
         raise MalformedEntryError(
             f"numNotes={num_notes} disagrees with {len(notes)} note record(s)"
         )
-    return Entry(entnum=entnum, duration=duration, is_rest=num_notes == 0, notes=notes)
+    # Finale's valid entries use isNote to distinguish notes from rests. A
+    # positioned rest may still store note-shaped data for its drawing position.
+    # Minimal authored records without source flags retain count semantics.
+    is_rest = num_notes == 0 or ("isValid" in record.fields and "isNote" not in record.fields)
+    return Entry(entnum=entnum, duration=duration, is_rest=is_rest, notes=() if is_rest else notes)
 
 
 def duration_from_edu(edu: int) -> Duration:

@@ -338,15 +338,21 @@ Three details that are easy to get wrong, each caught by comparing against groun
 - **The TCD's alteration nibble is sign-and-magnitude**, bit 3 being the sign — not two's complement.
   `eeppd.txt` calls it "a signed quantity … -8 to +7", which reads as two's complement; under that
   reading `0x9` decodes to −7 where the corpus says −1.
-- **`FLOATREST` decides whether an entry has pitch content, not `NOTEBIT`.** A floating rest stores a
-  placeholder note with a count of 1; a rest dragged off the midline clears `FLOATREST` and stores a
-  *real* note record for its vertical position. Using `NOTEBIT` misclassifies 74 corpus entries.
+- **`NOTEBIT` (0x40000000) distinguishes musical notes from rests.** `FLOATREST` (0x01000000)
+  controls rest positioning, not pitch content: a positioned rest can store a note-shaped record
+  for its vertical position, and a musical note can have FLOATREST set. See the vendor's
+  `eeppd.txt` entry-flag definitions. The raw document retains the stored count and geometry,
+  which still determine slot traversal. Typed entries with `isValid` use the presence of
+  `isNote` (the normalized NOTEBIT) to select pitches; minimal authored records without source
+  flags retain count-based semantics. Count/record agreement is validated even for rests.
 - **Notes do not run at a fixed stride from the entry start.** Note 3 onward lives in the next slot,
   after that slot's own 6-byte tag.
 
-Verified across every 2011/2012 `.mus` with a confirmed `.musx` pair — **30,420 entries**: entry
-numbers, durations and rest flags all agree exactly, and note pitches agree on every document without
-a transposing staff.
+The earlier paired-container comparison covered **30,420 entries**, but its count-based typed XML
+reader also treated positioned-rest geometry as pitches; agreement did not prove note/rest semantics.
+The Ninsheetmusic audit and ActRaiser PDF/MIDI expose both directions of the error. Authored tests
+cover positioned/floating rests, pitched entries with FLOATREST, continuation slots, both byte orders,
+and both supported container eras. The corrected ActRaiser export removes the false E4 in bar 30.
 
 **Transposing staves place `harm_lev` in a different octave.** On a staff with a transposition, the
 two containers disagree by whole octaves, and `harm_lev_octave_shift(interval)` converts a `.mus`

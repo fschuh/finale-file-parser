@@ -84,13 +84,7 @@ def test_reads_entries(tmp_path: Path) -> None:
 
 
 def test_rest_has_no_notes_even_though_a_placeholder_is_stored(tmp_path: Path) -> None:
-    """FLOATREST decides, not the stored count and not NOTEBIT.
-
-    A floating rest carries a placeholder note record with a count of 1, while
-    .musx reports zero notes. Reading the count regresses 55 corpus entries;
-    reading NOTEBIT instead regresses a different 74, because a rest moved off the
-    midline clears FLOATREST and stores a real note record for its position.
-    """
+    """The source rest flag takes precedence over its stored placeholder."""
     pool = _entry_slot(1, dura=1024, flag=SETBIT | 0x01000000, notes=[(0x0000, SETBIT)]) + _pool(
         150
     )
@@ -367,3 +361,61 @@ def test_a_labelled_pool_that_is_not_entry_slots_raises(tmp_path: Path) -> None:
     path.write_bytes(_dcl_file(b"\x01\x02\x03", "big"))
     with pytest.raises(CorruptScoreError, match="does not tile as entry slots"):
         read_mus_entries(path)
+
+
+@pytest.mark.parametrize(("era", "order"), [(2005, "little"), (2005, "big"), (2012, "little")])
+@pytest.mark.parametrize("floating", [False, True])
+def test_a_rest_retains_stored_geometry_without_becoming_a_pitch(
+    tmp_path: Path, era: int, order: ByteOrder, floating: bool
+) -> None:
+    """Authored entry flags and records; no third-party music is embedded."""
+    slot = _entry_slot if order == "little" else _be_entry_slot
+    pool = slot(
+        501, dura=512, flag=SETBIT | (0x01000000 if floating else 0), notes=[(0x0060, SETBIT)]
+    )
+    pool += slot(502, dura=1024, flag=SETBIT | NOTEBIT, notes=[(0x0030, SETBIT)])
+    path = tmp_path / "positioned-rest.mus"
+    path.write_bytes(_dcl_file(pool, order) if era == 2005 else _mus_file(pool + _pool(150)))
+    entries = read_mus_entries(path)
+    assert entries[0].is_rest and entries[0].notes == ()
+    assert entries[0].duration.base is NoteValue.EIGHTH
+    assert entries[1].entnum == 502 and entries[1].notes[0].harm_lev == 3
+    record = read_mus_entry_records(path)[0]
+    assert record.fields["numNotes"] == "1"
+    assert "isValid" in record.fields and "isNote" not in record.fields
+    assert "note" in record.fields
+
+
+@pytest.mark.parametrize(("era", "order"), [(2005, "little"), (2005, "big"), (2012, "little")])
+def test_floatrest_does_not_discard_a_musical_note(
+    tmp_path: Path, era: int, order: ByteOrder
+) -> None:
+    slot = _entry_slot if order == "little" else _be_entry_slot
+    pool = slot(501, dura=512, flag=SETBIT | NOTEBIT | 0x01000000, notes=[(0x0020, SETBIT)])
+    path = tmp_path / "note-with-floatrest.mus"
+    path.write_bytes(_dcl_file(pool, order) if era == 2005 else _mus_file(pool + _pool(150)))
+    entry = read_mus_entries(path)[0]
+    assert not entry.is_rest
+    assert [n.harm_lev for n in entry.notes] == [2]
+
+
+@pytest.mark.parametrize("order", ["little", "big"])
+def test_stored_rest_records_still_determine_continuation_slot_traversal(
+    tmp_path: Path, order: ByteOrder
+) -> None:
+    slot = _entry_slot if order == "little" else _be_entry_slot
+    first = slot(501, dura=512, flag=SETBIT, notes=[(0x0010, SETBIT)] * 3)
+    continuation = (
+        (501).to_bytes(4, order)
+        + (1).to_bytes(2, order)
+        + (0x0010).to_bytes(2, order)
+        + SETBIT.to_bytes(4, order)
+        + bytes(26)
+    )
+    following = slot(502, dura=1024, flag=SETBIT | NOTEBIT, notes=[(0x0040, SETBIT)])
+    path = tmp_path / "rest-continuation.mus"
+    path.write_bytes(_dcl_file(first + continuation + following, order))
+    entries = read_mus_entries(path)
+    assert entries[0].is_rest and entries[0].notes == ()
+    assert len(entries) == 2
+    assert entries[1].entnum == 502 and entries[1].notes[0].harm_lev == 4
