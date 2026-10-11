@@ -765,14 +765,12 @@ def _mus_reference_targets(
     Keyed by the pair `_references_to` puts on a `Reference` -- the record's tag
     and `_musx_key` -- so the join needs no key string parsed back apart.
 
-    An `inci` is matched first and only then fallen back on, because it means
-    different things per tag: `articAssign` retains the raw row's incidence in
-    `sourceInci` when unpacked, `tupletDef` carries none, and `lyrDataVerse` carries a
-    per-entry verse counter `mus_document` invents, which is not an incidence
-    at all and finds nothing. A record with no row is left out entirely rather
-    than pointed at a neighbour.
+    The raw header word historically called `inci` is a part ID. Match that
+    scope using the compatibility `sourceInci` attribute or `part` (default
+    score), never a packed element's logical incidence. A missing scope is not
+    redirected to another part's first row.
     """
-    by_inci, by_entry = _mus_entry_rows(details)
+    by_inci, _by_entry = _mus_entry_rows(details)
     targets: dict[tuple[str, str], tuple[str, str]] = {}
     for record in document.details.records:
         tag = ENTRY_DETAIL_TAGS.get(record.tag)
@@ -781,10 +779,8 @@ def _mus_reference_targets(
         entnum = _attr_int(record.attrs.get("entnum"))
         if entnum is None:
             continue
-        inci = _attr_int(record.attrs.get("sourceInci", record.attrs.get("inci")))
+        inci = _attr_int(record.attrs.get("sourceInci", record.attrs.get("part", "0")))
         key = by_inci.get((tag, entnum, inci)) if inci is not None else None
-        if key is None:
-            key = by_entry.get((tag, entnum))
         if key is not None:
             targets[(record.tag, _musx_key(record, 0))] = (str(tag), key)
     return targets

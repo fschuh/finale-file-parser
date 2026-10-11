@@ -8,7 +8,7 @@ its header carries one more field and is twelve bytes rather than ten:
     0-1    tag       record type (numeric; `.musx` names the same types)
     2-3    cmper1    first key component (staff, for `gfhold`)
     4-5    cmper2    second key component (measure, for `gfhold`)
-    6-7    inci      incidence -- see the caveat on `MusDetailRecord.inci`
+    6-7    part      0 for the score, otherwise the linked-part ID
     8-11   length    payload size in bytes
     12-    payload   `length` bytes, then four bytes of trailer
 
@@ -59,7 +59,7 @@ __all__ = [
 ]
 
 _HEADER = 12
-"""tag (2) + cmper1 (2) + cmper2 (2) + inci (2) + length (4)."""
+"""tag (2) + cmper1 (2) + cmper2 (2) + part (2) + length (4)."""
 _EXTRA_LENGTH = 4
 """Size of the second length field, which follows the payload.
 
@@ -170,12 +170,12 @@ _MIN_RECORDS = 50
 class MusDetailRecord:
     """One `details` record, with its key pair and its payload verbatim.
 
-    `inci` is named by position: it sits exactly where Enigma's third key
-    component belongs, and `DetailsPool` keys `.musx` records by
-    (cmper1, cmper2, inci). **The identification is unconfirmed** -- the field
-    is zero in all 77,384 corpus records examined, and no corpus document
-    repeats a (tag, cmper1, cmper2) key, so nothing yet distinguishes an
-    incidence counter from a reserved field.
+    The header's third word is the linked-part ID, not a logical incidence.
+    `inci` retains its original constructor/attribute spelling for compatibility;
+    prefer `part` when interpreting scope. The old all-zero corpus could not
+    distinguish these meanings. Nonzero staff groups and the PDK's no-incidence
+    group contract resolve it; see ARCHITECTURE.md. Packed payload elements
+    receive their own normalized incidence counters in the adapter.
     """
 
     tag: int
@@ -191,6 +191,11 @@ class MusDetailRecord:
     present) and what it means is not yet known, so dropping it would lose
     something a later reader has no way to recover.
     """
+
+    @property
+    def part(self) -> int:
+        """The header's score/linked-part scope (legacy attribute name: inci)."""
+        return self.inci
 
 
 def entry_key(record: MusDetailRecord) -> int:

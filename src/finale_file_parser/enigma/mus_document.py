@@ -1390,7 +1390,11 @@ def _lyric_records(
         out.append(
             Record(
                 tag="lyrDataVerse",
-                attrs={"entnum": str(entnum), "inci": str(seen.get(entnum, 0))},
+                attrs={
+                    "entnum": str(entnum),
+                    "inci": str(seen.get(entnum, 0)),
+                    **_detail_scope(record),
+                },
                 text="",
                 fields=fields,
             )
@@ -1422,8 +1426,8 @@ def _artic_records(
             continue
         emitted.add(identity)
         # Splitting one raw row creates several identities. Keep them unique,
-        # and retain the source incidence so report links still find that row.
-        incidence = max(incidences.get(entnum, 0), record.inci)
+        # and retain the legacy source key so report links still find that row.
+        incidence = incidences.get(entnum, 0)
         out.append(
             Record(
                 tag="articAssign",
@@ -1431,6 +1435,7 @@ def _artic_records(
                     "entnum": str(entnum),
                     "inci": str(incidence),
                     "sourceInci": str(record.inci),
+                    **_detail_scope(record),
                 },
                 text="",
                 fields={
@@ -1468,6 +1473,7 @@ def _smart_shape_entry_marks(record: MusDetailRecord, incidences: dict[int, int]
                     "entnum": str(entry),
                     "inci": str(incidence),
                     "sourceInci": str(record.inci),
+                    **_detail_scope(record),
                 },
                 text="",
                 fields={"shapeNum": str(_u16(record.payload, at))},
@@ -1477,34 +1483,61 @@ def _smart_shape_entry_marks(record: MusDetailRecord, incidences: dict[int, int]
     return out
 
 
+def _detail_scope(record: MusDetailRecord) -> dict[str, str]:
+    return {"part": str(record.part)} if record.part else {}
+
+
 def _details_records(records: tuple[MusDetailRecord, ...]) -> list[Record]:
     out: list[Record] = []
-    lyric_incidence: dict[int, int] = {}
-    lyric_seen: set[tuple[int, int]] = set()
-    artic_incidence: dict[int, int] = {}
-    artic_seen: set[tuple[int, int, bool]] = set()
-    shape_incidence: dict[int, int] = {}
+    # Logical incidences and duplicate suppression are local to each part.
+    lyric_incidence: dict[int, dict[int, int]] = {}
+    lyric_seen: dict[int, set[tuple[int, int]]] = {}
+    artic_incidence: dict[int, dict[int, int]] = {}
+    artic_seen: dict[int, set[tuple[int, int, bool]]] = {}
+    shape_incidence: dict[int, dict[int, int]] = {}
     for record in records:
         if record.tag == TAG_GFHOLD and len(record.payload) >= 10:
             out.append(
                 Record(
                     tag="gfhold",
-                    attrs={"cmper1": str(record.cmper1), "cmper2": str(record.cmper2)},
+                    attrs={
+                        "cmper1": str(record.cmper1),
+                        "cmper2": str(record.cmper2),
+                        **_detail_scope(record),
+                    },
                     text="",
                     fields=_gfhold(record.payload),
                 )
             )
         elif record.tag == TAG_ARTIC_ASSIGN:
-            out.extend(_artic_records(record, artic_incidence, artic_seen))
+            out.extend(
+                _artic_records(
+                    record,
+                    artic_incidence.setdefault(record.part, {}),
+                    artic_seen.setdefault(record.part, set()),
+                )
+            )
         elif record.tag == TAG_LYRIC_VERSE:
-            out.extend(_lyric_records(record, lyric_incidence, lyric_seen))
+            out.extend(
+                _lyric_records(
+                    record,
+                    lyric_incidence.setdefault(record.part, {}),
+                    lyric_seen.setdefault(record.part, set()),
+                )
+            )
         elif record.tag == TAG_SMART_SHAPE_ENTRY_MARK:
-            out.extend(_smart_shape_entry_marks(record, shape_incidence))
+            out.extend(
+                _smart_shape_entry_marks(record, shape_incidence.setdefault(record.part, {}))
+            )
         elif record.tag == TAG_STAFF_GROUP and len(record.payload) >= _GROUP_BARLINE_BYTE + 1:
             out.append(
                 Record(
                     tag="staffGroup",
-                    attrs={"cmper1": str(record.cmper1), "cmper2": str(record.cmper2)},
+                    attrs={
+                        "cmper1": str(record.cmper1),
+                        "cmper2": str(record.cmper2),
+                        **_detail_scope(record),
+                    },
                     text="",
                     fields=_staff_group(record.payload),
                 )
@@ -1513,7 +1546,7 @@ def _details_records(records: tuple[MusDetailRecord, ...]) -> list[Record]:
             out.append(
                 Record(
                     tag="tupletDef",
-                    attrs={"entnum": str(entry_key(record))},
+                    attrs={"entnum": str(entry_key(record)), **_detail_scope(record)},
                     text="",
                     fields={
                         name: str(_u16(record.payload, offset)) for name, offset in _TUPLET_FIELDS

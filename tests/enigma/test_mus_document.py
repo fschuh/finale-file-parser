@@ -405,7 +405,7 @@ def test_a_repeated_lyric_assignment_is_emitted_once(pools: Callable[..., None])
     pools(
         details=(
             MusDetailRecord(TAG_LYRIC_VERSE, 0, 9, 0, payload),
-            MusDetailRecord(TAG_LYRIC_VERSE, 0, 9, 1, payload),
+            MusDetailRecord(TAG_LYRIC_VERSE, 0, 9, 0, payload),
         )
     )
     assert len(read_mus_document(PATH).details.of_tag("lyrDataVerse")) == 1
@@ -447,7 +447,7 @@ def test_a_repeated_articulation_assignment_is_emitted_once(
         others=(MusOther(TAG_ARTIC_DEF, 1, 0, artic_def_payload(62)),),
         details=(
             MusDetailRecord(TAG_ARTIC_ASSIGN, 0, 9, 0, payload),
-            MusDetailRecord(TAG_ARTIC_ASSIGN, 0, 9, 1, payload),
+            MusDetailRecord(TAG_ARTIC_ASSIGN, 0, 9, 0, payload),
         ),
     )
     assert articulations_by_entry(read_mus_document(PATH)) == {9: ("accent",)}
@@ -463,7 +463,7 @@ def test_two_different_articulations_on_one_entry_both_survive(
         ),
         details=(
             MusDetailRecord(TAG_ARTIC_ASSIGN, 0, 9, 0, (1).to_bytes(2, "little") + bytes(18)),
-            MusDetailRecord(TAG_ARTIC_ASSIGN, 0, 9, 1, (2).to_bytes(2, "little") + bytes(18)),
+            MusDetailRecord(TAG_ARTIC_ASSIGN, 0, 9, 0, (2).to_bytes(2, "little") + bytes(18)),
         ),
     )
     assert articulations_by_entry(read_mus_document(PATH)) == {9: ("staccato", "accent")}
@@ -573,16 +573,16 @@ def test_a_hidden_duplicate_does_not_swallow_a_visible_assignment(
     pools(
         others=(MusOther(TAG_ARTIC_DEF, 1, 0, artic_def_payload(62)),),
         details=(
-            MusDetailRecord(TAG_ARTIC_ASSIGN, 0, 9, 4, b"".join(groups)),
-            MusDetailRecord(TAG_ARTIC_ASSIGN, 0, 9, 5, b"".join(reversed(groups))),
+            MusDetailRecord(TAG_ARTIC_ASSIGN, 0, 9, 0, b"".join(groups)),
+            MusDetailRecord(TAG_ARTIC_ASSIGN, 0, 9, 0, b"".join(reversed(groups))),
         ),
     )
     document = read_mus_document(PATH)
     assignments = document.details.of_tag("articAssign")
     assert len(assignments) == 2
     assert {"hide" in record.fields for record in assignments} == {False, True}
-    assert [record.attrs["inci"] for record in assignments] == ["4", "5"]
-    assert [record.attrs["sourceInci"] for record in assignments] == ["4", "4"]
+    assert [record.attrs["inci"] for record in assignments] == ["0", "1"]
+    assert [record.attrs["sourceInci"] for record in assignments] == ["0", "0"]
     assert articulations_by_entry(document) == {9: ("accent",)}
 
 
@@ -626,19 +626,19 @@ def test_a_fermata_in_a_packed_mus_assignment_reaches_musicxml(
 def test_packed_and_separate_assignments_keep_unique_identities_and_source_rows(
     pools: Callable[..., None],
 ) -> None:
-    """A following raw incidence can equal a packed group's synthetic incidence."""
+    """Separate score records continue the packed group's logical incidences."""
     pools(
         details=(
-            MusDetailRecord(TAG_ARTIC_ASSIGN, 0, 9, 4, artic_assign_payload(1, 2, 1)),
-            MusDetailRecord(TAG_ARTIC_ASSIGN, 0, 9, 5, artic_assign_payload(2, 3)),
+            MusDetailRecord(TAG_ARTIC_ASSIGN, 0, 9, 0, artic_assign_payload(1, 2, 1)),
+            MusDetailRecord(TAG_ARTIC_ASSIGN, 0, 9, 0, artic_assign_payload(2, 3)),
         )
     )
     document = read_mus_document(PATH)
     assignments = document.details.of_tag("articAssign")
     assert [record.fields["articDef"] for record in assignments] == ["1", "2", "3"]
-    assert [record.attrs["inci"] for record in assignments] == ["4", "5", "6"]
-    assert [record.attrs["sourceInci"] for record in assignments] == ["4", "4", "5"]
-    for incidence, assignment in zip((4, 5, 6), assignments, strict=True):
+    assert [record.attrs["inci"] for record in assignments] == ["0", "1", "2"]
+    assert [record.attrs["sourceInci"] for record in assignments] == ["0", "0", "0"]
+    for incidence, assignment in zip((0, 1, 2), assignments, strict=True):
         assert document.details.for_entry("articAssign", 9, incidence) is assignment
 
 

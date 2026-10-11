@@ -829,6 +829,19 @@ def test_a_tuplet_reference_carries_no_inci_and_still_finds_its_row() -> None:
     assert references[0]["tree_key"] == "(cmper1 0, cmper2 501, inci 0)"
 
 
+def test_a_reference_selects_the_raw_part_scope_before_its_logical_incidence() -> None:
+    references = _retargeted(
+        (_raw(TAG_TUPLET_DEF, 501), _raw(TAG_TUPLET_DEF, 501, 3)),
+        _named("tupletDef", entnum="501", inci="0", part="3"),
+    )
+    assert references[0]["tree_key"] == "(cmper1 0, cmper2 501, inci 3)"
+
+
+def test_a_missing_part_row_is_not_retargeted_to_the_score_row() -> None:
+    document = _mus_document((_named("tupletDef", entnum="501", part="3"),), ())
+    assert model._mus_reference_targets(document, (_raw(TAG_TUPLET_DEF, 501),)) == {}
+
+
 def test_every_verse_of_a_lyric_reference_points_at_the_one_row_that_holds_them() -> None:
     """The trap. A `lyrDataVerse` record's `inci` is a per-entry assignment
     counter that `mus_document` invents, not the raw row's incidence: one raw

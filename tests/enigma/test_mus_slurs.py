@@ -79,7 +79,7 @@ def test_packed_marks_keep_every_incidence_and_the_full_entry_key(
     ] == [
         ({"entnum": "65538", "inci": "0", "sourceInci": "0"}, {"shapeNum": "7"}),
         ({"entnum": "65538", "inci": "1", "sourceInci": "0"}, {"shapeNum": "8"}),
-        ({"entnum": "65538", "inci": "2", "sourceInci": "9"}, {"shapeNum": "10"}),
+        ({"entnum": "65538", "inci": "0", "sourceInci": "9", "part": "9"}, {"shapeNum": "10"}),
     ]
 
 

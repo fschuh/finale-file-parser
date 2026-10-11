@@ -316,6 +316,41 @@ Layers are distinct from Finale's **voice 1 / voice 2** within a layer (`eeppd.t
 "V2 launch" and `CNTLBIT`). No voice-2 marker has been located in EnigmaXML entry records yet, and the
 measure sums above do not require one, so it remains unmodelled.
 
+### Legacy detail scope and linked-part groups (2026-10-11)
+
+The variable-length details header word at **+6** is the **part ID**, with 0
+for the score. It was previously called `inci` without evidence because every
+record in the original paired corpus held zero. The raw `MusDetailRecord.inci`
+constructor/attribute is retained for compatibility; its new `part` property
+expresses the corrected meaning. This is not the logical incidence used when
+unpacking a payload into normalized records.
+
+Evidence: the published [PDK FCGroup source](https://pdk.finalelua.com/ff__details_8h_source.html)
+derives groups from `__FCNoInciDetail` and explicitly initializes logical
+incidence to zero. In the attributed RGP Lua 0.79 binary, its `Load(cmper1,
+cmper2)` at **0x4cbb06** writes those two keys and clears the actual incidence
+word. The supplied 75 MUS files have **131** group records: **76** have header
+part 0, **54** have part 1 and **one** has part 2. Every nonzero value resolves
+to a stored linked-part definition (others 238 cmper), while other translated
+detail types have header part 0 in these files. Multiple score groups retain
+part 0; this field is not a group ordinal or a duplicate counter.
+
+Birth of the People's `(0,1)` group has part 0 and `(0,2)` has part 1. Both
+have the same two-staff span, brace and full measure range; they belong to
+different contexts. Normalize the header scope as `part` on **all** translated
+detail records, and keep the existing score-only filters in the shared
+resolvers. This exports the score's one brace without deleting its linked-part
+record or comparing labels/endpoints. Genuine nested groups and score groups
+sharing endpoints remain distinct.
+
+Packed assignment incidence counters and duplicate suppression are local to
+each part, so a part's copy cannot swallow a score articulation or lyric.
+The compatibility `sourceInci` backlink continues to carry the raw header
+value; inspector references select this raw scope or normalized `part`, never
+the packed element's logical incidence or a different part's first row. The
+raw Records tree retains its existing `inci` key spelling for link compatibility.
+No new IR layout or name-based group policy is introduced.
+
 ### Legacy staff and group names (2026-10-11)
 
 Names use the document's stored two-hop references, not a fixed palette:
@@ -538,7 +573,7 @@ cmpers, so its header carries one more field:
 0-1    tag       record type (numeric; .musx names the same types)
 2-3    cmper1    first key component (staff, for gfhold)
 4-5    cmper2    second key component (measure, for gfhold)
-6-7    inci      incidence — identified by position only, see below
+6-7    part      score (0) or linked-part ID; compatibility attribute named inci
 8-11   length    payload size in bytes
 12-    payload   `length` bytes
 12+length  extra length   LE32
@@ -565,10 +600,11 @@ pairs, all of which are same-content pairs carrying `gfhold`:
 the resolved clef into the record. This refines the earlier note that every `gfhold` carries a
 `clefID` with no inheritance — true of `.musx`, not of `.mus`.
 
-**`inci` is named by position, not evidence.** It sits exactly where Enigma's third key component
-belongs, but it is zero in all 77,384 corpus records examined and no corpus document repeats a
-`(tag, cmper1, cmper2)` key, so nothing yet distinguishes an incidence counter from a reserved
-field. The reader keeps the value rather than dropping it.
+**The header's earlier incidence hypothesis is retracted (2026-10-11).** The
+all-zero paired corpus could not determine the word's meaning. Nonzero groups,
+their linked-part definitions and the PDK's no-incidence contract establish
+part scope; see [the evidence above](#legacy-detail-scope-and-linked-part-groups-2026-10-11).
+The reader retains `inci` as a compatibility spelling and exposes `part`.
 
 Locating `gfhold` cost a third repeat of the same mistake: the previously recorded offsets (staff at
 +20, measure+1 at +22, both ~160/164) were the **next record's key pair**, read from an anchor that

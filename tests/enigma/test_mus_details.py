@@ -76,10 +76,10 @@ def test_reads_consecutive_records_of_differing_length(
     assert (second.tag, len(second.payload)) == (1044, 20)
 
 
-def test_keeps_a_non_zero_incidence(streams: Callable[..., None]) -> None:
-    """`inci` is zero throughout the corpus, so nothing else would catch a
-    reader that dropped the field or read the wrong two bytes."""
+def test_keeps_a_non_zero_part_scope(streams: Callable[..., None]) -> None:
+    """The original all-zero corpus could not distinguish this header field."""
     streams(pool(record(1044, 1, 1, 3, bytes(20))))
+    assert read_mus_details(PATH)[0].part == 3
     assert read_mus_details(PATH)[0].inci == 3
 
 
