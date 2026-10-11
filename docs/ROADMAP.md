@@ -130,6 +130,11 @@ limit is verified by mutation, because no real corpus archive trips one.
 - [x] **Normal fermatas** — assigned legacy glyphs 85/117 preserve upright/inverted
       symbols on notes, chords and rests. Packed `.mus` articulation groups are
       fully split; notation export keeps written durations and adds no tempo curve.
+- [x] **Plain arpeggios** — assigned legacy glyph 103 becomes note-level MusicXML
+      arpeggiation. Documented clone endpoints and staff distances connect an
+      evidenced two-staff roll; export projects those staff-parts into one XML
+      part while the canonical IR retains the source staff structure. Larger
+      spans, arrow/shape variants and exact performance timing remain unsupported.
 - [x] **Explicit metronome rates** — assigned printed beat/rate markings become
       structured IR tempo, MusicXML metronome notation and quarter-note playback
       tempo. Untyped playback values and expressive timing remain uninterpreted.
@@ -145,7 +150,7 @@ limit is verified by mutation, because no real corpus archive trips one.
       across 85 corpus documents.
 - [x] **Articulations** — `enigma/articulations.py`, both containers. 22,821 marks across 273
       documents, from the five music-font characters with cross-font evidence; fingerings and the
-      evidenced ornaments/fermatas have separate resolvers; remaining characters are not guessed at.
+      evidenced ornaments/fermatas/arpeggios have separate resolvers; remaining characters are not guessed at.
 - [x] **Beams** — `enigma/beams.py`, both containers. 84,593 beams across 366 documents, with
       secondary beams and hooks; Enigma stores only a "starts a group" bit, so the rest is derived.
 - [x] **Repeats** — `enigma/repeats.py`, both containers. Forward and backward repeat barlines,

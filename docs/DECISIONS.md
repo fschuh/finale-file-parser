@@ -10,6 +10,29 @@ and resolved ones **DECIDED**.
 
 ---
 
+## 2026-10-10 — DECIDED: retain arpeggio connections in the IR and project connected staves at export
+
+**Context.** The user requested missing arpeggio signs from Scars of Time. Six
+assigned plain glyphs were already normalized but had no resolver or exporter.
+Its opening sign spans both staves; a note-only glyph mapping would shorten it
+to the upper chord. MusicXML expresses connected staff rolls inside one part,
+while the reader's canonical `Score` currently has one part per staff.
+
+**Decision.** Append `Event.arpeggios` using immutable `Arpeggio` objects. Keep
+the reader's existing staff-parts, and record a shared connection and staff ids
+only where the assignment's documented vertical-copy endpoint covers one
+complete simultaneous lower chord in a two-staff brace with known geometry.
+The XML exporter projects explicitly connected consecutive staff-parts into
+one multi-staff part. A brace alone never causes merging or a new arpeggio.
+
+**Consequence.** Every chord pitch receives a real `<arpeggiate>` notation;
+shared numbers preserve connected rolls, and independent simultaneous rolls
+remain separate. Staff attributes, voice identities, cursor timing, directions,
+barlines and outer groups survive the projection. Source pitches, written and
+metric durations stay intact. No exact Finale roll timing, arrow glyph, manual
+shape or broader span policy is inferred. The byte evidence and local/synthetic
+validation are recorded in `docs/ARCHITECTURE.md`.
+
 ## 2026-08-20 — DECIDED: PDF export goes through svglib, behind an optional extra
 
 `finale-parser convert --format pdf` writes an engraved score as PDF. The route is

@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import math
 import xml.etree.ElementTree as ET
+from dataclasses import replace
 from decimal import Decimal
 from fractions import Fraction
 
@@ -60,6 +61,8 @@ _NOTE_TYPES = {
 _MAX_DIVISIONS = 1_000_000
 """Guard against a pathological duration forcing an absurd divisions value."""
 
+_ArpeggioNumbers = dict[tuple[str, int, int, int], tuple[str, ...]]
+
 
 class ExportError(FinaleFileError):
     """The score cannot be represented as MusicXML."""
@@ -75,17 +78,28 @@ def to_musicxml(score: Score) -> bytes:
     root = ET.Element("score-partwise", version=MUSICXML_VERSION)
     _append_identification(root, score)
 
-    _append_part_list(root, score)
+    bundles = _staff_bundles(score)
+    labels = {
+        bundle[0].id: group
+        for bundle in bundles
+        if len(bundle) > 1 and (group := _bundle_group(bundle, score.groups)) is not None
+    }
+    _append_part_list(root, _part_list_layout(score, bundles), labels=labels)
 
-    for part in score.parts:
-        _append_part(root, part)
+    for bundle in bundles:
+        if len(bundle) == 1:
+            _append_part(root, bundle[0], arpeggio_numbers=_arpeggio_numbers(bundle))
+        else:
+            _append_multistaff_part(root, bundle, score.groups)
 
     ET.indent(root, space="  ")
     body = ET.tostring(root, encoding="unicode")
     return f'<?xml version="1.0" encoding="UTF-8"?>\n{_DOCTYPE}\n{body}\n'.encode()
 
 
-def _append_part_list(root: ET.Element, score: Score) -> None:
+def _append_part_list(
+    root: ET.Element, score: Score, *, labels: dict[str, PartGroup] | None = None
+) -> None:
     """The part list, with each group's brace or bracket wrapped around it.
 
     MusicXML expresses a group as a matched pair of `<part-group>` elements
@@ -102,7 +116,12 @@ def _append_part_list(root: ET.Element, score: Score) -> None:
             open_numbers[group_index] = number
             _append_group(part_list, score.groups[group_index], number, "start")
         score_part = ET.SubElement(part_list, "score-part", id=part.id)
-        ET.SubElement(score_part, "part-name").text = part.name or part.id
+        label = (labels or {}).get(part.id)
+        ET.SubElement(score_part, "part-name").text = (
+            label.name if label is not None and label.name else part.name or part.id
+        )
+        if label is not None and label.abbreviation:
+            ET.SubElement(score_part, "part-abbreviation").text = label.abbreviation
         # Innermost first, so groups close in the reverse of the order they
         # opened even where several end on the same part.
         for group_index in reversed(stopping.get(index, ())):
@@ -203,13 +222,242 @@ def _note_type(event: Event) -> str:
     return name
 
 
-def _append_part(root: ET.Element, part: Part) -> None:
+def _append_part(
+    root: ET.Element,
+    part: Part,
+    *,
+    divisions: int | None = None,
+    arpeggio_numbers: _ArpeggioNumbers | None = None,
+) -> None:
     element = ET.SubElement(root, "part", id=part.id)
-    divisions = _divisions_for(part)
+    divisions = _divisions_for(part) if divisions is None else divisions
     first = True
     for measure in part.measures:
-        _append_measure(element, measure, divisions, emit_divisions=first)
+        _append_measure(
+            element,
+            measure,
+            divisions,
+            emit_divisions=first,
+            part_id=part.id,
+            arpeggio_numbers=arpeggio_numbers,
+        )
         first = False
+
+
+def _staff_bundles(score: Score) -> tuple[tuple[Part, ...], ...]:
+    """Only explicit arpeggio connections join staff-parts for MusicXML."""
+    positions = {part.id: index for index, part in enumerate(score.parts)}
+    joined = [False] * max(0, len(score.parts) - 1)
+    for part in score.parts:
+        for measure in part.measures:
+            for voice in measure.voices:
+                for event in voice.events:
+                    for mark in event.arpeggios:
+                        if not mark.part_ids:
+                            continue
+                        indices = [positions.get(part_id, -1) for part_id in mark.part_ids]
+                        if (
+                            not mark.group
+                            or len(indices) < 2
+                            or part.id not in mark.part_ids
+                            or indices[0] < 0
+                            or indices != list(range(indices[0], indices[0] + len(indices)))
+                        ):
+                            raise ExportError("an arpeggio span must name consecutive score parts")
+                        for index in indices[:-1]:
+                            joined[index] = True
+    bundles: list[tuple[Part, ...]] = []
+    start = 0
+    for index, connected in enumerate(joined):
+        if not connected:
+            bundles.append(score.parts[start : index + 1])
+            start = index + 1
+    if score.parts:
+        bundles.append(score.parts[start:])
+    return tuple(bundles)
+
+
+def _part_list_layout(score: Score, bundles: tuple[tuple[Part, ...], ...]) -> Score:
+    ids = {part.id: bundle[0].id for bundle in bundles for part in bundle}
+    absorbed = {
+        group
+        for bundle in bundles
+        if len(bundle) > 1 and (group := _bundle_group(bundle, score.groups)) is not None
+    }
+    groups = []
+    for group in score.groups:
+        members = tuple(dict.fromkeys(ids[part_id] for part_id in group.part_ids if part_id in ids))
+        if group in absorbed:
+            # This group's symbol now belongs to the multi-staff part itself.
+            continue
+        groups.append(replace(group, part_ids=members))
+    return replace(score, parts=tuple(bundle[0] for bundle in bundles), groups=tuple(groups))
+
+
+def _bundle_group(parts: tuple[Part, ...], groups: tuple[PartGroup, ...]) -> PartGroup | None:
+    ids = tuple(part.id for part in parts)
+    candidates = [group for group in groups if group.part_ids == ids and group.symbol]
+    return next(
+        (group for group in reversed(candidates) if group.symbol == "brace"),
+        candidates[-1] if candidates else None,
+    )
+
+
+def _arpeggio_numbers(parts: tuple[Part, ...]) -> _ArpeggioNumbers:
+    """Independent simultaneous rolls get different numbers, connected rolls one."""
+    result: _ArpeggioNumbers = {}
+    used: dict[tuple[int, Fraction], dict[str | tuple[str, int, int, int], str]] = {}
+    for part in parts:
+        for measure in part.measures:
+            for voice in measure.voices:
+                onset = Fraction(0)
+                for index, event in enumerate(voice.events):
+                    assigned = []
+                    for mark_index, mark in enumerate(event.arpeggios):
+                        numbers = used.setdefault((measure.number, onset), {})
+                        identity = mark.group or (part.id, voice.number, index, mark_index)
+                        if identity not in numbers:
+                            if len(numbers) == 16:
+                                raise ExportError("more than 16 simultaneous arpeggios")
+                            numbers[identity] = str(len(numbers) + 1)
+                        assigned.append(numbers[identity])
+                    if assigned:
+                        result[part.id, measure.number, voice.number, index] = tuple(assigned)
+                    if not event.is_grace:
+                        onset += event.duration
+    return result
+
+
+def _append_multistaff_part(
+    root: ET.Element, parts: tuple[Part, ...], groups: tuple[PartGroup, ...]
+) -> None:
+    """Project staff-parts onto one XML part, keeping notes and their attachments."""
+    numbers = tuple(measure.number for measure in parts[0].measures)
+    if any(tuple(measure.number for measure in part.measures) != numbers for part in parts):
+        raise ExportError("connected staff parts must have the same measure sequence")
+    divisions = math.lcm(*(_divisions_for(part) for part in parts))
+    if divisions > _MAX_DIVISIONS:
+        raise ExportError(f"durations require {divisions} divisions per quarter; refusing")
+    temporary = ET.Element("parts")
+    arpeggio_numbers = _arpeggio_numbers(parts)
+    next_voice = 1
+    for staff, part in enumerate(parts, start=1):
+        _append_part(temporary, part, divisions=divisions, arpeggio_numbers=arpeggio_numbers)
+        voices = sorted({voice.number for measure in part.measures for voice in measure.voices})
+        voice_ids = {str(voice): str(next_voice + index) for index, voice in enumerate(voices)}
+        next_voice += len(voices)
+        _assign_staff(temporary[-1], staff, voice_ids)
+    group = _bundle_group(parts, groups)
+    symbol = group.symbol if group is not None else None
+    result = ET.SubElement(root, "part", id=parts[0].id)
+    for index, number in enumerate(numbers):
+        measures = tuple(part[index] for part in temporary)
+        _merge_staff_measures(result, number, measures, symbol, first=index == 0)
+
+
+def _assign_staff(part: ET.Element, staff: int, voices: dict[str, str]) -> None:
+    for measure in part:
+        for element in measure:
+            if element.tag == "note":
+                voice = element.find("voice")
+                if voice is not None and voice.text is not None:
+                    voice.text = voices[voice.text]
+                at = next(
+                    (
+                        index
+                        for index, child in enumerate(element)
+                        if child.tag in {"beam", "notations", "lyric"}
+                    ),
+                    len(element),
+                )
+                staff_element = ET.Element("staff")
+                staff_element.text = str(staff)
+                element.insert(at, staff_element)
+            elif element.tag == "direction":
+                at = next(
+                    (index for index, child in enumerate(element) if child.tag == "sound"),
+                    len(element),
+                )
+                staff_element = ET.Element("staff")
+                staff_element.text = str(staff)
+                element.insert(at, staff_element)
+
+
+def _merged_attributes(
+    measures: tuple[ET.Element, ...], symbol: str | None, *, first: bool
+) -> ET.Element | None:
+    sources = [measure.find("attributes") for measure in measures]
+    if not first and all(source is None for source in sources):
+        return None
+    result = ET.Element("attributes")
+    for tag in ("divisions", "key", "time"):
+        for staff, source in enumerate(sources, start=1):
+            if source is None or (element := source.find(tag)) is None:
+                continue
+            if tag == "divisions":
+                if result.find(tag) is None:
+                    result.append(element)
+            else:
+                element.set("number", str(staff))
+                result.append(element)
+    if first:
+        ET.SubElement(result, "staves").text = str(len(measures))
+        if symbol:
+            ET.SubElement(
+                result, "part-symbol", {"top-staff": "1", "bottom-staff": str(len(measures))}
+            ).text = symbol
+    for staff, source in enumerate(sources, start=1):
+        if source is not None and (clef := source.find("clef")) is not None:
+            clef.set("number", str(staff))
+            result.append(clef)
+    return result
+
+
+def _merge_staff_measures(
+    parent: ET.Element,
+    number: int,
+    measures: tuple[ET.Element, ...],
+    symbol: str | None,
+    *,
+    first: bool,
+) -> None:
+    result = ET.SubElement(parent, "measure", number=str(number))
+    attributes = _merged_attributes(measures, symbol, first=first)
+    if attributes is not None:
+        result.append(attributes)
+    barlines = {
+        element.get("location", "right"): element for element in measures[0].findall("barline")
+    }
+    for measure in measures[1:]:
+        other = {
+            element.get("location", "right"): element for element in measure.findall("barline")
+        }
+        if {key: ET.tostring(value) for key, value in other.items()} != {
+            key: ET.tostring(value) for key, value in barlines.items()
+        }:
+            raise ExportError("connected staff parts have conflicting barlines")
+    cursor = 0
+    for measure in measures:
+        if cursor:
+            ET.SubElement(ET.SubElement(result, "backup"), "duration").text = str(cursor)
+            cursor = 0
+        for element in measure:
+            if element.tag == "attributes":
+                continue
+            if element.tag == "barline":
+                continue
+            result.append(element)
+            duration = int(element.findtext("duration", "0"))
+            if element.tag == "backup":
+                cursor -= duration
+            elif element.tag == "forward" or (
+                element.tag == "note" and element.find("chord") is None
+            ):
+                cursor += duration
+    if "left" in barlines:
+        result.insert(0, barlines["left"])
+    if "right" in barlines:
+        result.append(barlines["right"])
 
 
 _DYNAMICS_PLACEMENT = "below"
@@ -319,7 +567,13 @@ def _is_glyph(text: str) -> bool:
 
 
 def _append_measure(
-    parent: ET.Element, measure: Measure, divisions: int, *, emit_divisions: bool
+    parent: ET.Element,
+    measure: Measure,
+    divisions: int,
+    *,
+    emit_divisions: bool,
+    part_id: str = "",
+    arpeggio_numbers: _ArpeggioNumbers | None = None,
 ) -> None:
     element = ET.SubElement(parent, "measure", number=str(measure.number))
     _append_barline(element, measure, "left")
@@ -345,8 +599,13 @@ def _append_measure(
             if spent:
                 backup = ET.SubElement(element, "backup")
                 ET.SubElement(backup, "duration").text = str(spent)
-        for event in voice.events:
-            _append_event(element, event, voice, divisions)
+        for event_index, event in enumerate(voice.events):
+            numbers = (
+                ()
+                if arpeggio_numbers is None
+                else arpeggio_numbers.get((part_id, measure.number, voice.number, event_index), ())
+            )
+            _append_event(element, event, voice, divisions, arpeggio_numbers=numbers)
 
     _append_barline(element, measure, "right")
 
@@ -428,7 +687,14 @@ def _append_attributes(
             ET.SubElement(clef, "line").text = str(measure.clef_line)
 
 
-def _append_event(element: ET.Element, event: Event, voice: Voice, divisions: int) -> None:
+def _append_event(
+    element: ET.Element,
+    event: Event,
+    voice: Voice,
+    divisions: int,
+    *,
+    arpeggio_numbers: tuple[str, ...] = (),
+) -> None:
     if event.note_ties and len(event.note_ties) != len(event.pitches):
         raise ExportError("per-note tie flags must match the number of pitches")
     legacy_ties = NoteTies(event.tie_start, event.tie_end)
@@ -437,7 +703,16 @@ def _append_event(element: ET.Element, event: Event, voice: Voice, divisions: in
         return
     for index, pitch in enumerate(event.pitches):
         ties = event.note_ties[index] if event.note_ties else legacy_ties
-        _append_note(element, event, voice, divisions, pitch=pitch, chord=bool(index), ties=ties)
+        _append_note(
+            element,
+            event,
+            voice,
+            divisions,
+            pitch=pitch,
+            chord=bool(index),
+            ties=ties,
+            arpeggio_numbers=arpeggio_numbers,
+        )
 
 
 def _append_note(
@@ -449,6 +724,7 @@ def _append_note(
     pitch: Pitch | None,
     chord: bool,
     ties: NoteTies,
+    arpeggio_numbers: tuple[str, ...] = (),
 ) -> None:
     note = ET.SubElement(element, "note")
     # Schema order: grace, chord, pitch or rest, duration, tie, voice, type...
@@ -508,7 +784,8 @@ def _append_note(
     digits = () if chord else event.fingerings
     ornaments = () if chord else event.ornaments
     fermatas = () if chord else event.fermatas
-    if ties.start or ties.stop or marks or digits or ornaments or fermatas:
+    arpeggios = event.arpeggios if pitch is not None else ()
+    if ties.start or ties.stop or marks or digits or ornaments or fermatas or arpeggios:
         notations = ET.SubElement(note, "notations")
         if ties.stop:
             ET.SubElement(notations, "tied", type="stop")
@@ -543,6 +820,13 @@ def _append_note(
             technical = ET.SubElement(notations, "technical")
             for digit in digits:
                 ET.SubElement(technical, "fingering").text = digit
+        # Unlike an accent, an arpeggio names every participating chord pitch.
+        # There is no arrow on the supported glyph, so omit `direction`.
+        for index, arpeggio in enumerate(arpeggios):
+            attrs = {"number": arpeggio_numbers[index] if arpeggio_numbers else str(index + 1)}
+            if arpeggio.part_ids:
+                attrs["unbroken"] = "yes"
+            ET.SubElement(notations, "arpeggiate", attrs)
     # Schema order puts <lyric> last, after <notations>. Only on a chord's
     # principal note: the syllable is sung once, not once per pitch.
     if not chord:

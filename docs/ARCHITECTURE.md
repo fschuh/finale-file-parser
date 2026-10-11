@@ -982,12 +982,94 @@ incidence on that entry, avoiding collisions with following raw records;
 `sourceInci` retains the raw row for report links. This is adapter metadata,
 not a newly decoded file field.
 
-No other fields in these groups have been newly interpreted. The local export
+At that stage no other group fields were interpreted; the arpeggio work below
+now preserves the four positioning words. The local export
 recovers the fermata and two supported accents; the remaining pedal assignments
 reach the normalized document but still need a pedal resolver/exporter. Authored
 synthetic tests cover multiple groups, repeated definitions, identity collisions,
 partial groups and the full reader-to-export path. The licensed corpus is absent
 in this checkout, so a new sweep over its era variants remains outstanding.
+
+### Known format facts — arpeggios and their vertical extent
+
+`enigma/arpeggios.py` recognizes an assigned, visible score `articDef.charMain`
+of **103**, lowercase `g`, as a plain rolled-chord sign. Finale's official
+[Maestro](https://usermanuals.finalemusic.com/FinaleWin/Content/Finale/font-maestro.htm),
+[Engraver](https://usermanuals.finalemusic.com/FinaleWin/Content/Finale/font-engraver.htm)
+and [Broadway Copyist](https://usermanuals.finalemusic.com/FinaleWin/Content/Finale/font-broadway-copyist.htm)
+charts agree. Unassigned definitions, linked-part variants, XML hidden assignments,
+shape definitions and unknown glyphs do not place signs. There is no arrow on
+this glyph; its default upward roll does not imply a printed upward arrow.
+
+The legacy tag-1009 adapter retains these fields in each complete 20-byte group:
+
+| Group offset | EnigmaXML field | Stored type | PDK name |
+| --- | --- | --- | --- |
+| +0 | `articDef` | u16 | `imrkdef` |
+| +2 | `horzOff` | signed i16 EVPUs | `posadd` |
+| +4 | `horzAdd` | signed i16 EVPUs | `posadder` |
+| +6 | `vertOff` | signed i16 EVPUs | `noteadd` |
+| +8 | `vertAdd` | signed i16 EVPUs | `lonoadd` |
+
+Evidence: the ETF specification's `IM` example orders the definition and four
+positioning words; published PDK
+[articulation getters](https://pdk.finalelua.com/ff__entrydetails_8h_source.html#l02060)
+name the corresponding members. The
+[vertical-copy API](https://pdk.finalelua.com/class_f_c_articulation.html)
+defines the endpoint relative to the lowest note. The same EnigmaXML names are
+documented by MIT-licensed musxdom's
+[assignment model](https://github.com/openmusx/musxdom/blob/faf0a0156f4073142fe96022f9644a05fb774581/src/musx/dom/Details.h#L146)
+and [field map](https://github.com/openmusx/musxdom/blob/faf0a0156f4073142fe96022f9644a05fb774581/src/musx/factory/FieldPopulatorsDetails.cpp#L125).
+Read-only inspection of the same released RGP Lua 0.79 binary identified above
+confirms signed 16-bit reads at object +0x42/+0x44/+0x46/+0x48, relative to its
+definition word at +0x40: getter VMs 0x73c5e, 0x73f50, 0x73e84 and 0x7401a,
+with `GetID` at 0x741c4. These are runtime object offsets; subtracting the
+definition's base gives the file-group offsets. No plugin code is copied or run.
+
+The tag-159 `instUsed` **24-byte staff slot** also retains signed i32
+`distFromTop` at **+8**. The published
+[staff-list getter](https://pdk.finalelua.com/ff__other_8h_source.html#l07039)
+reads `-_instrumentused.separ`; musxdom's
+[StaffUsed model](https://github.com/openmusx/musxdom/blob/faf0a0156f4073142fe96022f9644a05fb774581/src/musx/dom/Others.h#L2987)
+uses the stored sign, negative down. In the released binary `SetStaff` at VM
+0x1f4e0e writes the slot's leading staff word at object +0x38, and `GetDistance`
+at 0x1f4eda negates the i32 at +0x40. Their difference establishes slot +8.
+The Scars score's default and page layouts independently store lower-staff
+distance **-288**, corroborating the sign and width.
+
+For a two-staff brace with known default score geometry, the reader combines
+that distance, a carried G/F/C clef and written pitch to locate notes in EVPUs
+(24 per staff space, 12 per diatonic step). A source `vertAdd` extending below
+the assigned event connects exactly one ordinary, simultaneous lower chord
+only when its entire pitch range lies within the extension. No brace or MIDI
+timing alone creates a roll. Missing geometry, ambiguous candidates, graces,
+partial chord coverage and an independently marked lower chord retain the
+single-staff sign. Larger spans, nonstandard staff geometry, changing system
+spacing, manual shapes and arrow glyphs require further evidence.
+
+`Event.arpeggios` appends immutable `Arpeggio` objects to the canonical IR.
+Connected events share a group token and the participating staff-part ids;
+`Score.parts` remains one part per source staff. MusicXML emits `<arpeggiate>`
+directly in each participating pitch's `<notations>`, unlike an accent which
+belongs once to the chord. The
+[MusicXML reference](https://www.w3.org/2021/06/musicxml40/musicxml-reference/elements/arpeggiate/)
+uses a shared `number` for connected rolls and `unbroken="yes"` as a staff-span
+hint. A connected run is projected into one XML part with numbered staves,
+clefs, keys, time signatures, unique voices and exact cursor backups. Brace
+names/abbreviations become part labels; surrounding groups survive. Independent
+simultaneous rolls get different numbers. Without a connection, part layout is
+unchanged. This preserves engraving semantics without reconstructing MIDI timing.
+
+Local verification (2026-10-10): Scars has six source assignments, at m1, m5,
+m12, m13, m16 and m18. The m1 assignment's `vertAdd=-312` reaches the lower
+chord; the other five stay on the lower staff. Export has 22 note-level
+`arpeggiate` elements representing **six printed signs**, including the opening
+continuous span. All 928 written pitches and every earlier note, onset,
+attachment and direction match the previous corrected export after accounting
+for staff/voice identities. The official schema validates it; all three
+Verovio pages were inspected. Authored regressions cover recognition, packed
+positions, source geometry, span ambiguity, cursor rewinds and grouping. The
+licensed corpus and a MuseScore runtime are absent here.
 
 ### Known format facts — fermatas
 

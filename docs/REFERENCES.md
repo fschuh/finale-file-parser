@@ -152,6 +152,11 @@ entry here that supports them.
   no binary or implementation code is copied into this repository.
 - Published API documentation: https://pdk.finalelua.com/ff__prefs_8h_source.html
   and https://pdk.finalelua.com/ff__noteframe_8h_source.html
+  plus https://pdk.finalelua.com/ff__entrydetails_8h_source.html (articulation
+  positioning/copy endpoints) and https://pdk.finalelua.com/ff__other_8h_source.html
+  (staff-list geometry).
 - The released preference-location map and individual entry getter establish
-  the legacy grace fields. Hashes and reproducible offsets, with their scope,
+  the legacy grace fields. Articulation getters and staff-list accessors also
+  establish positioning words and staff distance used for arpeggio connections.
+  Hashes and reproducible offsets, with their scope,
   are recorded in `docs/ARCHITECTURE.md`.

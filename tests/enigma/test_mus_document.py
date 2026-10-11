@@ -41,7 +41,7 @@ from finale_file_parser.enigma.pitch import read_transposition
 from finale_file_parser.enigma.to_ir import build_score
 from finale_file_parser.enigma.tuplet import tuplets_by_entry
 from finale_file_parser.export.musicxml import to_musicxml
-from finale_file_parser.ir import Fermata
+from finale_file_parser.ir import Arpeggio, Fermata
 
 PATH = "unused.mus"
 """Every reader is stubbed, so no file is ever opened."""
@@ -511,8 +511,10 @@ def test_a_fermata_in_a_packed_mus_assignment_reaches_musicxml(
     score = build_score(read_mus_document(PATH))
     event = score.parts[0].measures[0].voices[0].events[0]
     assert event.fermatas == (Fermata(),)
+    assert event.arpeggios == (Arpeggio(),)
     root = DET.fromstring(to_musicxml(score))
     assert len(root.findall(".//fermata[@type='upright']")) == 1
+    assert len(root.findall(".//arpeggiate")) == 2
     assert [note.findtext("pitch/step") for note in root.findall(".//note")] == ["C", "E"]
 
 
@@ -533,6 +535,23 @@ def test_packed_and_separate_assignments_keep_unique_identities_and_source_rows(
     assert [record.attrs["sourceInci"] for record in assignments] == ["4", "4", "5"]
     for incidence, assignment in zip((4, 5, 6), assignments, strict=True):
         assert document.details.for_entry("articAssign", 9, incidence) is assignment
+
+
+def test_packed_assignment_positions_use_signed_words_in_each_group(
+    pools: Callable[..., None],
+) -> None:
+    first = b"".join(
+        value.to_bytes(2, "little", signed=True) for value in (1, -18, 0, -20, -240)
+    ) + bytes(10)
+    second = b"".join(
+        value.to_bytes(2, "little", signed=True) for value in (2, 5, 24, 30, 48)
+    ) + bytes(10)
+    pools(details=(MusDetailRecord(TAG_ARTIC_ASSIGN, 0, 9, 0, first + second),))
+    assignments = read_mus_document(PATH).details.of_tag("articAssign")
+    assert [record.fields for record in assignments] == [
+        {"articDef": "1", "horzOff": "-18", "horzAdd": "0", "vertOff": "-20", "vertAdd": "-240"},
+        {"articDef": "2", "horzOff": "5", "horzAdd": "24", "vertOff": "30", "vertAdd": "48"},
+    ]
 
 
 @pytest.mark.parametrize("length", [0, 1, 2, 19, 21, 39, 41])
@@ -850,6 +869,20 @@ def test_the_score_staff_list_becomes_one_inst_used_record_per_slot(
     records = read_mus_document(PATH).others.of_tag("instUsed")
     assert [r.attrs["inci"] for r in records] == ["0", "1", "2"]
     assert [r.fields["inst"] for r in records] == ["1", "2", "3"]
+
+
+def test_staff_geometry_reads_signed_32_bit_distances_per_slot(
+    pools: Callable[..., None],
+) -> None:
+    payload = bytearray(inst_used_payload(1, 2, 3))
+    for index, distance in enumerate((0, -240, -70000)):
+        payload[index * _SLOT + 8 : index * _SLOT + 12] = distance.to_bytes(
+            4, "little", signed=True
+        )
+    pools(others=(MusOther(INST_USED, 0, 0, bytes(payload)),))
+    assert [
+        record.fields["distFromTop"] for record in read_mus_document(PATH).others.of_tag("instUsed")
+    ] == ["0", "-240", "-70000"]
 
 
 def test_a_staff_list_that_is_not_ascending_keeps_its_order(

@@ -12,6 +12,7 @@ from collections import defaultdict
 from dataclasses import dataclass, field, replace
 from fractions import Fraction
 
+from finale_file_parser.enigma.arpeggios import EventPosition, arpeggios_by_entry, connect_arpeggios
 from finale_file_parser.enigma.articulations import articulations_by_entry
 from finale_file_parser.enigma.barlines import barline_styles
 from finale_file_parser.enigma.beams import BeamedNote, beams_for
@@ -42,6 +43,7 @@ from finale_file_parser.enigma.timesig import TimeSignature as EnigmaTimeSignatu
 from finale_file_parser.enigma.timesig import time_signatures
 from finale_file_parser.enigma.tuplet import entry_chain, sounded_durations, tuplets_by_entry
 from finale_file_parser.ir import (
+    Arpeggio,
     Event,
     Expression,
     Fermata,
@@ -121,6 +123,8 @@ def build_score(document: EnigmaDocument) -> Score:
     fingerings = fingerings_by_entry(document)
     ornaments = ornaments_by_entry(document)
     fermatas = fermatas_by_entry(document)
+    arpeggios = arpeggios_by_entry(document)
+    assigned_entries: dict[EventPosition, int] = {}
     always_slash = slash_flagged_grace_notes(document)
 
     # One pass, in chain order, so a measure's notes come out in playing order
@@ -140,6 +144,13 @@ def build_score(document: EnigmaDocument) -> Score:
                 _Cell(events_by_layer=defaultdict(list), key_raw=here.key_signature),
             )
             cell.starts_beam[here.layer].append("beam" in record.fields)
+            if entnum in arpeggios:
+                assigned_entries[
+                    f"P{here.staff}",
+                    here.measure,
+                    here.layer,
+                    len(cell.events_by_layer[here.layer]),
+                ] = entnum
             cell.events_by_layer[here.layer].append(
                 _event(
                     record=record,
@@ -152,6 +163,7 @@ def build_score(document: EnigmaDocument) -> Score:
                     fingerings=fingerings.get(entnum, ()),
                     ornaments=ornaments.get(entnum, ()),
                     fermatas=fermatas.get(entnum, ()),
+                    arpeggios=arpeggios.get(entnum, ()),
                 )
             )
 
@@ -208,9 +220,10 @@ def build_score(document: EnigmaDocument) -> Score:
         )
         for staff in staves
     ]
+    groups = _groups(document, [part.id for part in parts])
     return Score(
-        parts=tuple(parts),
-        groups=_groups(document, [part.id for part in parts]),
+        parts=connect_arpeggios(document, tuple(parts), groups, assigned_entries),
+        groups=groups,
         title=info.get("title", ""),
         composer=info.get("composer", ""),
         metadata={k: v for k, v in info.items() if k not in {"title", "composer"}},
@@ -404,6 +417,7 @@ def _event(
     fingerings: tuple[str, ...] = (),
     ornaments: tuple[Ornament, ...] = (),
     fermatas: tuple[Fermata, ...] = (),
+    arpeggios: tuple[Arpeggio, ...] = (),
 ) -> Event:
     entry = read_entry(record)
     key = decode_key(key_raw)
@@ -466,6 +480,7 @@ def _event(
         fingerings=fingerings,
         ornaments=ornaments,
         fermatas=fermatas,
+        arpeggios=arpeggios if pitches else (),
     )
 
 

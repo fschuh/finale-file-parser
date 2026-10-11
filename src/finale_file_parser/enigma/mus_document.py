@@ -256,6 +256,9 @@ _ARTIC_DEF_REFERENCE = 0
 _ARTIC_GROUP = 20
 """Bytes per assignment group; a payload can hold several (ARCHITECTURE.md)."""
 
+_ARTIC_POSITION_FIELDS = {"horzOff": 2, "horzAdd": 4, "vertOff": 6, "vertAdd": 8}
+"""Signed EVPU words, per published PDK getters and the ETF IM field order."""
+
 _LYRIC_GROUP = 20
 """Bytes per verse assignment inside a `lyrDataVerse` payload."""
 
@@ -805,8 +808,9 @@ _INST_SLOT = 24
 
 The slot size is not inferred from one document: the record's length is exactly
 `24 x` the staff count in all 95 paired documents, which is what distinguishes
-this record from a sequence that merely happens to fit. The remaining 22 bytes of
-a slot are not decoded. See `mus_others.TAG_INST_USED`.
+this record from a sequence that merely happens to fit. Signed i32 +8 is
+`distFromTop`, established through PDK/RGP Lua evidence (ARCHITECTURE.md).
+The remaining 18 bytes are not decoded. See `mus_others.TAG_INST_USED`.
 """
 
 
@@ -947,7 +951,16 @@ def _others_records(records: tuple[MusOther, ...], fallback: str) -> list[Record
                         tag="instUsed",
                         attrs={**attrs, "inci": str(inci)},
                         text="",
-                        fields={"inst": str(staff)},
+                        fields={
+                            "inst": str(staff),
+                            "distFromTop": str(
+                                int.from_bytes(
+                                    record.payload[inci * _INST_SLOT + 8 : inci * _INST_SLOT + 12],
+                                    "little",
+                                    signed=True,
+                                )
+                            ),
+                        },
                     )
                 )
         elif record.tag == TAG_TEXT_EXPR_DEF and len(record.payload) >= _EXPR_DEF_DESC:
@@ -1236,7 +1249,13 @@ def _artic_records(
                     "sourceInci": str(record.inci),
                 },
                 text="",
-                fields={"articDef": str(definition)},
+                fields={
+                    "articDef": str(definition),
+                    **{
+                        name: str(_s16(record.payload, at + offset))
+                        for name, offset in _ARTIC_POSITION_FIELDS.items()
+                    },
+                },
             )
         )
         incidences[entnum] = incidence + 1

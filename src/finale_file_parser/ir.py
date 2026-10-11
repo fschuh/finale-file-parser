@@ -20,6 +20,7 @@ from dataclasses import dataclass, field
 from fractions import Fraction
 
 __all__ = [
+    "Arpeggio",
     "Beam",
     "Ending",
     "Event",
@@ -136,6 +137,20 @@ class Lyric:
 
 
 @dataclass(frozen=True)
+class Arpeggio:
+    """A plain rolled-chord sign, shared across every pitch of the event.
+
+    A connected sign has the same ``group`` on all participating events and
+    lists their staff-part ids in score order. Empty ids mean one staff. The
+    exporter can put connected staves in one MusicXML part without changing
+    the reader's one-part-per-staff representation.
+    """
+
+    group: str | None = None
+    part_ids: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
 class Event:
     """One note, chord, or rest.
 
@@ -216,6 +231,9 @@ class Event:
     events; None retains the exporter's bare grace element for authored scores
     or a source whose slash settings could not be read.
     """
+
+    arpeggios: tuple[Arpeggio, ...] = ()
+    """Rolled-chord signs in source order; rests do not participate."""
 
     @property
     def is_rest(self) -> bool:
