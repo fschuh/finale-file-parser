@@ -75,6 +75,7 @@ class _Wedge:
     offset: Fraction
     kind: str
     number: str
+    x_offset: Fraction
 
 
 _HairpinDirections = dict[tuple[str, int], tuple[_Wedge, ...]]
@@ -602,7 +603,12 @@ def _hairpin_directions(parts: tuple[Part, ...]) -> _HairpinDirections:
             number = active.pop(key)
         measure = span.start_measure if starting else span.end_measure
         result.setdefault((parts[staff].id, measure), []).append(
-            _Wedge(offset, span.kind if starting else "stop", number)
+            _Wedge(
+                offset,
+                span.kind if starting else "stop",
+                number,
+                span.start_x_offset if starting else span.end_x_offset,
+            )
         )
     return {key: tuple(directions) for key, directions in result.items()}
 
@@ -612,14 +618,16 @@ def _append_wedges(element: ET.Element, wedges: tuple[_Wedge, ...], divisions: i
     # Leave the optional spread to the reader's style. MuseScore treats the
     # crescendo start's spread as overall height (despite MusicXML ignoring it
     # at the closed tip), so an explicit zero collapses the whole hairpin.
-    # Source geometry is not decoded; see ARCHITECTURE for the importer evidence.
+    # Source opening widths are not decoded; see ARCHITECTURE for importer evidence.
     for wedge in wedges:
         direction = ET.SubElement(element, "direction", placement=_DYNAMICS_PLACEMENT)
+        attrs = {"type": wedge.kind, "number": wedge.number}
+        if wedge.x_offset:
+            attrs["relative-x"] = _decimal_number(wedge.x_offset * 10)
         ET.SubElement(
             ET.SubElement(direction, "direction-type"),
             "wedge",
-            type=wedge.kind,
-            number=wedge.number,
+            attrs,
         )
         ET.SubElement(direction, "offset", sound="yes").text = str(
             _duration_in_divisions(wedge.offset, divisions)
@@ -771,7 +779,7 @@ def _append_expressions(element: ET.Element, measure: Measure) -> None:
             words.text = expression.text
 
 
-def _tempo_number(value: Fraction) -> str:
+def _decimal_number(value: Fraction) -> str:
     text = format(Decimal(value.numerator) / Decimal(value.denominator), "f")
     return text.rstrip("0").rstrip(".") if "." in text else text
 
@@ -789,8 +797,8 @@ def _append_tempo(element: ET.Element, tempo: Tempo) -> None:
     ET.SubElement(metronome, "beat-unit").text = unit
     for _ in range(tempo.dots):
         ET.SubElement(metronome, "beat-unit-dot")
-    ET.SubElement(metronome, "per-minute").text = _tempo_number(tempo.per_minute)
-    ET.SubElement(direction, "sound", tempo=_tempo_number(tempo.quarter_bpm))
+    ET.SubElement(metronome, "per-minute").text = _decimal_number(tempo.per_minute)
+    ET.SubElement(direction, "sound", tempo=_decimal_number(tempo.quarter_bpm))
 
 
 def prints_as_words(expression: Expression) -> bool:

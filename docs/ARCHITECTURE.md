@@ -1302,6 +1302,9 @@ reading fields, rather than silently truncating them.
 | +6 / +36 | signed i16 | endpoint staff |
 | +8 / +38 | signed i16 | endpoint measure |
 | +10 / +40 | signed i32 | EDU for measure-based shapes, entry number when entry-based |
+| +14 / +44 | signed i16 | endpoint horizontal adjustment, separate from musical time |
+| +16 / +46 | signed i16 | endpoint vertical adjustment |
+| +18 / +48 | u16 | endpoint adjustment flags; bit 0x4000 enables adjustment |
 | +82 | u16 | `flag2`; bit0 hides the shape |
 
 Flags **0x40000000** and **0x10000000** identify entry-based and lyric-based
@@ -1328,8 +1331,10 @@ segment +0/+2 and the 32-bit value at +4. No plugin implementation is copied
 or executed; release hash and attribution remain those documented above.
 
 Canonical `Part.hairpins` holds immutable `Hairpin(kind, start_measure,
-start_offset, end_measure, end_offset)` objects. Offsets are exact whole-note
-fractions, independent of notes or XML numbering. Export uses paired
+start_offset, end_measure, end_offset)` objects with optional `start_x_offset`
+and `end_x_offset` values. Temporal offsets are exact whole-note fractions;
+horizontal offsets are exact staff-space fractions, defaulting to zero.
+Both are independent of notes or XML numbering. Export uses paired
 [`wedge`](https://www.w3.org/2021/06/musicxml40/musicxml-reference/elements/wedge/)
 directions and
 [`offset`](https://www.w3.org/2021/06/musicxml40/musicxml-reference/elements/offset/)
@@ -1373,6 +1378,63 @@ projection. Official MusicXML4.0 schema validation and all three visually
 inspected Verovio pages confirm two printed crescendos. `make check` passes
 lint/format/strict types and1,680 tests (seven skipped), including69 new
 authored cases. The licensed corpus and MuseScore runtime remain unavailable here.
+
+Printed endpoint adjustment evidence (2026-10-11): the PDK's `__SSTERMSEG`
+places `__SSENDPTADJ` after the eight-byte endpoint, and
+`GetEndpointOffsetX/Y` read its signed `offset.x/y`. `SetCustomOffset()` writes
+flag words **0x400c / 0x400d**; both source hairpins have **0x4000** at their
+endpoint adjustments. The adapter normalizes the common active bit as `on`,
+keeps signed X/Y under `endPtAdj`, and retains the complete flag word as
+`sourceFlags` metadata. Other context bits remain uninterpreted. The normalized
+`x`, `y` and `on` names are corroborated by musxdom's
+[endpoint adjustment field map](https://github.com/openmusx/musxdom/blob/main/src/musx/factory/FieldPopulatorsOthers.cpp#L438).
+Inactive coordinates stay in the source record without moving the IR's endpoint.
+An active X defaults to zero only when omitted; malformed values or values
+outside signed 32-bit Enigma EVPU bounds raise a clear error.
+
+A fresh read of score shape 94 has left X/Y **0 / -175** and right X/Y
+**-41 / -175**. Its musical end remains **staff 1, m51, EDU 4096**; the
+negative X adjustment pulls the printed end left independently of that time.
+Shape 36 in m58 has left/right X **-1 / +1** and Y **-183** at both ends.
+Finale's official [measurement equivalents](https://usermanuals.finalemusic.com/FinaleMac/Content/Finale/def-equivalents.htm)
+define **24 EVPUs per space**. MusicXML
+[`tenths`](https://www.w3.org/2021/06/musicxml40/musicxml-reference/data-types/tenths/)
+are **10 per staff space**. The IR divides source X by 24; export writes ten
+times that value as optional wedge
+[`relative-x`](https://www.w3.org/2021/06/musicxml40/musicxml-reference/elements/wedge/)
+in decimal notation, omitting zero adjustments. This leaves the reader's base
+placement intact and does not introduce absolute measure coordinates, spreads
+or new rhythmic offsets. Geometry denominators do not influence divisions.
+Vertical placement, control/break geometry and source anchor contexts remain
+outside this horizontal-adjustment path.
+
+The corrected XML now carries **three nonzero relative-x attributes**: m51's
+stop at approximately **-17.0833 tenths**, and m58's start/stop at approximately
+**-0.4167 / +0.4167 tenths**. The m51 stop still has offset **16** with **4
+divisions per quarter**, exactly the end of 4/4; m52 has an explicit `f` at
+offset zero and no continued wedge. The local make audit compares source
+bytes, canonical spans and XML independently; removing only these three
+attributes reproduces the complete prior tree and every note onset. All 928
+pitches and 87 slurs remain unchanged. Official MusicXML 4.0 schema validation
+passes. `make check` passes lint/format, strict typing and **1,772 tests** (seven
+skipped), including **17 new authored cases** for active/inactive flags,
+negative/decimal adjustments, malformed data, staff projection and timing.
+
+MuseScore limitation: the user's **4.7.5-260831071**, revision **3654226**, was
+inspected at its exact public
+[importer revision](https://github.com/musescore/MuseScore/blob/3654226/src/importexport/musicxml/internal/import/importmusicxmlpass2.cpp#L5461).
+SHA256: `fa8e02b6cc04b41e47ec6081f72ed71a89961cbbbbb0c82114ccbcb3ffd32f01`.
+The generic direction loop reads relative-x (line 4020), but only text/sticking
+handling applies it; the wedge function (lines 5461–5511) reads no horizontal
+geometry. Hairpin stop time still comes from `tick + m_offset`. Thus the
+standard XML retains the recovered inset, but that build needs a manual visual
+endpoint adjustment to display it. No upstream implementation is copied/run.
+The Verovio audit similarly imports both hairpins and all 87 slurs but produces
+three byte-identical SVG pages before/after these relative-x attributes; it
+does not verify applied horizontal geometry. Its m51 and m58 pages are visually
+inspected for notation preservation. No MuseScore runtime result is claimed.
+Scratch `BoundaryMakefile` targets `hairpin-boundary` and
+`verify-hairpin-position` preserve diagnosis and final verification separately.
 
 ### Known format facts — entry-attached phrase slurs
 

@@ -18,6 +18,9 @@ __all__ = ["hairpins_by_staff"]
 _KINDS = {"cresc": "crescendo", "decresc": "diminuendo"}
 _WHOLE_EDU = 4096
 _MAX_EDU = 0x7FFFFFFF
+_EVPU_PER_SPACE = 24
+_MIN_ADJUSTMENT = -0x80000000
+_MAX_ADJUSTMENT = 0x7FFFFFFF
 _UNSUPPORTED = frozenset({"hidden", "noPresetShape", "entryBased", "lyricBased"})
 
 
@@ -41,6 +44,24 @@ def _endpoint(record: Record, name: str) -> tuple[int, int, Fraction]:
     ):
         raise CorruptScoreError(f"smartShape {record.attrs.get('cmper')}: invalid {name} position")
     return staff, measure, Fraction(edu, _WHOLE_EDU)
+
+
+def _horizontal_adjustment(record: Record, name: str) -> Fraction:
+    """Active Finale EVPU adjustments become exact staff-space distances."""
+    segment = record.fields.get(name)
+    adjustment = segment.fields.get("endPtAdj") if isinstance(segment, Record) else None
+    if adjustment is None:
+        return Fraction(0)
+    if not isinstance(adjustment, Record):
+        raise CorruptScoreError(f"smartShape {record.attrs.get('cmper')}: invalid {name}.endPtAdj")
+    if "on" not in adjustment.fields:
+        return Fraction(0)
+    x = field_int(adjustment.fields.get("x", "0"))
+    if x is None or not _MIN_ADJUSTMENT <= x <= _MAX_ADJUSTMENT:
+        raise CorruptScoreError(
+            f"smartShape {record.attrs.get('cmper')}: invalid {name} horizontal adjustment"
+        )
+    return Fraction(x, _EVPU_PER_SPACE)
 
 
 def hairpins_by_staff(document: EnigmaDocument) -> dict[int, tuple[Hairpin, ...]]:
@@ -72,6 +93,14 @@ def hairpins_by_staff(document: EnigmaDocument) -> dict[int, tuple[Hairpin, ...]
         if (end_measure, end_offset) <= (start_measure, start_offset):
             raise CorruptScoreError(f"smartShape {shape}: hairpin end must follow its start")
         result.setdefault(staff, []).append(
-            Hairpin(kind, start_measure, start_offset, end_measure, end_offset)
+            Hairpin(
+                kind,
+                start_measure,
+                start_offset,
+                end_measure,
+                end_offset,
+                _horizontal_adjustment(record, "startTermSeg"),
+                _horizontal_adjustment(record, "endTermSeg"),
+            )
         )
     return {staff: tuple(spans) for staff, spans in result.items()}

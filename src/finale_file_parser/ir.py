@@ -411,6 +411,10 @@ class Hairpin:
     end_measure: int
     end_offset: Fraction
 
+    start_x_offset: Fraction = Fraction(0)
+    end_x_offset: Fraction = Fraction(0)
+    """Horizontal endpoint adjustments in staff spaces; independent of time."""
+
 
 @dataclass(frozen=True)
 class SlurEndpoint:

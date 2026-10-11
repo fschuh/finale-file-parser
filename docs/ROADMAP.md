@@ -146,6 +146,9 @@ limit is verified by mutation, because no real corpus archive trips one.
       Numeric `.mus` tags217/218 share the `.musx` resolver; paired MusicXML
       wedges retain fractional positions, cross-measure spans and overlap
       numbers during staff projection. Both Scars crescendos are recovered.
+      Active endpoint X adjustments retain exact staff-space distances and
+      become MusicXML relative-x without changing time; MuseScore 4.7.5's
+      importer ignores these positions, so its displayed inset needs manual editing.
       Cross-staff/custom/entry/lyric-based shapes, DCL-era shape records and
       exact Finale layout/playback curves remain unsupported.
 - [x] **Entry-attached phrase slurs** — assigned visible preset SmartShapes

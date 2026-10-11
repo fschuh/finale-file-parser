@@ -172,6 +172,9 @@ entry here that supports them.
   musxdom's normalized SmartShape field map was additionally inspected 2026-10-11.
   Its `FieldPopulatorsCommon.cpp` corroborates the `automatic`/`over`/`under`
   direction vocabulary on the same date; implementations remain independent.
+  `FieldPopulatorsOthers.cpp` additionally corroborates active `endPtAdj`
+  X/Y fields on 2026-10-11; PDK structs/getters/custom-offset setter and both
+  local hairpin endpoint flag words establish the numeric adjustment layout.
   Hashes and reproducible offsets, with their scope,
   are recorded in `docs/ARCHITECTURE.md`.
 
@@ -186,3 +189,18 @@ entry here that supports them.
 - Its wedge importer applies a start spread to overall hairpin height and does
   not read the stop spread. Omission of optional spread avoids collapsing
   crescendos to flat lines. Evidence/hash are in `docs/ARCHITECTURE.md`.
+- The same file was read at the user's MuseScore **4.7.5-260831071** revision
+  `3654226` on 2026-10-11 (same SPDX license). That wedge importer ignores
+  horizontal positioning, although it honors the timed offset. The source was
+  inspected read-only, not copied or executed; hash/evidence are in Architecture.
+
+**Finale and MusicXML measurement units** — MakeMusic and the W3C Music Notation Community Group
+
+- Finale's [measurement equivalents](https://usermanuals.finalemusic.com/FinaleMac/Content/Finale/def-equivalents.htm)
+  define 24 EVPUs per space, including the distinction from temporal EDUs.
+- MusicXML's [tenths type](https://www.w3.org/2021/06/musicxml40/musicxml-reference/data-types/tenths/)
+  defines ten units per staff space; the
+  [wedge positioning attributes](https://www.w3.org/2021/06/musicxml40/musicxml-reference/elements/wedge/)
+  distinguish relative horizontal placement from its direction's timed offset.
+- Read 2026-10-11 for hairpin endpoint X adjustments only. This is no broader
+  reconstruction of Finale's layout or application-specific anchor geometry.

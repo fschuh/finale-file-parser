@@ -10,6 +10,25 @@ and resolved ones **DECIDED**.
 
 ---
 
+## 2026-10-11 — DECIDED: retain hairpin endpoint X adjustments independently of time
+
+**Context.** The user approved recovering the m51 hairpin's source inset.
+Its musical end is the barline, with a separate negative horizontal adjustment.
+Moving that musical end to shorten the printed line would alter the crescendo.
+
+**Decision.** Append exact staff-space `start_x_offset` / `end_x_offset` values
+to canonical `Hairpin`, preserving existing constructor defaults. Normalize
+active `endPtAdj` X values from Finale's 24 EVPUs per space, then emit MusicXML
+`relative-x` in ten tenths per space. Preserve inactive source data without
+applying it. Timing, divisions, pairing and note cursors remain independent.
+
+**Consequence.** The XML carries the source inset for readers that support it.
+MuseScore 4.7.5 revision `3654226` reads no hairpin X positioning in its importer;
+this standard XML correction cannot itself change that build's displayed
+endpoint. Do not change timing or add duplicate fake hairpins to compensate.
+Vertical layout, source anchor contexts and system-break geometry remain
+outside this horizontal-adjustment change. Evidence is in `docs/ARCHITECTURE.md`.
+
 ## 2026-10-11 — DECIDED: retain phrase slurs as complete spans between exact events
 
 **Context.** The user requested missing slurs in Scars' bars 17–19 and approved

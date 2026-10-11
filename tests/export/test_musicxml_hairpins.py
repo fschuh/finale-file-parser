@@ -248,3 +248,50 @@ def test_duplicate_measure_labels_do_not_make_span_placement_ambiguous() -> None
     part = replace(score.parts[0], measures=(_measure(1), _measure(1)))
     with pytest.raises(ExportError, match="unique measure numbers"):
         to_musicxml(replace(score, parts=(part,)))
+
+
+@pytest.mark.parametrize("kind", ["crescendo", "diminuendo"])
+def test_horizontal_adjustments_change_only_visual_wedge_positions(kind: str) -> None:
+    span = Hairpin(kind, 1, Fraction(0), 1, Fraction(1))
+    before = _tree(_score(span))
+    after = _tree(
+        _score(replace(span, start_x_offset=Fraction(1, 2), end_x_offset=Fraction(-3, 4)))
+    )
+    wedges = after.findall(".//wedge")
+    assert [wedge.get("relative-x") for wedge in wedges] == ["5", "-7.5"]
+    assert _positions(after) == _positions(before)
+    for wedge in wedges:
+        assert "spread" not in wedge.attrib and "default-x" not in wedge.attrib
+        del wedge.attrib["relative-x"]
+    assert ET.tostring(after) == ET.tostring(before)
+
+
+def test_nonterminating_space_adjustments_export_valid_decimal_tenths() -> None:
+    span = Hairpin("crescendo", 1, Fraction(0), 1, Fraction(1), end_x_offset=Fraction(-37, 24))
+    text = _tree(_score(span)).findall(".//wedge")[1].get("relative-x")
+    assert text is not None and "e" not in text.lower()
+    assert abs(Fraction(text) - Fraction(-185, 12)) < Fraction(1, 10**25)
+
+
+def test_visual_adjustment_denominators_do_not_change_time_divisions() -> None:
+    span = Hairpin(
+        "crescendo", 1, Fraction(0), 1, Fraction(1), end_x_offset=Fraction(-1, 1_000_003)
+    )
+    root = _tree(_score(span))
+    assert root.findtext("part/measure/attributes/divisions") == "1"
+    assert _positions(root) == [
+        ("1", None, Fraction(0), "crescendo", "1"),
+        ("1", None, Fraction(1), "stop", "1"),
+    ]
+
+
+def test_projected_staff_hairpins_keep_their_own_horizontal_adjustments() -> None:
+    first = Hairpin("crescendo", 1, Fraction(0), 2, Fraction(1), Fraction(1, 2), Fraction(-3, 4))
+    second = Hairpin("diminuendo", 1, Fraction(0), 2, Fraction(1), Fraction(1), Fraction(-1, 4))
+    root = _tree(_bundle(first, second))
+    assert [wedge.get("relative-x") for wedge in root.findall(".//wedge")] == [
+        "5",
+        "10",
+        "-7.5",
+        "-2.5",
+    ]

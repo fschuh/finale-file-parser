@@ -922,12 +922,13 @@ _SMART_SHAPE_MARK_SLOT = 12
 _SMART_SHAPE_ENTRY_BASED = 0x40000000
 _SMART_SHAPE_LYRIC_BASED = 0x10000000
 _SMART_SHAPE_PRESET = 0x00008000
+_SMART_SHAPE_ADJUSTMENT_ON = 0x4000
 _SMART_SHAPE_TYPES = {0: "slurDown", 1: "slurUp", 2: "decresc", 3: "cresc", 15: "slurAuto"}
 """Published PDK structs/flags, corroborated by getters; see ARCHITECTURE."""
 
 
 def _smart_shape_endpoint(payload: bytes, at: int, name: str, *, entry_based: bool) -> Record:
-    """The evidenced 8-byte endpoint inside a bounds-checked 30-byte segment."""
+    """Endpoint and adjustment inside a bounds-checked 30-byte segment."""
     endpoint = Record(
         tag="endPt",
         attrs={},
@@ -940,7 +941,19 @@ def _smart_shape_endpoint(payload: bytes, at: int, name: str, *, entry_based: bo
             ),
         },
     )
-    return Record(tag=name, attrs={}, text="", fields={"endPt": endpoint})
+    fields: dict[str, str | tuple[str, ...] | Record | tuple[Record, ...]] = {"endPt": endpoint}
+    x, y, flags = _s16(payload, at + 8), _s16(payload, at + 10), _u16(payload, at + 12)
+    if x or y or flags:
+        adjustment: dict[str, str | tuple[str, ...] | Record | tuple[Record, ...]] = {
+            "x": str(x),
+            "y": str(y),
+        }
+        if flags & _SMART_SHAPE_ADJUSTMENT_ON:
+            adjustment["on"] = ""
+        fields["endPtAdj"] = Record(
+            tag="endPtAdj", attrs={"sourceFlags": str(flags)}, text="", fields=adjustment
+        )
+    return Record(tag=name, attrs={}, text="", fields=fields)
 
 
 def _smart_shape(payload: bytes, attrs: dict[str, str]) -> Record:

@@ -18,7 +18,15 @@ from finale_file_parser.enigma.mus_others import (
 from finale_file_parser.ir import Hairpin
 
 
-def _payload(*, kind: int = 3, flags: int = 0x8600, flag2: int = 0) -> bytes:
+def _payload(
+    *,
+    kind: int = 3,
+    flags: int = 0x8600,
+    flag2: int = 0,
+    start_x: int = 0,
+    end_x: int = 0,
+    adjustment_flags: int = 0,
+) -> bytes:
     result = bytearray(96)
     result[0:2] = kind.to_bytes(2, "little", signed=True)
     result[2:6] = flags.to_bytes(4, "little")
@@ -27,6 +35,10 @@ def _payload(*, kind: int = 3, flags: int = 0x8600, flag2: int = 0) -> bytes:
         result[offset + 2 : offset + 4] = measure.to_bytes(2, "little", signed=True)
         result[offset + 4 : offset + 8] = edu.to_bytes(4, "little", signed=True)
     result[82:84] = flag2.to_bytes(2, "little")
+    for at, x in ((14, start_x), (44, end_x)):
+        result[at : at + 2] = x.to_bytes(2, "little", signed=True)
+        result[at + 2 : at + 4] = (-144).to_bytes(2, "little", signed=True)
+        result[at + 4 : at + 6] = adjustment_flags.to_bytes(2, "little")
     return bytes(result)
 
 
@@ -142,3 +154,49 @@ def test_signed_invalid_edu_is_not_reinterpreted_as_a_large_positive_position(
     )
     with pytest.raises(CorruptScoreError, match="invalid startTermSeg position"):
         hairpins_by_staff(document)
+
+
+@pytest.mark.parametrize("flags", [0x4000, 0x400C, 0x400D])
+def test_binary_active_adjustments_keep_signed_x_without_retiming(
+    monkeypatch: pytest.MonkeyPatch, flags: int
+) -> None:
+    document = _read(
+        monkeypatch,
+        MusOther(TAG_SMART_SHAPE, 7, 0, _payload(start_x=12, end_x=-37, adjustment_flags=flags)),
+        MusOther(TAG_SMART_SHAPE_MEAS_MARK, 1, 0, _slot(7)),
+    )
+    assert hairpins_by_staff(document) == {
+        1: (
+            Hairpin(
+                "crescendo", 1, Fraction(1, 8), 2, Fraction(7, 8), Fraction(1, 2), Fraction(-37, 24)
+            ),
+        )
+    }
+    record = document.others.get("smartShape", 7)
+    assert record is not None
+    segment = record.fields["endTermSeg"]
+    assert isinstance(segment, Record)
+    adjustment = segment.fields["endPtAdj"]
+    assert isinstance(adjustment, Record)
+    assert adjustment.fields == {"x": "-37", "y": "-144", "on": ""}
+    assert adjustment.attrs == {"sourceFlags": str(flags)}
+
+
+def test_inactive_binary_adjustments_remain_source_data_without_moving_layout(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    document = _read(
+        monkeypatch,
+        MusOther(TAG_SMART_SHAPE, 7, 0, _payload(start_x=12, end_x=-37)),
+        MusOther(TAG_SMART_SHAPE_MEAS_MARK, 1, 0, _slot(7)),
+    )
+    assert hairpins_by_staff(document) == {
+        1: (Hairpin("crescendo", 1, Fraction(1, 8), 2, Fraction(7, 8)),)
+    }
+    record = document.others.get("smartShape", 7)
+    assert record is not None
+    segment = record.fields["endTermSeg"]
+    assert isinstance(segment, Record)
+    adjustment = segment.fields["endPtAdj"]
+    assert isinstance(adjustment, Record)
+    assert adjustment.fields == {"x": "-37", "y": "-144"}

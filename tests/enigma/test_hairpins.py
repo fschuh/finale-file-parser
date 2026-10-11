@@ -24,16 +24,18 @@ def _shape(
     end_measure: str = "2",
     start_edu: str = "512",
     end_edu: str = "3072",
+    start_adjustment: str = "",
+    end_adjustment: str = "",
 ) -> str:
     return f"""
       <smartShape cmper="7"{attrs}>
         <shapeType>{kind}</shapeType>{flags}
         <startTermSeg><endPt>
           <inst>{start_staff}</inst><meas>{start_measure}</meas><edu>{start_edu}</edu>
-        </endPt></startTermSeg>
+        </endPt>{start_adjustment}</startTermSeg>
         <endTermSeg><endPt>
           <inst>{end_staff}</inst><meas>{end_measure}</meas><edu>{end_edu}</edu>
-        </endPt></endTermSeg>
+        </endPt>{end_adjustment}</endTermSeg>
       </smartShape>
     """
 
@@ -166,3 +168,40 @@ def test_ir_retains_staff_identity_and_spans_over_silent_measures() -> None:
     assert tuple(part.measures for part in score.parts) == tuple(
         part.measures for part in build_score(_document(marks="")).parts
     )
+
+
+def test_active_horizontal_adjustments_keep_exact_space_units_and_metric_endpoints() -> None:
+    shape = _shape(
+        start_adjustment="<endPtAdj><on/><x>12</x><y>-144</y></endPtAdj>",
+        end_adjustment="<endPtAdj><on/><x>-37</x><y>-144</y></endPtAdj>",
+    )
+    assert hairpins_by_staff(_document(shape)) == {
+        1: (
+            Hairpin(
+                "crescendo", 1, Fraction(1, 8), 2, Fraction(3, 4), Fraction(1, 2), Fraction(-37, 24)
+            ),
+        )
+    }
+    assert tuple(part.measures for part in build_score(_document(shape)).parts) == tuple(
+        part.measures for part in build_score(_document(_shape())).parts
+    )
+
+
+def test_inactive_and_omitted_horizontal_adjustments_leave_layout_automatic() -> None:
+    shape = _shape(
+        start_adjustment="<endPtAdj><x>120</x></endPtAdj>",
+        end_adjustment="<endPtAdj><on/><y>-144</y></endPtAdj>",
+    )
+    assert hairpins_by_staff(_document(shape)) == hairpins_by_staff(_document(_shape()))
+
+
+@pytest.mark.parametrize("value", ["nonsense", "1.5", "", "2147483648", "-2147483649"])
+def test_malformed_active_horizontal_adjustments_fail_clearly(value: str) -> None:
+    shape = _shape(end_adjustment=f"<endPtAdj><on/><x>{value}</x></endPtAdj>")
+    with pytest.raises(CorruptScoreError, match="invalid endTermSeg horizontal adjustment"):
+        hairpins_by_staff(_document(shape))
+
+
+def test_malformed_adjustment_container_does_not_become_automatic_layout() -> None:
+    with pytest.raises(CorruptScoreError, match="invalid endTermSeg.endPtAdj"):
+        hairpins_by_staff(_document(_shape(end_adjustment="<endPtAdj>bad</endPtAdj>")))
