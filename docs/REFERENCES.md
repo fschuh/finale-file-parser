@@ -166,6 +166,12 @@ entry here that supports them.
   description getter establishes the Finale-2012 Unicode decoding path.
   SmartShape and termination-segment getters independently corroborate hairpin
   attachment modes, visibility and staff/measure/EDU offsets.
+  The published SmartShape solid-slur enums, endpoint union, note-id words
+  and 10-byte `__EDTSmartShapeEntryMark` also establish the slur path; numeric
+  tag 1064 is corroborated by the complete local shape/entry assignment join.
+  musxdom's normalized SmartShape field map was additionally inspected 2026-10-11.
+  Its `FieldPopulatorsCommon.cpp` corroborates the `automatic`/`over`/`under`
+  direction vocabulary on the same date; implementations remain independent.
   Hashes and reproducible offsets, with their scope,
   are recorded in `docs/ARCHITECTURE.md`.
 

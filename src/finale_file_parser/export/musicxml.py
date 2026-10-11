@@ -28,6 +28,8 @@ from finale_file_parser.ir import (
     PartGroup,
     Pitch,
     Score,
+    Slur,
+    SlurEndpoint,
     Tempo,
     Voice,
 )
@@ -76,6 +78,28 @@ class _Wedge:
 
 
 _HairpinDirections = dict[tuple[str, int], tuple[_Wedge, ...]]
+
+_MAX_SLUR_NUMBER = 16
+"""MusicXML's number-level bound on overlapping slurs in document order."""
+
+
+@dataclass(frozen=True)
+class _SlurNotation:
+    type: str
+    number: str
+    placement: str | None
+
+
+@dataclass(frozen=True)
+class _SlurPosition:
+    order: tuple[int, int, int]
+    """Measure index, voice index and event index in the part's XML order."""
+
+    onset: Fraction
+    pitched: bool
+
+
+_SlurNotations = dict[tuple[str, int, int, int], tuple[_SlurNotation, ...]]
 
 
 class ExportError(FinaleFileError):
@@ -246,11 +270,14 @@ def _append_part(
     divisions: int | None = None,
     arpeggio_numbers: _ArpeggioNumbers | None = None,
     hairpin_directions: _HairpinDirections | None = None,
+    slur_notations: _SlurNotations | None = None,
 ) -> None:
     element = ET.SubElement(root, "part", id=part.id)
     divisions = _divisions_for(part) if divisions is None else divisions
     if hairpin_directions is None:
         hairpin_directions = _hairpin_directions((part,))
+    if slur_notations is None:
+        slur_notations = _slur_notations((part,))
     first = True
     for measure in part.measures:
         _append_measure(
@@ -261,6 +288,7 @@ def _append_part(
             part_id=part.id,
             arpeggio_numbers=arpeggio_numbers,
             wedges=hairpin_directions.get((part.id, measure.number), ()),
+            slur_notations=slur_notations,
         )
         first = False
 
@@ -362,6 +390,7 @@ def _append_multistaff_part(
     temporary = ET.Element("parts")
     arpeggio_numbers = _arpeggio_numbers(parts)
     hairpin_directions = _hairpin_directions(parts)
+    slur_notations = _slur_notations(parts)
     next_voice = 1
     for staff, part in enumerate(parts, start=1):
         _append_part(
@@ -370,6 +399,7 @@ def _append_multistaff_part(
             divisions=divisions,
             arpeggio_numbers=arpeggio_numbers,
             hairpin_directions=hairpin_directions,
+            slur_notations=slur_notations,
         )
         voices = sorted({voice.number for measure in part.measures for voice in measure.voices})
         voice_ids = {str(voice): str(next_voice + index) for index, voice in enumerate(voices)}
@@ -596,6 +626,90 @@ def _append_wedges(element: ET.Element, wedges: tuple[_Wedge, ...], divisions: i
         )
 
 
+def _slur_positions(part: Part) -> dict[SlurEndpoint, _SlurPosition]:
+    """Resolve authored endpoint references without expanding supplied indices."""
+    result = {}
+    measures: set[int] = set()
+    for measure_index, measure in enumerate(part.measures):
+        if measure.number in measures:
+            raise ExportError("slurs require unique measure numbers within a part")
+        measures.add(measure.number)
+        voices: set[int] = set()
+        for voice_index, voice in enumerate(measure.voices):
+            if voice.number in voices:
+                raise ExportError("slurs require unique voice numbers within a measure")
+            voices.add(voice.number)
+            onset = Fraction(0)
+            for event_index, event in enumerate(voice.events):
+                result[SlurEndpoint(measure.number, voice.number, event_index)] = _SlurPosition(
+                    (measure_index, voice_index, event_index), onset, not event.is_rest
+                )
+                if not event.is_grace:
+                    onset += event.duration
+    return result
+
+
+def _slur_endpoints(
+    span: Slur, positions: dict[SlurEndpoint, _SlurPosition]
+) -> tuple[_SlurPosition, _SlurPosition]:
+    if span.placement not in {None, "above", "below"}:
+        raise ExportError(f"unsupported slur placement {span.placement!r}")
+    start = positions.get(span.start)
+    end = positions.get(span.end)
+    if start is None or end is None:
+        raise ExportError("slur refers to a missing measure, voice or event")
+    if not start.pitched or not end.pitched:
+        raise ExportError("slur endpoints must be pitched events")
+    start_time, end_time = (start.order[0], start.onset), (end.order[0], end.onset)
+    if end_time < start_time or (
+        end_time == start_time
+        and (start.order[1] != end.order[1] or end.order[2] <= start.order[2])
+    ):
+        raise ExportError("slur end must follow its start")
+    return start, end
+
+
+def _slur_notations(parts: tuple[Part, ...]) -> _SlurNotations:
+    """Pair complete spans in actual measure/staff/voice/event XML order.
+
+    A cross-voice stop can precede its start in XML. Whichever endpoint is
+    serialized first reserves the number; the second releases it. Musical
+    endpoints still retain their start/stop types and exact event references.
+    """
+    endpoints: list[tuple[int, int, int, int, bool, int, Slur]] = []
+    for staff, part in enumerate(parts):
+        if not part.slurs:
+            continue
+        positions = _slur_positions(part)
+        for index, span in enumerate(part.slurs):
+            start, end = _slur_endpoints(span, positions)
+            for position, starting in ((start, True), (end, False)):
+                measure, voice, event = position.order
+                endpoints.append((measure, staff, voice, event, starting, index, span))
+    active: dict[tuple[int, int], str] = {}
+    result: dict[tuple[str, int, int, int], list[_SlurNotation]] = {}
+    for _, staff, _, _, starting, index, span in sorted(endpoints, key=lambda item: item[:6]):
+        identity = staff, index
+        number = active.pop(identity, None)
+        if number is None:
+            number = next(
+                (
+                    str(value)
+                    for value in range(1, _MAX_SLUR_NUMBER + 1)
+                    if str(value) not in active.values()
+                ),
+                None,
+            )
+            if number is None:
+                raise ExportError("more than 16 slurs overlap in MusicXML document order")
+            active[identity] = number
+        point = span.start if starting else span.end
+        result.setdefault(
+            (parts[staff].id, point.measure, point.voice, point.event_index), []
+        ).append(_SlurNotation("start" if starting else "stop", number, span.placement))
+    return {key: tuple(marks) for key, marks in result.items()}
+
+
 _MAX_GLYPH = 2
 """Text this short with no letters or digits is a music-font character rather
 than words. Printing it literally puts an A-umlaut in the score where a
@@ -707,6 +821,7 @@ def _append_measure(
     part_id: str = "",
     arpeggio_numbers: _ArpeggioNumbers | None = None,
     wedges: tuple[_Wedge, ...] = (),
+    slur_notations: _SlurNotations | None = None,
 ) -> None:
     element = ET.SubElement(parent, "measure", number=str(measure.number))
     _append_barline(element, measure, "left")
@@ -739,7 +854,12 @@ def _append_measure(
                 if arpeggio_numbers is None
                 else arpeggio_numbers.get((part_id, measure.number, voice.number, event_index), ())
             )
-            _append_event(element, event, voice, divisions, arpeggio_numbers=numbers)
+            slurs = (
+                ()
+                if slur_notations is None
+                else slur_notations.get((part_id, measure.number, voice.number, event_index), ())
+            )
+            _append_event(element, event, voice, divisions, arpeggio_numbers=numbers, slurs=slurs)
 
     _append_barline(element, measure, "right")
 
@@ -828,6 +948,7 @@ def _append_event(
     divisions: int,
     *,
     arpeggio_numbers: tuple[str, ...] = (),
+    slurs: tuple[_SlurNotation, ...] = (),
 ) -> None:
     if event.note_ties and len(event.note_ties) != len(event.pitches):
         raise ExportError("per-note tie flags must match the number of pitches")
@@ -846,6 +967,7 @@ def _append_event(
             chord=bool(index),
             ties=ties,
             arpeggio_numbers=arpeggio_numbers,
+            slurs=slurs if not index else (),
         )
 
 
@@ -859,6 +981,7 @@ def _append_note(
     chord: bool,
     ties: NoteTies,
     arpeggio_numbers: tuple[str, ...] = (),
+    slurs: tuple[_SlurNotation, ...] = (),
 ) -> None:
     note = ET.SubElement(element, "note")
     # Schema order: grace, chord, pitch or rest, duration, tie, voice, type...
@@ -888,7 +1011,7 @@ def _append_note(
             _duration_in_divisions(event.duration, divisions)
         )
     # <tie> is the sounding instruction; <tied> inside <notations> is the visual
-    # slur. Both are required for a tie to survive a round trip through most
+    # tie. Both are required for a tie to survive a round trip through most
     # applications.
     if ties.stop:
         ET.SubElement(note, "tie", type="stop")
@@ -919,12 +1042,18 @@ def _append_note(
     ornaments = () if chord else event.ornaments
     fermatas = () if chord else event.fermatas
     arpeggios = event.arpeggios if pitch is not None else ()
-    if ties.start or ties.stop or marks or digits or ornaments or fermatas or arpeggios:
+    if ties.start or ties.stop or marks or digits or ornaments or fermatas or arpeggios or slurs:
         notations = ET.SubElement(note, "notations")
         if ties.stop:
             ET.SubElement(notations, "tied", type="stop")
         if ties.start:
             ET.SubElement(notations, "tied", type="start")
+        for slur in slurs:
+            attrs = {"type": slur.type, "number": slur.number}
+            if slur.placement is not None:
+                attrs["placement"] = slur.placement
+                attrs["orientation"] = "over" if slur.placement == "above" else "under"
+            ET.SubElement(notations, "slur", attrs)
         for fermata in fermatas:
             ET.SubElement(notations, "fermata", type="inverted" if fermata.inverted else "upright")
         if marks:

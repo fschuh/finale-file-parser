@@ -39,6 +39,7 @@ from finale_file_parser.enigma.music import read_entry
 from finale_file_parser.enigma.ornaments import ornaments_by_entry
 from finale_file_parser.enigma.pitch import StaffTransposition, read_transposition, spell_note
 from finale_file_parser.enigma.repeats import Repeats, repeats_for
+from finale_file_parser.enigma.slurs import slurs_by_staff
 from finale_file_parser.enigma.text import file_info, staff_names
 from finale_file_parser.enigma.timesig import TimeSignature as EnigmaTimeSignature
 from finale_file_parser.enigma.timesig import time_signatures
@@ -56,6 +57,7 @@ from finale_file_parser.ir import (
     PartGroup,
     Pitch,
     Score,
+    SlurEndpoint,
     TimeSignature,
     Voice,
 )
@@ -126,6 +128,7 @@ def build_score(document: EnigmaDocument) -> Score:
     fermatas = fermatas_by_entry(document)
     arpeggios = arpeggios_by_entry(document)
     assigned_entries: dict[EventPosition, int] = {}
+    slur_positions: dict[tuple[int, int, int], list[SlurEndpoint]] = defaultdict(list)
     always_slash = slash_flagged_grace_notes(document)
 
     # One pass, in chain order, so a measure's notes come out in playing order
@@ -145,6 +148,9 @@ def build_score(document: EnigmaDocument) -> Score:
                 _Cell(events_by_layer=defaultdict(list), key_raw=here.key_signature),
             )
             cell.starts_beam[here.layer].append("beam" in record.fields)
+            slur_positions[here.staff, here.measure, entnum].append(
+                SlurEndpoint(here.measure, here.layer, len(cell.events_by_layer[here.layer]))
+            )
             if entnum in arpeggios:
                 assigned_entries[
                     f"P{here.staff}",
@@ -188,6 +194,7 @@ def build_score(document: EnigmaDocument) -> Score:
     barlines = barline_styles(document)
     expressions = expressions_by_measure(document)
     hairpins = hairpins_by_staff(document)
+    slurs = slurs_by_staff(document, slur_positions)
 
     staves = _ordered_staves(document, {staff for staff, _ in cells})
     keys = effective_keys(document)
@@ -220,6 +227,7 @@ def build_score(document: EnigmaDocument) -> Score:
                 for index, number in enumerate(numbers)
             ),
             hairpins=hairpins.get(staff, ()),
+            slurs=slurs.get(staff, ()),
         )
         for staff in staves
     ]

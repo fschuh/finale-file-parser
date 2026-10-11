@@ -26,6 +26,7 @@ from finale_file_parser.enigma.models import CorruptScoreError
 from finale_file_parser.enigma.mus_details import (
     TAG_ARTIC_ASSIGN,
     TAG_LYRIC_VERSE,
+    TAG_SMART_SHAPE_ENTRY_MARK,
     TAG_TUPLET_DEF,
     MusDetailRecord,
 )
@@ -1359,4 +1360,5 @@ def test_the_tag_map_names_the_raw_tags_the_adapter_reads() -> None:
         "articAssign": TAG_ARTIC_ASSIGN,
         "tupletDef": TAG_TUPLET_DEF,
         "lyrDataVerse": TAG_LYRIC_VERSE,
+        "smartShapeEntryMark": TAG_SMART_SHAPE_ENTRY_MARK,
     }

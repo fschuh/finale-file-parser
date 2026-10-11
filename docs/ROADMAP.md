@@ -148,6 +148,12 @@ limit is verified by mutation, because no real corpus archive trips one.
       numbers during staff projection. Both Scars crescendos are recovered.
       Cross-staff/custom/entry/lyric-based shapes, DCL-era shape records and
       exact Finale layout/playback curves remain unsupported.
+- [x] **Entry-attached phrase slurs** — assigned visible preset SmartShapes
+      retain exact measure/voice/event endpoints in `Part.slurs`, including
+      graces and cross-bar phrases. Numeric tag 1064 entry marks share the Enigma
+      resolver; MusicXML pairs principal-note slurs in staff/voice document
+      order. All 87 local Scars slurs are recovered. Cross-staff, pitch-specific,
+      measure-based/custom/dashed slurs and DCL-era layouts remain unsupported.
 - [x] **Articulation assignment visibility** — legacy group +10 bit0 becomes `hide`;
       all articulation-derived resolvers skip hidden and linked-part assignments.
       Visible duplicates survive hidden copies. The two hidden Scars m59 accents

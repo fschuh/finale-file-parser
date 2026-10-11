@@ -10,6 +10,29 @@ and resolved ones **DECIDED**.
 
 ---
 
+## 2026-10-11 — DECIDED: retain phrase slurs as complete spans between exact events
+
+**Context.** The user requested missing slurs in Scars' bars 17–19 and approved
+the recovery plan. Its 87 visible SmartShapes have explicit entry endpoints,
+including 25 cross-measure spans and seven grace-note endpoints. These are
+independent of per-pitch ties and cannot be recovered from note adjacency.
+
+**Decision.** Append immutable `Slur` spans to canonical `Part`, using
+`SlurEndpoint(measure, voice, event_index)` references. Gather entry placements
+while building events, then resolve assigned visible preset entry-based solid
+slurs against the endpoint's staff and measure. Preserve automatic direction or
+an explicit up/down shape. Use the same normalized Enigma path for both formats.
+
+**Consequence.** Exact event references distinguish graces at the same onset and
+select the intended placement of a mirrored entry. MusicXML emits one start/stop
+pair on the endpoint events' principal notes, with numbers allocated in actual
+measure/staff/voice/event document order, independent of ties or playback. The
+exporter validates spans and handles cross-voice stops serialized before starts.
+It keeps the 1–16 overlap bound at export, not in the IR. No manual curve geometry
+is guessed. Cross-staff spans, measure-based/custom/dashed slurs, pitch-specific
+note-id attachments and older DCL shape layouts remain unsupported. Format and
+assignment evidence is in `docs/ARCHITECTURE.md`.
+
 ## 2026-10-10 — DECIDED: preserve hairpins as exact spans on canonical staff-parts
 
 **Context.** The user requested Scars' missing crescendo hairpins and approved

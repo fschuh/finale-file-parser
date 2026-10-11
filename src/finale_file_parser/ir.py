@@ -35,6 +35,8 @@ __all__ = [
     "PartGroup",
     "Pitch",
     "Score",
+    "Slur",
+    "SlurEndpoint",
     "Tempo",
     "TimeSignature",
     "Voice",
@@ -411,6 +413,30 @@ class Hairpin:
 
 
 @dataclass(frozen=True)
+class SlurEndpoint:
+    """An exact event on a staff-part, including a particular grace note.
+
+    Measure and voice use their source numbers; event_index is zero-based
+    within that voice. An onset alone cannot distinguish several grace notes
+    from the following ordinary note, which all share the same metric time.
+    """
+
+    measure: int
+    voice: int
+    event_index: int
+
+
+@dataclass(frozen=True)
+class Slur:
+    """A complete phrase slur between two events on one staff-part."""
+
+    start: SlurEndpoint
+    end: SlurEndpoint
+    placement: str | None = None
+    """``above`` or ``below`` when explicit; None leaves direction automatic."""
+
+
+@dataclass(frozen=True)
 class Part:
     """One instrumental part."""
 
@@ -420,6 +446,9 @@ class Part:
 
     hairpins: tuple[Hairpin, ...] = ()
     """Dynamic spans on this staff, without inferred playback velocities."""
+
+    slurs: tuple[Slur, ...] = ()
+    """Phrase spans with exact note attachments, independent of ties."""
 
 
 @dataclass(frozen=True)

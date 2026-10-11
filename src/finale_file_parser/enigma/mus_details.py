@@ -49,6 +49,7 @@ __all__ = [
     "TAG_ARTIC_ASSIGN",
     "TAG_GFHOLD",
     "TAG_LYRIC_VERSE",
+    "TAG_SMART_SHAPE_ENTRY_MARK",
     "TAG_STAFF_GROUP",
     "TAG_TUPLET_DEF",
     "read_mus_details",
@@ -94,18 +95,28 @@ order `etfspec.pdf` documents for the ETF `NG` record; see `enigma.groups`."""
 TAG_TUPLET_DEF = 1072
 """`tupletDef` -- keyed by entry, not by a (staff, measure) pair. See `entry_key`."""
 
+TAG_SMART_SHAPE_ENTRY_MARK = 1064
+"""`smartShapeEntryMark` — 10-byte assignments with u16 shapeNum at +0.
+
+The published PDK structure and all 174 local Scars assignments corroborate
+the shape/entry join. See ARCHITECTURE.md for the evidence and scope.
+"""
+
 ENTRY_DETAIL_TAGS: dict[str, int] = {
     "articAssign": TAG_ARTIC_ASSIGN,
     "tupletDef": TAG_TUPLET_DEF,
     "lyrDataVerse": TAG_LYRIC_VERSE,
+    "smartShapeEntryMark": TAG_SMART_SHAPE_ENTRY_MARK,
 }
 """The detail records that hang off an *entry*, by the name `mus_document`
 gives them.
 
-Exactly three, measured over 114 `.mus` documents: `articAssign` (4,802),
-`tupletDef` (373) and `lyrDataVerse` (321). Every other detail tag is keyed by
-a (staff, measure) pair or by an instrument list, and `entry_key` means nothing
-for one.
+The first three were measured over 114 `.mus` documents: `articAssign` (4,802),
+`tupletDef` (373) and `lyrDataVerse` (321). `smartShapeEntryMark` is additionally
+established by the published PDK and 174 local Scars records. Those earlier
+corpus counts are historical, not remeasured. Other detail tags may instead
+use (staff, measure), shape/system or instrument-list keys; do not apply
+`entry_key` without evidence.
 
 Written out rather than derived, because the two sides are read by different
 code: a `.mus` records tree is built from the numeric tags on the left of

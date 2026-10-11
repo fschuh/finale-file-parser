@@ -42,6 +42,7 @@ Translated:
 | others | `measExprAssign` (177) | `textExprID`, `staffAssign`, offsets; per 24-byte slot |
 | others | `smartShape` (217) | type, attachment mode, visibility, endpoints |
 | others | `smartShapeMeasMark` (218) | `shapeNum`, `centerShapeNum`; per 12-byte slot |
+| details | `smartShapeEntryMark` (1064) | `shapeNum`; per 10-byte slot |
 
 Most fields above are confirmed against paired `.musx` files; see
 `docs/formats/mus-binary-notes.md`. Grace slashes are established by published
@@ -68,6 +69,7 @@ from finale_file_parser.enigma.mus_details import (
     TAG_ARTIC_ASSIGN,
     TAG_GFHOLD,
     TAG_LYRIC_VERSE,
+    TAG_SMART_SHAPE_ENTRY_MARK,
     TAG_STAFF_GROUP,
     TAG_TUPLET_DEF,
     MusDetailRecord,
@@ -920,7 +922,7 @@ _SMART_SHAPE_MARK_SLOT = 12
 _SMART_SHAPE_ENTRY_BASED = 0x40000000
 _SMART_SHAPE_LYRIC_BASED = 0x10000000
 _SMART_SHAPE_PRESET = 0x00008000
-_SMART_SHAPE_TYPES = {2: "decresc", 3: "cresc", 15: "slurAuto"}
+_SMART_SHAPE_TYPES = {0: "slurDown", 1: "slurUp", 2: "decresc", 3: "cresc", 15: "slurAuto"}
 """Published PDK structs/flags, corroborated by getters; see ARCHITECTURE."""
 
 
@@ -964,6 +966,10 @@ def _smart_shape(payload: bytes, attrs: dict[str, str]) -> Record:
         fields["noPresetShape"] = ""
     if _u16(payload, 82) & 1:
         fields["hidden"] = ""
+    for name, at in (("startNoteID", 76), ("endNoteID", 78)):
+        note_id = _s16(payload, at)
+        if note_id:
+            fields[name] = str(note_id)
     return Record(tag="smartShape", attrs=attrs, text="", fields=fields)
 
 
@@ -1365,12 +1371,43 @@ def _artic_records(
     return out
 
 
+_SMART_SHAPE_ENTRY_MARK_SLOT = 10
+"""Published __EDTSmartShapeEntryMark; see ARCHITECTURE.md."""
+
+
+def _smart_shape_entry_marks(record: MusDetailRecord, incidences: dict[int, int]) -> list[Record]:
+    if not record.payload or len(record.payload) % _SMART_SHAPE_ENTRY_MARK_SLOT:
+        raise CorruptScoreError(
+            f"smartShapeEntryMark {entry_key(record)}: expected complete "
+            f"{_SMART_SHAPE_ENTRY_MARK_SLOT}-byte slots, got {len(record.payload)} bytes"
+        )
+    entry = entry_key(record)
+    out = []
+    for at in range(0, len(record.payload), _SMART_SHAPE_ENTRY_MARK_SLOT):
+        incidence = incidences.get(entry, 0)
+        out.append(
+            Record(
+                tag="smartShapeEntryMark",
+                attrs={
+                    "entnum": str(entry),
+                    "inci": str(incidence),
+                    "sourceInci": str(record.inci),
+                },
+                text="",
+                fields={"shapeNum": str(_u16(record.payload, at))},
+            )
+        )
+        incidences[entry] = incidence + 1
+    return out
+
+
 def _details_records(records: tuple[MusDetailRecord, ...]) -> list[Record]:
     out: list[Record] = []
     lyric_incidence: dict[int, int] = {}
     lyric_seen: set[tuple[int, int]] = set()
     artic_incidence: dict[int, int] = {}
     artic_seen: set[tuple[int, int, bool]] = set()
+    shape_incidence: dict[int, int] = {}
     for record in records:
         if record.tag == TAG_GFHOLD and len(record.payload) >= 10:
             out.append(
@@ -1385,6 +1422,8 @@ def _details_records(records: tuple[MusDetailRecord, ...]) -> list[Record]:
             out.extend(_artic_records(record, artic_incidence, artic_seen))
         elif record.tag == TAG_LYRIC_VERSE:
             out.extend(_lyric_records(record, lyric_incidence, lyric_seen))
+        elif record.tag == TAG_SMART_SHAPE_ENTRY_MARK:
+            out.extend(_smart_shape_entry_marks(record, shape_incidence))
         elif record.tag == TAG_STAFF_GROUP and len(record.payload) >= _GROUP_BARLINE_BYTE + 1:
             out.append(
                 Record(

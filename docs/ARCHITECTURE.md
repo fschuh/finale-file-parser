@@ -1296,7 +1296,7 @@ reading fields, rather than silently truncating them.
 
 | Shape payload offset | Type | Meaning |
 | --- | --- | --- |
-| +0 | signed i16 | shape type: 2 diminuendo, 3 crescendo, 15 automatic slur |
+| +0 | signed i16 | shape type: 0 down slur, 1 up slur, 2 diminuendo, 3 crescendo, 15 automatic slur |
 | +2 | u32 | attachment/preset flags |
 | +6 / +36 | 30-byte segment | left / right termination segment |
 | +6 / +36 | signed i16 | endpoint staff |
@@ -1307,7 +1307,7 @@ reading fields, rather than silently truncating them.
 Flags **0x40000000** and **0x10000000** identify entry-based and lyric-based
 attachments; **0x00008000** selects a preset shape. Clear preset means the type
 must not be mistaken for a standard crescendo/diminuendo. The adapter names the
-three evidenced enum values above, retains other types numerically, distinguishes
+five evidenced enum values above, retains other types numerically, distinguishes
 `entryNum` from `edu`, and keeps these filters in the normalized record. Only the
 numeric-pool encoding is decoded here; no DCL-era row layout is inferred.
 
@@ -1373,6 +1373,115 @@ projection. Official MusicXML4.0 schema validation and all three visually
 inspected Verovio pages confirm two printed crescendos. `make check` passes
 lint/format/strict types and1,680 tests (seven skipped), including69 new
 authored cases. The licensed corpus and MuseScore runtime remain unavailable here.
+
+### Known format facts — entry-attached phrase slurs
+
+The same SmartShape definitions carry phrase slurs. Solid types **0** (`slurDown`),
+**1** (`slurUp`) and **15** (`slurAuto`) are documented by the published PDK
+[SmartShape enums and structs](https://pdk.finalelua.com/ff__smartshapes_8h_source.html)
+and corroborated by musxdom's
+[normalized field map](https://github.com/openmusx/musxdom/blob/main/src/musx/factory/FieldPopulatorsOthers.cpp)
+(inspected 2026-10-11). The entry-based flag **0x40000000** changes each endpoint's
+32-bit union from EDU to **entry number**. Preserve that distinction: an entry
+id is never a measure offset. Staff and measure still identify which placement
+of that entry is intended. A slur may skip notes, cross barlines or begin/end
+on a particular grace note without requiring any intermediate markers.
+
+In the numeric `.mus` pool, **details tag 1064** is `smartShapeEntryMark`. Its
+payload consists of **10-byte** assignment slots: `u16+0 shapeNum` followed by
+eight bytes this adapter does not interpret. The published
+`__EDTSmartShapeEntryMark` structure has this exact layout and uses ETF `Ex`.
+The numeric tag is identified independently by all **174** local records:
+every shape id resolves to a visible type 15 definition, and every entry key
+is exactly one of that definition's two endpoint entries. Each of the 87 shapes
+has both links, with no mismatches. As for other entry details, combine the
+key's high-word `cmper1` and low-word `cmper2`; do not treat them as staff/measure.
+Keep packed-slot incidence and `sourceInci` separately. Reject empty payloads
+and partial slots before reading fields. The entry-detail tag map also includes
+this record so inspection-report joins keep working. Historical corpus counts
+for the earlier three known entry detail kinds are not remeasured here.
+
+The PDK SmartShape structure also names its two signed note-id words at
+**+76 / +78**, between the complete control-point adjustment and line-style
+id. Normalize nonzero values as `startNoteID`/`endNoteID`, the corroborated
+EnigmaXML names. Pitch-specific attachments require note-id resolution and are
+excluded from the current entry-attached path instead of being moved onto a
+chord's first pitch. All 87 local slurs have both ids zero and flag2 zero.
+No new binary/plugin implementation is copied or executed; the shared endpoint
+layout already has the independent getter evidence documented above.
+
+`enigma/slurs.py` joins score measure **or entry** assignments once per shape;
+definitions alone do not place notation. Exclude hidden, linked-part, custom,
+lyric-based and non-entry-based shapes, and unrelated/dashed shape kinds. Exact
+event indices are gathered in the existing IR build pass, including grace notes.
+A supported endpoint must resolve to exactly one pitched event at its stated
+staff and measure. Missing or ambiguous placements, malformed endpoint/note ids,
+and equal/reversed spans raise `CorruptScoreError`. Cross-staff endpoints remain
+unsupported rather than becoming shortened single-staff slurs.
+
+Canonical `Part.slurs` holds complete immutable `Slur` spans, with
+`SlurEndpoint(measure, voice, event_index)` for each tip. Event indices are
+zero-based, while measure/voice retain their source numbers. This keeps several
+graces and the following main note distinct even though all share one metric
+onset. A None placement means automatic direction; explicit up/down shapes
+carry above/below placement. EnigmaXML's explicit `dir=over|under` overrides
+that default, while `automatic` retains it. These values are corroborated by
+musxdom's
+[common enum field map](https://github.com/openmusx/musxdom/blob/main/src/musx/factory/FieldPopulatorsCommon.cpp).
+Malformed directions raise a clear error. Binary flag2 direction overrides are
+not decoded; all local slurs have flag2 zero. These spans are independent of
+`NoteTies` and do not introduce a sounding tie or change any written/metric duration.
+
+MusicXML emits paired numbered
+[`slur`](https://www.w3.org/2021/06/musicxml40/musicxml-reference/elements/slur/)
+elements in the endpoint notes' `notations`, once per event even for chords.
+Let the reader choose curve geometry and automatic direction. Explicit placement
+also sets the corresponding over/under orientation. Allocate numbers in actual
+measure/staff/voice/event XML order, closing before opening at a shared note;
+the first serialized endpoint reserves a number and the second releases it.
+This also permits a cross-voice stop appearing before its start in XML. Numbers
+obey MusicXML's 1–16 document-overlap bound, independent of the IR's span count.
+Staff projection preserves endpoints and numbers. Missing references, duplicate
+measure/voice labels, rest endpoints, invalid placement, equal/reversed spans
+and excess document overlaps raise `ExportError` without expanding supplied
+indices into large allocations.
+
+Local evidence: all **87 assigned visible automatic slurs** resolve, including
+**25 cross-measure spans** and **seven grace endpoints**, with no cross-staff or
+rest endpoints and no staff/measure mismatch. For the user's examples:
+
+| Shape | Staff | Start entry and location | End entry and location |
+| --- | --- | --- | --- |
+| 42 | 1 | 166, m17 event 0 (G5) | 169, m17 event 2 (E5) |
+| 43 | 1 | 170, m17 event 3 (D5) | 173, m19 event 0 (E5) |
+| 44 | 1 | 183, m19 event 1 (E5) | 1269, m20 event 0 (E5) |
+| 88 | 2 | 284, m17 event 0 | 291, m17 event 7 |
+| 89 | 2 | 292, m18 event 0 | 299, m18 event 7 |
+| 90 | 2 | 300, m19 event 0 | 303, m19 event 3 |
+| 91 | 2 | 307, m19 grace event 4 | 305, m19 event 7 |
+
+The original PDF's first two pages independently confirm these phrase
+tips. The pre-change corrected MusicXML has no `slur` elements; its existing
+short curves are `tied` notations. Source entry numbers need not increase with
+musical time (see 307→305): use resolved event order, never raw id ordering.
+Authored XML/binary/export regressions cover nonadjacent/cross-bar/grace spans,
+mirrors, assignment kinds, hidden/linked/unused records, malformed input, chord
+ties, nested/touching numbering, cross-voice serialization and staff projection.
+The corrected local export now contains **174 paired slur endpoints**, all
+verified against their source entry placements including both Finale layers.
+Removing only these slurs and newly empty `notations` containers reproduces the
+entire prior score tree and every note onset. All 928 pitches, ties, eight dynamics,
+two hairpins, ten mordents, six arpeggio signs, one fermata and 24 grace flags are
+unchanged. Original input and unrelated `uv.lock` hashes are unchanged.
+Official MusicXML 4.0 schema validation succeeds; Verovio imports 87 MEI slurs and
+draws 95 segments across three pages because cross-system spans split visually.
+All three rendered pages are visually inspected, including the m17–19 phrases.
+`make check` passes lint, formatting, strict typing and **1,755 tests** (seven
+skipped), including **75 new authored regression cases**.
+Automatic slur placement follows the reader's engraving style; source stems,
+manual curve geometry and page layout are not reconstructed by this change.
+No supplied score files become repository fixtures. The licensed corpus and
+MuseScore runtime remain unavailable here.
 
 ### Explicit metronome markings
 
