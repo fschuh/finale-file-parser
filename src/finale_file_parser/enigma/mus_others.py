@@ -54,6 +54,7 @@ __all__ = [
     "TAG_SMART_SHAPE",
     "TAG_SMART_SHAPE_MEAS_MARK",
     "TAG_STAFF_SPEC",
+    "TAG_TEXT_BLOCK",
     "TAG_TEXT_EXPR_DEF",
     "MusOther",
     "read_mus_others",
@@ -87,6 +88,9 @@ TAG_SMART_SHAPE_MEAS_MARK = 218
 TAG_STAFF_SPEC = 231
 """`staffSpec` — confirmed by payload (rest offsets, staff lines, repeat-dot
 offsets), not by key sequence."""
+
+TAG_TEXT_BLOCK = 183
+"""`textBlock` / ETF TX: textID +0, raw text-pool selector +24; see ARCHITECTURE."""
 
 TAG_ARTIC_DEF = 121
 """`articDef` — an articulation's definition. Its `charMain` is the music-font

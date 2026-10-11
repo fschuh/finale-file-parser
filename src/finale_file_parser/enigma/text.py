@@ -80,7 +80,12 @@ def text_block(document: EnigmaDocument, number: int) -> str | None:
     text_id = block.fields.get("textID")
     if not isinstance(text_id, str):
         return None
-    for record in document.texts.of_tag(_BLOCK_TEXT):
+    tag = {"block": _BLOCK_TEXT, "expression": "expression"}.get(
+        str(block.fields.get("textTag", "block"))
+    )
+    if tag is None:
+        return None
+    for record in document.texts.of_tag(tag):
         if record.attrs.get("number") == text_id:
             return record.text
     return None

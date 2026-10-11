@@ -1,4 +1,21 @@
-# `.mus` staff names: what is established, and the one link still missing
+# `.mus` staff names: decoded reference chain and investigation history
+
+## Current result — 2026-10-11
+
+The missing link is the file's own **others tag 183 / ETF TX** record, keyed
+by the name ID. Its u16 `+0` holds the text ID and u16 `+24` selects block
+(2004) or expression (2006) text. The adapter now decodes this record and
+stream 3's block texts. Staff IDs remain at `+30/+32`; group IDs at `+4/+22`.
+See [the layout and primary-source evidence](../ARCHITECTURE.md#legacy-staff-and-group-names-2026-10-11).
+
+The historical claim below that a document-independent external table was
+required is **retracted**. It inferred the nature of the lookup from repeated
+template values without decoding TX. No arithmetic or hardcoded name table
+is used. Missing/unknown references keep fallback names. Staff and group
+names remain separate, with score textBlock variants selected explicitly.
+
+The remainder is the earlier investigation record, retained to explain the
+failed approaches rather than as the current parser specification.
 
 A `.mus` has been recorded as unable to supply staff names, which also blocks group names and would
 have supplied the instrument identity the whole-octave transposition case wanted. This is what an

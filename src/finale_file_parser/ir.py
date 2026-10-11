@@ -474,6 +474,9 @@ class Part:
     slurs: tuple[Slur, ...] = ()
     """Phrase spans with exact note attachments, independent of ties."""
 
+    abbreviation: str = ""
+    """The staff's abbreviated name, kept separately from a group label."""
+
 
 @dataclass(frozen=True)
 class PartGroup:

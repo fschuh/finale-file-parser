@@ -159,8 +159,9 @@ def _append_part_list(
         ET.SubElement(score_part, "part-name").text = (
             label.name if label is not None and label.name else part.name or part.id
         )
-        if label is not None and label.abbreviation:
-            ET.SubElement(score_part, "part-abbreviation").text = label.abbreviation
+        abbreviation = label.abbreviation if label is not None else part.abbreviation
+        if abbreviation:
+            ET.SubElement(score_part, "part-abbreviation").text = abbreviation
         # Innermost first, so groups close in the reverse of the order they
         # opened even where several end on the same part.
         for group_index in reversed(stopping.get(index, ())):

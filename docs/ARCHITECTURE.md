@@ -316,6 +316,51 @@ Layers are distinct from Finale's **voice 1 / voice 2** within a layer (`eeppd.t
 "V2 launch" and `CNTLBIT`). No voice-2 marker has been located in EnigmaXML entry records yet, and the
 measure sums above do not require one, so it remains unmodelled.
 
+### Legacy staff and group names (2026-10-11)
+
+Names use the document's stored two-hop references, not a fixed palette:
+`staffSpec.fullName` / `abbrvName`, or `staffGroup.fullID` / `abbrvID`, selects
+`others.textBlock[cmper]`; that record selects a text pool and text ID. The
+earlier claim in `mus-staff-names.md` that an external fixed table was missing
+is retracted. Repeated template IDs did not establish such a table.
+
+The vendor ETF specification's **Text Block** section names the record `TX`
+and documents its first word as the `^block(N)` reference. The published
+[PDK FCTextBlock source](https://pdk.finalelua.com/ff__others_8h_source.html)
+confirms distinct `textID` and `textTag` fields and `GetRawTextExtag()` selecting
+the text pool. Read-only inspection of the previously attributed RGP Lua 0.79
+binary confirms the pre-25.4 offsets: `GetRawTextID()` at `0x18ebbe` reads the
+legacy structure at object `+0x38`; `CreateRawTextString()` at `0x4bfb36` reads
+its tag at object `+0x50`, hence payload `+24`.
+
+For the 2011/2012 variable-length pool this is numeric tag **183**, with a
+36-byte payload: textID is u16 `+0`, textTag is u16 `+24`; on-wire selectors
+**2004** and **2006** address block and expression text respectively. All 6,907
+textBlock records in the 75 supplied Ninsheetmusic files have this layout
+(1,439 block references and 5,468 expression references). Unknown selectors
+are retained and unresolved rather than treated as block text. Truncated
+references raise `CorruptScoreError`. The DCL `TX` path reads the same fields
+in the file's byte order; a zero selector uses the older ETF default block
+pool, whose trailing incidences were documented as unused. This older path is
+covered with authored rows; the supplied 75 files do not exercise it.
+
+Staff full/abbreviated IDs are u16 `+30/+32`, in the ETF IS field order; group
+IDs remain u16 `+4/+22`. Zero means absent. The adapter now retains stream 3's
+`^block(N)` sections as `blockText`; stream 2 is never merged into it. Existing
+UTF-8/Windows/Macintosh decoding is used for literal text. Binary font/style/
+size commands `^84/^85/^86` and their four byte arguments are decoded
+separately, so their opcodes do not force UTF-8 instrument names through a
+legacy code page. Markup is retained in the normalized document and stripped
+by the existing name resolver. Linked-part textBlock variants cannot override
+the score's reference. Full and abbreviated staff names and group labels
+remain distinct through the IR and MusicXML.
+
+Birth of the People's group 1 fullID **2** resolves through tag 183 cmper 2,
+textID **30**, selector **2004**, to the stored literal **Piano**. Its group 2
+has separate fullID 5 and abbrvID 6 references to blocks 32/33 (**Piano/Pno.**).
+Neither record is selected or dropped based on its name; applicability is a
+separate issue. The unnamed staves retain their fallback names.
+
 ### Mid-measure clefs (2026-10-11)
 
 Legacy GF/numeric 1044 payload +0 is a **clef-list ID**, rather than a literal
@@ -813,10 +858,10 @@ numerically, so bracing them would join a run of parts the score does not group.
 the instrument list instead would fix those 8 and is a change to every part's position, so it is its
 own slice.
 
-`.mus` gaps: the instrument list itself is unidentified (**no** paired document distinguishes a
-right guess from a wrong one, since all of them number slots and staves alike), so staves fall back
-to numeric order; and a group's name resolves through the `textBlock → blockText` chain a `.mus`
-does not supply, the same missing chain as staff names.
+The earlier `.mus` gaps here have since been closed: instrument-list tag 159
+recovers staff order (including paired documents whose order is not numeric),
+and textBlock tag 183 resolves staff/group names through the source's own
+text references. See the adapter and [name-layout evidence](#legacy-staff-and-group-names-2026-10-11).
 
 ### Known format facts — text repeats
 

@@ -26,7 +26,8 @@ Translated:
 | options | `clefOptions` (109) | the clef table: `adjust`, `clefChar`, `clefYDisp`, `shapeID` |
 | options | `graceNoteOptions` (58 / ETF `^44`) | `slashFlaggedGraceNotes` |
 | details | `tupletDef` (1072) | `symbolicNum`, `symbolicDur`, `refNum`, `refDur` |
-| others | `staffSpec` (231) | `transposition.keysig.adjust` only — see below |
+| others | `staffSpec` (231) | `transposition.keysig.adjust`, `fullName`, `abbrvName` |
+| others | `textBlock` (183 / ETF `TX`) | `textID`, `textTag` |
 | others | `instUsed` (159) | `inst` per 24-byte slot — the staff layout order |
 | details | `lyrDataVerse` (1108) | `lyricNumber`, `syll`, `wext`, per 20-byte group |
 | details | `articAssign` (1009) | `articDef` |
@@ -37,6 +38,7 @@ Translated:
 | details | `staffGroup` (1057) | `startInst`, `endInst`, `bracket.id`, `fullID`, the barline bit |
 | texts | `verse` | the `^verse(N)…^end` sections of the text stream |
 | texts | `expression` | the `^expression(N)…^end` sections of the same stream |
+| texts | `blockText` | the `^block(N)…^end` sections of the same stream |
 | texts | `fileInfo` | title (1), composer (2), copyright (3) |
 | others | `textExprDef` (241) | `textIDKey`, `value`, `descStr` |
 | others | `measExprAssign` (177) | `textExprID`, `staffAssign`, offsets; per 24-byte slot |
@@ -93,6 +95,7 @@ from finale_file_parser.enigma.mus_others import (
     TAG_SMART_SHAPE,
     TAG_SMART_SHAPE_MEAS_MARK,
     TAG_STAFF_SPEC,
+    TAG_TEXT_BLOCK,
     TAG_TEXT_EXPR_DEF,
     MusOther,
     read_mus_others,
@@ -104,21 +107,6 @@ from finale_file_parser.version import mus as mus_header
 __all__ = ["UNTRANSLATED", "read_mus_document"]
 
 UNTRANSLATED = (
-    "staffSpec part names: the names ARE in the file -- text stream 3 carries "
-    "them as ^block(N) sections, and staffSpec +30 selects one. What is missing "
-    "is the FIXED TABLE from that id to the block number. This entry has twice "
-    "described the unknown as a per-document base; that was wrong both times. "
-    "The mapping does not vary by document: name id 2 selects block 30 in ten "
-    "documents of ten different pieces, and across 25 anchors no id ever "
-    "selects two blocks. The delta looked document-dependent only because "
-    "different documents use different ids. Nine ids are known (2->30, 89->20, "
-    "91/92/93->22, 94/95->24, 97->26, 98->37), which is enough to show the "
-    "answer is a many-to-one table and far too few to ship one -- fitting a "
-    "formula to nine points would repeat the palette trap. This closes when "
-    "more paired documents cover more ids, or Finale's own table is obtained "
-    "from outside this corpus; it does not close by looking harder at these "
-    "files. Parts still fall back to positional names. See "
-    "docs/formats/mus-staff-names.md.",
     "Bibliographic metadata in a 2001-2005 .mus. The 2011-era text stream "
     "carries tagged fileInfo sections, and kinds 1, 2 and 3 are read as title, "
     "composer and copyright. None of the 139 DCL-era text streams carries a "
@@ -153,12 +141,6 @@ UNTRANSLATED = (
     "and the DCL cohort's 4,113 measures had never been measured for it -- so "
     "nothing checks a guess. A .mus therefore ends a piece with an ordinary barline where the "
     ".musx draws a final one.",
-    "Staff group names: a staffGroup's fullID IS recovered, but resolving it "
-    "needs the textBlock -> blockText chain, which a .mus does not supply -- "
-    "the same missing chain as staffSpec part names. Groups therefore come out "
-    "unnamed rather than labelled with a raw block number. 26 of the 95 paired "
-    "documents carry a group, and the ones differing from their .musx in "
-    "nothing but the name are pinned as GROUP_NAME_ONLY_DIFFERENCES.",
     "Staff layout order in a 2001-2005 .mus: the 2011 tag IS identified (159, "
     "see mus_others.TAG_INST_USED) and read, so a 2011 .mus now lays its staves "
     "out in score order rather than numeric order. The DCL era carries an ETF "
@@ -282,9 +264,15 @@ _TEXT_STREAM = 3
 """The payload stream holding ETF tagged text (`^verse(1)...^end`)."""
 
 _TEXT_SECTION = re.compile(
-    rb"\^(verse|chorus|section|expression|fileInfo)\((\d+)\)(.*?)\^end", re.DOTALL
+    rb"\^(verse|chorus|section|expression|fileInfo|block)\((\d+)\)(.*?)\^end", re.DOTALL
 )
 """One tagged text section. The body keeps its markup; `plain_text` strips it."""
+
+_BINARY_FONT_COMMAND = re.compile(rb"(\^[\x84-\x86].{4})", re.DOTALL)
+"""Font/style/size commands have four byte arguments, independently of text encoding."""
+
+_TEXT_BLOCK_TAGS = {2004: "block", 2006: "expression"}
+"""On-wire text tags. They select distinct text pools, not block IDs."""
 
 _FILE_INFO_TYPES = {b"1": "title", b"2": "composer", b"3": "copyright"}
 """The bibliographic kinds confirmed by exact text matches to paired `.musx`.
@@ -642,6 +630,15 @@ def _rows_others(rows: MusRows, frames: dict[int, tuple[int, int, int | None]]) 
                     fields=_staff_spec(record.payload, rows.byte_order),
                 )
             )
+        elif tag == "TX":
+            out.append(
+                Record(
+                    "textBlock",
+                    attrs,
+                    "",
+                    _text_block(record.payload, rows.byte_order, legacy=True),
+                )
+            )
         elif tag == "CE":
             out.extend(_clef_enums(record.payload, attrs, rows.byte_order))
         elif tag == "FR" and cmper in frames:
@@ -706,6 +703,8 @@ def _texts_records(path: str | os.PathLike[str]) -> list[Record]:
     seen: set[tuple[str, str]] = set()
     for match in _TEXT_SECTION.finditer(streams[_TEXT_STREAM]):
         tag = match.group(1).decode("ascii")
+        if tag == "block":
+            tag = "blockText"
         number = match.group(2).decode("ascii")
         if tag == "fileInfo":
             kind = _FILE_INFO_TYPES.get(match.group(2))
@@ -721,7 +720,9 @@ def _texts_records(path: str | os.PathLike[str]) -> list[Record]:
             # the writer's business rather than something to fail a read over.
             continue
         seen.add(identity)
-        out.append(Record(tag=tag, attrs=attrs, text=_decode(match.group(3), fallback), fields={}))
+        body = match.group(3)
+        text = _decode_block(body, fallback) if tag == "blockText" else _decode(body, fallback)
+        out.append(Record(tag=tag, attrs=attrs, text=text, fields={}))
     return out
 
 
@@ -730,6 +731,16 @@ def _decode(raw: bytes, fallback: str) -> str:
         return raw.decode("utf-8")
     except UnicodeDecodeError:
         return raw.decode(fallback, errors="replace")
+
+
+def _decode_block(raw: bytes, fallback: str) -> str:
+    # Decode byte-valued font commands separately: otherwise their non-UTF-8
+    # opcodes force a UTF-8 instrument name through the legacy code page.
+    chunks = _BINARY_FONT_COMMAND.split(raw)
+    return "".join(
+        chunk.decode(fallback, errors="replace") if i % 2 else _decode(chunk, fallback)
+        for i, chunk in enumerate(chunks)
+    )
 
 
 def _banner_platform(path: str | os.PathLike[str]) -> str | None:
@@ -999,6 +1010,8 @@ def _others_records(
             attrs["part"] = str(record.part)
         if record.tag == TAG_CLEF_ENUM:
             out.extend(_clef_enums(record.payload, attrs))
+        elif record.tag == TAG_TEXT_BLOCK:
+            out.append(Record("textBlock", attrs, "", _text_block(record.payload)))
         elif record.tag == TAG_SMART_SHAPE:
             out.append(_smart_shape(record.payload, attrs))
         elif record.tag == TAG_SMART_SHAPE_MEAS_MARK:
@@ -1168,7 +1181,7 @@ def _repeat_back(payload: bytes) -> dict[str, str | tuple[str, ...] | Record | t
 def _staff_spec(
     payload: bytes, order: ByteOrder = "little"
 ) -> dict[str, str | tuple[str, ...] | Record | tuple[Record, ...]]:
-    """Only the transposition's key alteration -- which is all written pitch needs.
+    """Staff name references and the transposition's key alteration.
 
     `transpose_key` uses `adjust` alone; `interval` is accepted "for symmetry
     with transpose_pitch and does not affect the key". So recovering `adjust`
@@ -1182,12 +1195,30 @@ def _staff_spec(
     raw = _u16(payload, _STAFF_TRANSPOSITION, order)
     magnitude = raw & _ALTERATION_MAGNITUDE
     adjust = -magnitude if raw & _ALTERATION_SIGN else magnitude
-    if not adjust:
-        return {}
-    keysig = Record(tag="keysig", attrs={}, text="", fields={"adjust": str(adjust)})
-    return {
-        "transposition": Record(tag="transposition", attrs={}, text="", fields={"keysig": keysig})
-    }
+    fields: dict[str, str | tuple[str, ...] | Record | tuple[Record, ...]] = {}
+    if adjust:
+        keysig = Record(tag="keysig", attrs={}, text="", fields={"adjust": str(adjust)})
+        fields["transposition"] = Record(
+            tag="transposition", attrs={}, text="", fields={"keysig": keysig}
+        )
+    for name, offset in (("fullName", 30), ("abbrvName", 32)):
+        number = _u16(payload, offset, order) if len(payload) >= offset + 2 else 0
+        if number:
+            fields[name] = str(number)
+    return fields
+
+
+def _text_block(
+    payload: bytes, order: ByteOrder = "little", *, legacy: bool = False
+) -> dict[str, str | tuple[str, ...] | Record | tuple[Record, ...]]:
+    minimum = 24 if legacy else 26
+    if len(payload) < minimum:
+        raise CorruptScoreError("textBlock: truncated text reference")
+    tag = _u16(payload, 24, order) if len(payload) >= 26 else 0
+    # The 1998 ETF TX layout's trailing incidences are unused; it predates
+    # the explicit textTag. Unknown modern tags are retained and not resolved.
+    text_tag = "block" if legacy and tag == 0 else _TEXT_BLOCK_TAGS.get(tag, str(tag))
+    return {"textID": str(_u16(payload, 0, order)), "textTag": text_tag}
 
 
 def _meas_spec(

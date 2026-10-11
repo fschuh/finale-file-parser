@@ -11,8 +11,8 @@ named record's. Both are useful; conflating them is how a lead becomes a fact
 in someone else's document. Every entry therefore carries the evidence behind
 it, and anything showing a name is expected to show that too.
 
-This covers 68 of the 492 tags the two eras use between them -- the ones on the
-path from a file to its notes. What the rest hold is not known.
+This is a partial table of the tags the two eras use -- the ones decoded or
+documented on the path from a file to its music. What the rest hold is not known.
 """
 
 from __future__ import annotations
@@ -131,6 +131,7 @@ _DECODED: tuple[TagName, ...] = (
     TagName(
         "176", "others", "measSpec", "Per measure: width, key, beats, divbeat, barline", etf="MS"
     ),
+    TagName("183", "others", "textBlock", "Text ID and text-pool selector", etf="TX"),
     TagName("203", "others", "repeatBack", "Backward repeat barline, keyed by measure"),
     TagName("204", "others", "repeatEndingStart", "Ending bracket, keyed by measure"),
     TagName("206", "others", "repeatPassList", "Which passes an ending is taken on"),

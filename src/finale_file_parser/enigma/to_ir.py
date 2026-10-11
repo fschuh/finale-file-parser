@@ -234,6 +234,7 @@ def build_score(document: EnigmaDocument) -> Score:
             ),
             hairpins=hairpins.get(staff, ()),
             slurs=slurs.get(staff, ()),
+            abbreviation=names[staff].abbreviated if staff in names else "",
         )
         for staff in staves
     ]

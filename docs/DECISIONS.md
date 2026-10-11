@@ -877,3 +877,13 @@ and use the event-time clef for arpeggio geometry. Pitches remain key-relative
 and are unaffected. MusicXML forwards/backup place attributes at exact times
 before serializing voices, including changes during sustained notes; projected
 staves retain every timed attribute with the correct staff number.
+
+## 2026-10-11 — DECIDED: preserve abbreviated staff names in Part
+
+Append default-empty `Part.abbreviation` alongside the existing full `name`.
+The name resolver already recovers both strings, but the IR previously dropped
+the abbreviated staff label before export. Group labels remain on `PartGroup`;
+recovering a group name does not rename each staff or merge its instrument.
+MusicXML emits a staff's abbreviation with its score-part, or the group label
+when an existing connected-arpeggio projection produces a combined part.
+Appending the field preserves existing positional Part construction.
