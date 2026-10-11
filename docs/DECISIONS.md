@@ -10,6 +10,28 @@ and resolved ones **DECIDED**.
 
 ---
 
+## 2026-10-10 — DECIDED: recover source dynamics and honor hidden articulation assignments
+
+**Context.** Scars' assigned dynamics were missing because its Finale-2012
+UTF-16LE descriptions were truncated at a single zero byte. The final `sfz`
+expression was unnamed, while two separate hidden accents were incorrectly
+printed. The user approved the correction plan.
+
+**Decision.** Decode descriptions using the banner's evidenced encoding era,
+with aligned terminators and explicit malformed-input errors. Keep the existing
+`Expression` IR and MusicXML exporter. Grade names suffice for level dynamics;
+otherwise ambiguous attack names require their documented glyph when font
+markup is unresolved. Maestro glyph167 plus `sforzato` establishes `sfz`.
+Normalize assignment visibility, retain it in source records, and exclude hidden
+and linked-part assignments consistently from all articulation-derived notation.
+Include visibility in binary-assignment deduplication so visible copies survive.
+
+**Consequence.** The eight source dynamics print correctly and bar59 retains
+its visible staccatos plus `sfz`, with no invented accents. Ordinary visible
+accents keep their meaning. Playback values remain source data without guessed
+performance curves. No parallel score model or hidden-playback notation is
+added to the IR. Byte/glyph evidence is in `docs/ARCHITECTURE.md`.
+
 ## 2026-10-10 — DECIDED: retain arpeggio connections in the IR and project connected staves at export
 
 **Context.** The user requested missing arpeggio signs from Scars of Time. Six

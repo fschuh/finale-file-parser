@@ -99,7 +99,7 @@ ACCENT_DYNAMICS: tuple[Dynamic, ...] = (
     Dynamic("ê", "forte piano", "fp", None),
     Dynamic("Z", "forzando", "fz", None),
     Dynamic("S", "sforzando", None, None),
-    Dynamic("§", "sforzato", None, None),
+    Dynamic("§", "sforzato", "sfz", None),
     Dynamic("\x8d", "sforzato", None, None),
 )
 """The five that shape an attack instead of setting a level, so the shipped
@@ -107,11 +107,9 @@ library gives them no `value`. A user can still set one -- one corpus document
 gives its *sforzando* 88 with `playType='amplitude'` -- so `None` here means
 "no default", not "never has one".
 
-Three are left unabbreviated on purpose. Two glyphs -- `§` and `\\x8d` -- both
-read `sforzato` in `descStr`, so the file does not say which is which, and
-*sforzando* is written `sf` and `sfz` both. Naming them needs evidence this
-project does not have; the glyphs and the file's own words are recorded so the
-gap is visible rather than guessed.
+Two are left unabbreviated. The legacy Maestro chart and local score confirm
+`§` as `sfz`; the other two need their own glyph evidence. A description alone
+still cannot distinguish the two glyphs called `sforzato`. See ARCHITECTURE.md.
 """
 
 OTHER_DYNAMICS: tuple[Dynamic, ...] = (Dynamic("subito p", "subito piano", "subito p", 49),)
@@ -149,10 +147,10 @@ def velocity_of(glyph: str) -> int | None:
 
 _BY_NAME: dict[str, Dynamic] = {d.name: d for d in GRADED_DYNAMICS}
 """Only the graded ten. Two accent entries share the name `sforzato`, so a
-description cannot select between them -- see `ACCENT_DYNAMICS`."""
+description alone cannot select between them -- see `ACCENT_DYNAMICS`."""
 
 
-def described_dynamic(description: str) -> Dynamic | None:
+def described_dynamic(description: str, *, glyph: str | None = None) -> Dynamic | None:
     """The dynamic a `descStr` names, or None if it does not name one.
 
     This is the strongest signal there is, and the one that named the table in
@@ -165,11 +163,26 @@ def described_dynamic(description: str) -> Dynamic | None:
     spaces. The velocity in parentheses is ignored here; a caller comparing it
     against the record's own `value` is doing a different check.
 
+    An attack description needs its actual glyph as well: `sforzato` alone
+    does not select `sfz`, but the documented `§` glyph does. Unsupported attack
+    variants stay unnamed even when their description is a familiar word.
+
     Returns None for a DCL-era description: that era writes the *placement*
     instead -- `'Below Staff (Vel. 127)'` -- which names no dynamic.
     """
     name = " ".join(description.split("(")[0].split()).lower()
-    return _BY_NAME.get(name)
+    graded = _BY_NAME.get(name)
+    if graded is not None:
+        return graded
+    attack = _BY_GLYPH.get(glyph or "")
+    if (
+        attack is not None
+        and attack in ACCENT_DYNAMICS
+        and attack.name == name
+        and attack.marking is not None
+    ):
+        return attack
+    return None
 
 
 def marking_of(glyph: str) -> str | None:

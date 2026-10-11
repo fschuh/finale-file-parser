@@ -68,6 +68,8 @@ def fingerings_by_entry(document: EnigmaDocument) -> dict[int, tuple[str, ...]]:
     out: dict[int, list[str]] = {}
     seen: set[tuple[int, int]] = set()
     for record in document.details.of_tag(_ASSIGN):
+        if "part" in record.attrs or "hide" in record.fields:
+            continue
         entnum = field_int(record.attrs.get("entnum"))
         definition = field_int(record.fields.get(_DEFINITION))
         if entnum is None or definition is None or (entnum, definition) in seen:

@@ -244,19 +244,16 @@ def test_the_ladder_is_even_and_the_anchors_land(reading: _Reading) -> None:
     assert dynamic_for("ff") is None
 
 
-def test_the_two_sforzato_glyphs_are_left_unnamed() -> None:
-    """The file gives `§` and `\\x8d` the same description, so which is which is
-    not established. A future edit that names one must bring evidence; this test
-    exists so that doing it silently fails.
+def test_only_the_documented_sforzato_glyph_is_named() -> None:
+    """Maestro's chart establishes § as sfz; the other variant needs evidence.
+
+    Both share a description, which alone still cannot select the abbreviation.
+    See docs/ARCHITECTURE.md for the glyph chart and local-score confirmation.
     """
     sforzato = [d for d in DYNAMICS if d.name == "sforzato"]
     assert len(sforzato) == 2, f"expected two glyphs described 'sforzato', got {sforzato}"
     assert {d.glyph for d in sforzato} == {"§", "\x8d"}
-    named = [d for d in sforzato if d.marking is not None]
-    assert not named, (
-        f"a marking was claimed for {named} -- descStr does not distinguish the two "
-        "sforzato glyphs, so naming one needs evidence from outside the file"
-    )
+    assert {d.glyph: d.marking for d in sforzato} == {"§": "sfz", "\x8d": None}
 
 
 def test_maestro_dynamics_holds_only_the_levelled_ones() -> None:

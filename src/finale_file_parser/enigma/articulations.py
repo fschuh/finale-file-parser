@@ -64,6 +64,8 @@ def articulations_by_entry(document: EnigmaDocument) -> dict[int, tuple[str, ...
     characters = _definitions(document)
     out: dict[int, list[str]] = {}
     for record in document.details.of_tag(_ASSIGN):
+        if "part" in record.attrs or "hide" in record.fields:
+            continue
         entnum = field_int(record.attrs.get("entnum"))
         definition = field_int(record.fields.get(_DEFINITION))
         if entnum is None or definition is None:

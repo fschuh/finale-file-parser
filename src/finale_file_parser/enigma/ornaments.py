@@ -17,7 +17,7 @@ _UPPER_MORDENT = 109
 
 
 def ornaments_by_entry(document: EnigmaDocument) -> dict[int, tuple[Ornament, ...]]:
-    """Only assigned, evidenced ornaments; unknown glyphs and linked-part overrides stay out."""
+    """Only visible score ornaments; unknown glyphs and linked-part overrides stay out."""
     definitions = {
         field_int(record.attrs.get("cmper"))
         for record in document.others.of_tag("articDef")
@@ -25,7 +25,7 @@ def ornaments_by_entry(document: EnigmaDocument) -> dict[int, tuple[Ornament, ..
     }
     out: dict[int, list[Ornament]] = {}
     for record in document.details.of_tag("articAssign"):
-        if "part" in record.attrs:
+        if "part" in record.attrs or "hide" in record.fields:
             continue
         entry = field_int(record.attrs.get("entnum"))
         definition = field_int(record.fields.get("articDef"))

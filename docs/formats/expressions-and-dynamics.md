@@ -3,6 +3,10 @@
 Status: **identified, and now named.** Measured 2026-08-15 against 401 corpus
 `.musx` documents.
 
+Updated 2026-10-10: Finale-2012 Unicode descriptions and the evidenced `§`/`sfz`
+variant now reach the existing IR/export path. Counts from the earlier corpus
+audit below remain historical; the licensed corpus is absent in this checkout.
+
 ## A dynamic is a character, not a word
 
 `"ff"` appears nowhere in a Finale file. Searching every record payload and the
@@ -23,6 +27,11 @@ by one word and is otherwise the same dialect:
 
     .musx   ^fontMus(Font0,0)^size(24)^nfx(0)ë
     .mus    ^font(Font0,0)^size(24)^nfx(0)ë
+
+This describes the earlier text dialect. Scars' 2012-converter file uses
+compiled command bytes (including `^¥` plus four arguments) for the font.
+`plain_text` strips these commands, but they do not yet establish a music font;
+complete descriptions can still identify its dynamics.
 
 `^smartshape(n)` sections share the stream and are **not** expressions: they
 label glissandi, octave lines and bends. Every Maestro-set section in one
@@ -90,12 +99,16 @@ than setting a level:
 | `ê` | 0xEA | forte piano | `fp` |
 | `Z` | 0x5A | forzando | `fz` |
 | `S` | 0x53 | sforzando | *not claimed* |
-| `§` | 0xA7 | sforzato | *not claimed* |
+| `§` | 0xA7 | sforzato | `sfz` |
 | `\x8d` | 0x8D | sforzato | *not claimed* |
 
-**Three are deliberately unnamed.** `§` and `\x8d` have the *same* `descStr`, so
-the file does not say which is which, and *sforzando* is written `sf` and `sfz`
-both. Naming them needs evidence this project does not have.
+**Two remain unnamed.** `§` and `\x8d` have the *same* `descStr`, so the
+description alone cannot distinguish them. The official
+[Maestro chart](https://usermanuals.finalemusic.com/FinaleWin/Content/Finale/font-maestro.htm)
+at ALT+0167 prints `sfz`, as does Scars' PDF where its glyph-167 expression is
+assigned. That establishes `§`; `\x8d` and `S` need separate glyph evidence.
+With unresolved legacy font markup, the resolver requires a matching attack
+description and an evidenced glyph. Description-only `sforzato` remains unnamed.
 
 "No `value`" is the shipped default, not a rule: a user may set a playback level
 on any expression, and one corpus document gives its *sforzando* 88 with
@@ -164,6 +177,10 @@ dynamic filed in a custom category — still dynamics. A marking is therefore
 claimed when the glyph is in the table *and* either the text is set in a music
 font or the document's own category is `dynamics`; the 129 rows with neither
 signal are carried as text and left unnamed.
+
+A complete graded-dynamic description independently establishes its name, even
+without a text glyph. Attack names require the matching documented glyph, as
+described above; the word `sforzato` alone does not select `sfz`.
 
 ### A dynamic the file names but has no character for
 
@@ -262,7 +279,7 @@ treats a rehearsal mark as a navigation target.
 
 `<dynamics><ff/></dynamics>` for a named marking, `<words>` for anything that
 reads as words, and nothing at all for an unidentified music-font glyph — a
-literal `§` in a score is worse than an omission. `subito p` goes to
+literal unsupported `\x8d` in a score is worse than an omission. `subito p` goes to
 `<other-dynamics>`, since its name has a space and `<subito p/>` is not XML.
 
 **Velocity is not exported.** MusicXML carries playback on `<sound dynamics>` as
@@ -346,6 +363,31 @@ The enum vocabularies, read off the pairs rather than guessed:
 `horzMeasExprAlign` 1 `startTimeSig`, 3 `manual`, 13 `leftOfPrimaryNotehead`,
 14 `rightOfAllNoteheads`; `vertMeasExprAlign` 2 `manual`, 4 `topNote`,
 8 `aboveStaffOrEntry`, 9 `belowStaffOrEntry`.
+
+### Finale 2012 descriptions are UTF-16LE
+
+The serialized description still begins at **+36** in the local 2012-converter
+file, but it uses **UTF-16LE**, not the earlier 8-bit text. Splitting at a single
+NUL byte discarded nearly all the name: `pianissimo` became `p`, `mezzo piano`
+became `m`. The banner year selects the encoding; the decoder scans aligned
+16-bit NUL units or ends at the bounded record. It rejects odd/truncated Unicode
+and malformed surrogate sequences with `CorruptScoreError`, while retaining
+the older platform-decoding path. An aligned terminator may precede unrelated
+record-tail bytes. Scars' `Pedal` description also demonstrates a valid string
+ending at the record boundary without a terminator.
+
+The published PDK era types and released RGP Lua getter independently establish
+the Unicode transition, not the serialized offset. Exact getter addresses,
+links and the distinction between live-object and file offsets are recorded in
+`docs/ARCHITECTURE.md` under "Unicode expression descriptions and dynamics".
+
+The local score has eight assigned staff-1 dynamics: **m1 pp, m6 mp, m20 mf,
+m28 f, m36 mf, m44 mp, m52 f, m59 sfz**. All now export as `<dynamics>`.
+The final `sfz` is expression14 with glyph167 and description `sforzato`.
+Two separate m59 accent assignments have the hidden bit at group +10; their
+visibility is honored, so they no longer print. Visible staccatos survive.
+This is a source-notation fix; the file's own untyped playback values remain
+in `Expression.velocity`, without guessed MIDI performance shaping.
 
 **Not identified, and not guessed.** `categoryID` peaks at 20.3%, which is noise.
 `playType` partitions cleanly at no offset. `+4` also matches `execShape` at

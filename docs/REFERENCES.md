@@ -153,10 +153,12 @@ entry here that supports them.
 - Published API documentation: https://pdk.finalelua.com/ff__prefs_8h_source.html
   and https://pdk.finalelua.com/ff__noteframe_8h_source.html
   plus https://pdk.finalelua.com/ff__entrydetails_8h_source.html (articulation
-  positioning/copy endpoints) and https://pdk.finalelua.com/ff__other_8h_source.html
-  (staff-list geometry).
+  positioning/copy endpoints and visibility) and https://pdk.finalelua.com/ff__other_8h_source.html
+  (staff-list geometry and Unicode text-expression era types).
 - The released preference-location map and individual entry getter establish
   the legacy grace fields. Articulation getters and staff-list accessors also
   establish positioning words and staff distance used for arpeggio connections.
+  The visibility getter/setter identify the inverse hide bit; the text-expression
+  description getter establishes the Finale-2012 Unicode decoding path.
   Hashes and reproducible offsets, with their scope,
   are recorded in `docs/ARCHITECTURE.md`.

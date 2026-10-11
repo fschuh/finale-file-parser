@@ -268,14 +268,68 @@ def test_an_unidentified_glyph_is_still_carried() -> None:
     """
     doc = document(
         *library(),
-        definition(60, category_id=DYNAMICS_CATEGORY, desc="sforzato"),
-        text(60, "^fontMus(Font0,0)§"),
+        definition(60, category_id=DYNAMICS_CATEGORY, desc="sforzando"),
+        text(60, "^fontMus(Font0,0)S"),
         assignment(6, 60),
     )
     (found,) = expressions_by_measure(doc)[(1, 6)]
-    assert found.text == "§"
+    assert found.text == "S"
     assert found.marking is None
     assert found.category == "dynamics"
+
+
+def test_a_sforzato_glyph_and_description_identify_sfz_without_font_or_category() -> None:
+    """The compiled legacy font command cannot establish a font on its own."""
+    doc = document(
+        definition(60, category_id=99, desc="Sforzato (Copy)", value=21),
+        text(60, "^¥\x01\x01\x01\x01§"),
+        assignment(59, 60),
+    )
+    (found,) = expressions_by_measure(doc)[(1, 59)]
+    assert found.text == "§"
+    assert found.marking == "sfz"
+    assert found.category == ""
+    assert found.velocity == 21, "a dynamic's name must not replace an edited playback value"
+
+
+@pytest.mark.parametrize(
+    ("body", "category_id", "expected"),
+    [
+        ("^fontMus(Font0,0)§", 99, "sfz"),
+        ("§", DYNAMICS_CATEGORY, "sfz"),
+        ("^fontTxt(Font1,0)§", 99, None),
+        ("§", 99, None),
+    ],
+)
+def test_the_documented_sfz_glyph_still_requires_dynamic_context_without_a_description(
+    body: str, category_id: int, expected: str | None
+) -> None:
+    doc = document(
+        *library(), definition(60, category_id=category_id), text(60, body), assignment(59, 60)
+    )
+    assert expressions_by_measure(doc)[(1, 59)][0].marking == expected
+
+
+@pytest.mark.parametrize(
+    ("description", "glyph"),
+    [
+        ("sforzato", ""),
+        ("sforzato", "\x8d"),
+        ("sforzando", "S"),
+        ("sforzando", "§"),
+        ("section", "§"),
+    ],
+)
+def test_an_unsupported_or_unmatched_attack_description_does_not_claim_sfz(
+    description: str, glyph: str
+) -> None:
+    doc = document(
+        definition(60, category_id=99, desc=description), text(60, glyph), assignment(59, 60)
+    )
+    found = expressions_by_measure(doc).get((1, 59), ())
+    assert all(expression.marking is None for expression in found)
+    if glyph:
+        assert len(found) == 1 and found[0].text == glyph
 
 
 def test_a_dynamic_glyph_in_a_custom_category_is_still_a_dynamic() -> None:

@@ -481,6 +481,43 @@ def test_a_packed_assignment_preserves_the_second_definition(
     assert [record.fields["articDef"] for record in assignments] == ["1", "2"]
 
 
+def test_packed_assignment_visibility_uses_only_bit_zero_in_each_group(
+    pools: Callable[..., None],
+) -> None:
+    payload = bytearray(artic_assign_payload(1, 2, 3, 4, 5))
+    for offset, flags in enumerate((0, 1, 2, 3, 0x8000)):
+        start = offset * 20 + 10
+        payload[start : start + 2] = flags.to_bytes(2, "little")
+    pools(details=(MusDetailRecord(TAG_ARTIC_ASSIGN, 0, 9, 4, bytes(payload)),))
+    assignments = read_mus_document(PATH).details.of_tag("articAssign")
+    assert ["hide" in record.fields for record in assignments] == [False, True, False, True, False]
+    assert [record.attrs["sourceInci"] for record in assignments] == ["4"] * 5
+
+
+@pytest.mark.parametrize("hidden_first", [False, True])
+def test_a_hidden_duplicate_does_not_swallow_a_visible_assignment(
+    pools: Callable[..., None], hidden_first: bool
+) -> None:
+    visible = artic_assign_payload(1)
+    hidden = bytearray(visible)
+    hidden[10:12] = b"\x01\x00"
+    groups = (bytes(hidden), visible) if hidden_first else (visible, bytes(hidden))
+    pools(
+        others=(MusOther(TAG_ARTIC_DEF, 1, 0, artic_def_payload(62)),),
+        details=(
+            MusDetailRecord(TAG_ARTIC_ASSIGN, 0, 9, 4, b"".join(groups)),
+            MusDetailRecord(TAG_ARTIC_ASSIGN, 0, 9, 5, b"".join(reversed(groups))),
+        ),
+    )
+    document = read_mus_document(PATH)
+    assignments = document.details.of_tag("articAssign")
+    assert len(assignments) == 2
+    assert {"hide" in record.fields for record in assignments} == {False, True}
+    assert [record.attrs["inci"] for record in assignments] == ["4", "5"]
+    assert [record.attrs["sourceInci"] for record in assignments] == ["4", "4"]
+    assert articulations_by_entry(document) == {9: ("accent",)}
+
+
 def test_a_fermata_in_a_packed_mus_assignment_reaches_musicxml(
     pools: Callable[..., None],
 ) -> None:
@@ -1018,11 +1055,14 @@ TEXT_EXPR_DEF = 241
 MEAS_EXPR_ASSIGN = 177
 
 
-def text_expr_def_payload(*, text_id: int, value: int, description: bytes) -> bytes:
-    payload = bytearray(36 + len(description) + 1)
+def text_expr_def_payload(
+    *, text_id: int, value: int, description: bytes, terminator: bytes = b"\x00"
+) -> bytes:
+    payload = bytearray(36 + len(description) + len(terminator))
     payload[0:2] = text_id.to_bytes(2, "little")
     payload[4:6] = value.to_bytes(2, "little")
     payload[36 : 36 + len(description)] = description
+    payload[36 + len(description) :] = terminator
     return bytes(payload)
 
 
@@ -1075,6 +1115,158 @@ def test_a_definition_with_no_playback_level_omits_the_field(pools: Callable[...
     (record,) = [r for r in read_mus_document(PATH).others.records if r.tag == "textExprDef"]
     assert "value" not in record.fields
     assert record.fields["descStr"] == "forte piano"
+
+
+@pytest.mark.parametrize(
+    "description",
+    ["pianissimo (velocity = 36)", "mezzo piano (velocity = 62)", "sforzato", "演奏 a一 🎼"],
+)
+def test_unicode_expression_descriptions_use_complete_code_units(
+    pools: Callable[..., None], description: str
+) -> None:
+    pools(
+        year=2012,
+        others=(
+            MusOther(
+                TEXT_EXPR_DEF,
+                1,
+                0,
+                text_expr_def_payload(
+                    text_id=14,
+                    value=0,
+                    description=description.encode("utf-16-le"),
+                    terminator=b"\x00\x00",
+                ),
+            ),
+        ),
+    )
+    record = read_mus_document(PATH).others.get("textExprDef", 1)
+    assert record is not None and record.fields["descStr"] == description
+
+
+@pytest.mark.parametrize("raw", [b"\x70", b"\x00\xd8", b"\x00\xdc", b"\x00\xd8a\x00"])
+def test_malformed_unicode_expression_descriptions_raise_a_clear_error(
+    pools: Callable[..., None], raw: bytes
+) -> None:
+    pools(
+        year=2012,
+        others=(
+            MusOther(
+                TEXT_EXPR_DEF,
+                1,
+                0,
+                text_expr_def_payload(
+                    text_id=14,
+                    value=0,
+                    description=raw,
+                    terminator=b"",
+                ),
+            ),
+        ),
+    )
+    with pytest.raises(CorruptScoreError, match="textExprDef.*UTF-16LE description"):
+        read_mus_document(PATH)
+
+
+@pytest.mark.parametrize("tail", [b"", b"\x00\x00\xff"])
+def test_a_unicode_description_is_bounded_by_its_record_or_aligned_terminator(
+    pools: Callable[..., None], tail: bytes
+) -> None:
+    pools(
+        year=2012,
+        others=(
+            MusOther(
+                TEXT_EXPR_DEF,
+                1,
+                0,
+                text_expr_def_payload(
+                    text_id=14,
+                    value=0,
+                    description="Pedal".encode("utf-16-le") + tail,
+                    terminator=b"",
+                ),
+            ),
+        ),
+    )
+    record = read_mus_document(PATH).others.get("textExprDef", 1)
+    assert record is not None and record.fields["descStr"] == "Pedal"
+
+
+@pytest.mark.parametrize(
+    ("description", "glyph", "marking"),
+    [
+        ("pianissimo", "¹", "pp"),
+        ("mezzo piano", "P", "mp"),
+        ("mezzo forte", "F", "mf"),
+        ("forte", "f", "f"),
+        ("sforzato", "§", "sfz"),
+    ],
+)
+def test_a_unicode_dynamic_and_hidden_accent_reach_musicxml_correctly(
+    pools: Callable[..., None], description: str, glyph: str, marking: str
+) -> None:
+    """An authored C/E chord tests binary definitions, visibility and the join."""
+    hidden_accent = bytearray(artic_assign_payload(2))
+    hidden_accent[10:12] = b"\x01\x00"
+    notes = tuple(
+        Record(tag="note", attrs={}, text="", fields={"harmLev": str(level), "harmAlt": "0"})
+        for level in (0, 2)
+    )
+    entry = Record(
+        tag="entry",
+        attrs={"entnum": "9", "prev": "0", "next": "0"},
+        text="",
+        fields={"dura": "1024", "numNotes": "2", "note": notes},
+    )
+    pools(
+        year=2012,
+        others=(
+            MusOther(FRAME_SPEC, 3, 0, entry_pair(9, 9)),
+            MusOther(MEAS_SPEC, 1, 0, meas_spec_payload(305, 0, 1, 1024)),
+            MusOther(TAG_ARTIC_DEF, 1, 0, artic_def_payload(46, length=60)),
+            MusOther(TAG_ARTIC_DEF, 2, 0, artic_def_payload(62, length=60)),
+            MusOther(
+                TEXT_EXPR_DEF,
+                1,
+                0,
+                text_expr_def_payload(
+                    text_id=14,
+                    value=21,
+                    description=description.encode("utf-16-le"),
+                    terminator=b"\x00\x00",
+                ),
+            ),
+            MusOther(MEAS_EXPR_ASSIGN, 1, 0, meas_expr_assign_slot(expr_id=1, staff=1)),
+        ),
+        details=(
+            MusDetailRecord(GFHOLD, 1, 1, 0, gfhold_payload(0, 3)),
+            MusDetailRecord(
+                TAG_ARTIC_ASSIGN, 0, 9, 0, artic_assign_payload(1) + bytes(hidden_accent)
+            ),
+        ),
+        entries=(entry,),
+        # The same binary markup dialect, applied to authored music.
+        texts=(
+            Record(
+                tag="expression",
+                attrs={"number": "1"},
+                text="^¥\x01\x01\x01\x01" + glyph,
+                fields={},
+            ),
+        ),
+    )
+    score = build_score(read_mus_document(PATH))
+    measure = score.parts[0].measures[0]
+    assert measure.expressions[0].marking == marking
+    assert measure.expressions[0].velocity == 21
+    assert measure.voices[0].events[0].articulations == ("staccato",)
+    root = DET.fromstring(to_musicxml(score))
+    assert len(root.findall(f".//dynamics/{marking}")) == 1
+    assert len(root.findall(".//staccato")) == 1
+    assert not root.findall(".//accent")
+    assert not root.findall(".//sound[@dynamics]")
+    assert [n.findtext("pitch/step") for n in root.findall(".//note")] == ["C", "E"]
+    assert [n.findtext("duration") for n in root.findall(".//note")] == ["1", "1"]
 
 
 def test_two_markings_in_one_measure_become_two_assignments(pools: Callable[..., None]) -> None:

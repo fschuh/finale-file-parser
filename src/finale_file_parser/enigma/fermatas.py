@@ -16,7 +16,7 @@ _FERMATA_GLYPHS = {85: Fermata(), 117: Fermata(inverted=True)}
 
 
 def fermatas_by_entry(document: EnigmaDocument) -> dict[int, tuple[Fermata, ...]]:
-    """Resolve placed score fermatas, excluding library-only and linked-part marks."""
+    """Resolve visible score fermatas, excluding library-only and linked-part marks."""
     definitions: dict[int, Fermata] = {}
     for record in document.others.of_tag("articDef"):
         if "part" in record.attrs:
@@ -28,7 +28,7 @@ def fermatas_by_entry(document: EnigmaDocument) -> dict[int, tuple[Fermata, ...]
 
     out: dict[int, list[Fermata]] = {}
     for record in document.details.of_tag("articAssign"):
-        if "part" in record.attrs:
+        if "part" in record.attrs or "hide" in record.fields:
             continue
         entry = field_int(record.attrs.get("entnum"))
         definition = field_int(record.fields.get("articDef"))

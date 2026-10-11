@@ -138,6 +138,13 @@ limit is verified by mutation, because no real corpus archive trips one.
 - [x] **Explicit metronome rates** — assigned printed beat/rate markings become
       structured IR tempo, MusicXML metronome notation and quarter-note playback
       tempo. Untyped playback values and expressive timing remain uninterpreted.
+- [x] **Unicode dynamics and `sfz`** — Finale-2012 numeric expression descriptions
+      decode as UTF-16LE; complete graded names and evidenced attack glyphs reach
+      the existing IR/MusicXML path. All eight local Scars dynamics are restored.
+- [x] **Articulation assignment visibility** — legacy group +10 bit0 becomes `hide`;
+      all articulation-derived resolvers skip hidden and linked-part assignments.
+      Visible duplicates survive hidden copies. The two hidden Scars m59 accents
+      no longer print beside the independently assigned `sfz`.
 - [x] **Grace-note slashes** — document and individual settings resolve through
       the IR and MusicXML after separating grace beams from ordinary beams.
       Published PDK/RGP Lua evidence establishes the legacy fields; authored

@@ -259,6 +259,10 @@ _ARTIC_GROUP = 20
 _ARTIC_POSITION_FIELDS = {"horzOff": 2, "horzAdd": 4, "vertOff": 6, "vertAdd": 8}
 """Signed EVPU words, per published PDK getters and the ETF IM field order."""
 
+_ARTIC_FLAGS = 10
+_ARTIC_HIDE = 0x0001
+"""Hidden-assignment bit, per the PDK visibility getter (ARCHITECTURE.md)."""
+
 _LYRIC_GROUP = 20
 """Bytes per verse assignment inside a `lyrDataVerse` payload."""
 
@@ -362,16 +366,18 @@ def read_mus_document(path: str | os.PathLike[str]) -> EnigmaDocument:
         if any(pool.kind is not None for pool in read_mus_pools(path)):
             return _rows_document(path)
         raise
+    year = _banner_year(path)
     return EnigmaDocument(
         version=_VERSION,
         header=Pool(records=_EMPTY),
         mappings=Pool(records=_EMPTY),
-        options=OptionsPool(records=tuple(_options_records(others, _banner_year(path)))),
+        options=OptionsPool(records=tuple(_options_records(others, year))),
         others=OthersPool(
             records=tuple(
                 _others_records(
                     others,
                     _FALLBACK_ENCODING.get(_banner_platform(path) or "", "cp1252"),
+                    year=year,
                 )
             )
         ),
@@ -819,15 +825,31 @@ _EXPR_ASSIGN_SLOT = 24
 `mus_others.TAG_MEAS_EXPR_ASSIGN`."""
 
 _EXPR_DEF_DESC = 36
-"""Where a `textExprDef` payload's description begins, NUL-terminated.
+"""Where a `textExprDef` payload's bounded description begins.
 
 The wording is identical to the `.musx` `descStr` -- `'forte (velocity = 88)'` --
-which is what lets one reader name a dynamic from either container.
+which is what lets one reader name a dynamic from either container. Finale 2012
+writes UTF-16LE rather than the earlier 8-bit string (ARCHITECTURE.md).
 """
 
 
+def _expression_description(payload: bytes, fallback: str, year: int | None) -> str:
+    raw = payload[_EXPR_DEF_DESC:]
+    if year is None or year < 2012:
+        return _decode(raw.split(b"\x00", 1)[0], fallback).strip()
+    # A zero byte inside a UTF-16 code unit is not a string terminator. Scan
+    # complete, aligned code units, and allow a string bounded by the record.
+    end = next(
+        (at for at in range(0, len(raw) - 1, 2) if raw[at : at + 2] == b"\x00\x00"), len(raw)
+    )
+    try:
+        return raw[:end].decode("utf-16-le").strip()
+    except UnicodeDecodeError as exc:
+        raise CorruptScoreError("textExprDef has a malformed UTF-16LE description") from exc
+
+
 def _text_expr_def(
-    payload: bytes, fallback: str
+    payload: bytes, fallback: str, year: int | None
 ) -> dict[str, str | tuple[str, ...] | Record | tuple[Record, ...]]:
     """The two fields an expression definition needs, plus its description.
 
@@ -844,7 +866,7 @@ def _text_expr_def(
         # A definition with no playback level writes zero; the `.musx` omits the
         # field entirely, and `expressions` reads absent as "no level".
         fields["value"] = str(value)
-    description = _decode(payload[_EXPR_DEF_DESC:].split(b"\x00")[0], fallback).strip()
+    description = _expression_description(payload, fallback, year)
     if description:
         fields["descStr"] = description
     return fields
@@ -889,7 +911,9 @@ def _s16(data: bytes, offset: int) -> int:
     return value - 0x10000 if value >= 0x8000 else value
 
 
-def _others_records(records: tuple[MusOther, ...], fallback: str) -> list[Record]:
+def _others_records(
+    records: tuple[MusOther, ...], fallback: str, *, year: int | None = None
+) -> list[Record]:
     out: list[Record] = []
     for record in records:
         attrs = {"cmper": str(record.cmper)}
@@ -969,7 +993,7 @@ def _others_records(records: tuple[MusOther, ...], fallback: str) -> list[Record
                     tag="textExprDef",
                     attrs=attrs,
                     text="",
-                    fields=_text_expr_def(record.payload, fallback),
+                    fields=_text_expr_def(record.payload, fallback, year),
                 )
             )
         elif record.tag == TAG_MEAS_EXPR_ASSIGN and len(record.payload) >= _EXPR_ASSIGN_SLOT:
@@ -1220,7 +1244,7 @@ def _lyric_records(
 def _artic_records(
     record: MusDetailRecord,
     incidences: dict[int, int],
-    emitted: set[tuple[int, int]],
+    emitted: set[tuple[int, int, bool]],
 ) -> list[Record]:
     entnum = entry_key(record)
     length = len(record.payload)
@@ -1231,9 +1255,11 @@ def _artic_records(
     out: list[Record] = []
     for at in range(0, length, _ARTIC_GROUP):
         definition = _u16(record.payload, at + _ARTIC_DEF_REFERENCE)
+        hidden = bool(_u16(record.payload, at + _ARTIC_FLAGS) & _ARTIC_HIDE)
         # A `.mus` repeats assignments; emit each definition only once per
-        # entry, whether repeated in a packed group or a separate record.
-        identity = (entnum, definition)
+        # entry and visibility state. A hidden copy must not swallow a visible
+        # assignment, whether packed with it or stored in a separate record.
+        identity = (entnum, definition, hidden)
         if identity in emitted:
             continue
         emitted.add(identity)
@@ -1251,6 +1277,7 @@ def _artic_records(
                 text="",
                 fields={
                     "articDef": str(definition),
+                    **({"hide": ""} if hidden else {}),
                     **{
                         name: str(_s16(record.payload, at + offset))
                         for name, offset in _ARTIC_POSITION_FIELDS.items()
@@ -1267,7 +1294,7 @@ def _details_records(records: tuple[MusDetailRecord, ...]) -> list[Record]:
     lyric_incidence: dict[int, int] = {}
     lyric_seen: set[tuple[int, int]] = set()
     artic_incidence: dict[int, int] = {}
-    artic_seen: set[tuple[int, int]] = set()
+    artic_seen: set[tuple[int, int, bool]] = set()
     for record in records:
         if record.tag == TAG_GFHOLD and len(record.payload) >= 10:
             out.append(

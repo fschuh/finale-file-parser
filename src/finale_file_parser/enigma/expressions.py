@@ -21,7 +21,7 @@ fortissimo in every part of every file. The same trap as `textRepeatText`; see
 `shapeExprDef`, with none left dangling. The remaining 7,488 carry no id at all
 and place nothing.
 
-Resolved, the corpus yields **6,672 assigned dynamics across 315 documents**,
+The historical corpus audit yielded **6,672 assigned dynamics across 315 documents**,
 distributed as real music is rather than as a library is: f 1,715, mf 1,501,
 p 1,461, mp 777, ff 420, pp 161, ppp 45, fff 38, ffff 12. A palette read by
 mistake would instead give a flat count of about 400 for every entry.
@@ -55,6 +55,12 @@ set in a music font or the document's own category is `dynamics`. The 129 rows
 with neither signal are left unmarked: a bare `f` in `misc` with no font at all
 is as likely to be a label as a dynamic, and this project does not guess. The
 text is still carried, so nothing is lost.
+
+An explicit graded-dynamic description is sufficient on its own. For an attack
+description, the documented glyph must also match: `sforzato` with `§` identifies
+`sfz`, while the other identically described variant stays unnamed. This handles
+legacy compiled font markup without inventing a font or category. Unicode
+description decoding and glyph evidence are recorded in ARCHITECTURE.md.
 
 ## Score expressions, and what still does not reach the IR
 
@@ -99,7 +105,7 @@ one letting the consumer default it.
 91 assignments in the corpus. There is nothing to print as text, and this module
 carries text markings only.
 
-**A 2001-2005 `.mus`.** The 2011 era is read -- `others` 241 is the definition
+**A 2001-2005 `.mus`.** The numeric era is read -- `others` 241 is the definition
 and 177 the assignment, see `mus_others` -- and yields 3,022 markings across 186
 documents. The DCL era is not: it spells them `^DT` and `^DY`, and only one `DT`
 field is decoded (the playback value at `+4`, confirmed 434/434 by the record's
@@ -109,7 +115,8 @@ own description). See `mus_document.UNTRANSLATED`.
 identified in the 241 record (best offset 20.3%, which is noise) and `layer`
 collides with `staffAssign` at `+8`. Both are absent rather than invented, so
 `category` is `""` and `layer` is None for every `.mus` expression -- and the
-dynamics are still named, because the description does that on its own.
+dynamics are still named from their descriptions, with an evidenced glyph needed
+for the otherwise ambiguous attack variants.
 """
 
 from __future__ import annotations
@@ -395,11 +402,10 @@ def _marking(text: str, *, category: str, in_music_font: bool, description: str)
 
     Three signals, strongest first:
 
-    1. **The description names it.** `'fortissimo (velocity = 101)'` is the file
-       saying which dynamic this is, in words. No glyph or font reasoning can
-       beat that, and it is what named the table in the first place. It is also
-       the only signal a `.mus` document offers: that container has no
-       `^fontMus` markup and its category is not decoded.
+    1. **The description names it.** `'fortissimo (velocity = 101)'` identifies
+       a graded dynamic. An attack description also needs its documented glyph,
+       since two variants share the word `sforzato`. This handles a legacy
+       `.mus` whose compiled font markup and category are not decoded.
     2. **The glyph is in the table and set in a music font.** For a `.musx`,
        where the markup distinguishes.
     3. **The glyph is in the table and the document's own category is
@@ -408,7 +414,7 @@ def _marking(text: str, *, category: str, in_music_font: bool, description: str)
     Anything else is left unnamed -- see "When a glyph counts as a dynamic" in
     the module docstring for the counts behind the rule.
     """
-    described = described_dynamic(description)
+    described = described_dynamic(description, glyph=text)
     if described is not None:
         return described.marking
     entry = dynamic_for(text)

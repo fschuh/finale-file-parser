@@ -975,7 +975,8 @@ identifies U as an above-note fermata, matching the original PDF on that chord.
 All six trailing groups resolve to existing definitions: 14, 2, 1, 7, 1 and 7.
 The former `_details_records` read only +0, discarding those trailing marks.
 `_artic_records` now splits all complete 20-byte groups, preserving their order
-and the existing per-entry/definition deduplication. Empty payloads or partial
+and per-entry/definition deduplication, now distinguishing visibility as described
+below. Empty payloads or partial
 groups raise `CorruptScoreError` instead of silently dropping a marking.
 Each emitted incidence is at least the raw incidence and the next available
 incidence on that entry, avoiding collisions with following raw records;
@@ -983,12 +984,38 @@ incidence on that entry, avoiding collisions with following raw records;
 not a newly decoded file field.
 
 At that stage no other group fields were interpreted; the arpeggio work below
-now preserves the four positioning words. The local export
-recovers the fermata and two supported accents; the remaining pedal assignments
-reach the normalized document but still need a pedal resolver/exporter. Authored
+now preserves the four positioning words. The local export recovers the fermata.
+The two recovered accent assignments were subsequently found to be hidden and
+are excluded from visible notation; their separate `sfz` expression now exports.
+The remaining pedal assignments reach the normalized document but still need
+a pedal resolver/exporter. Authored
 synthetic tests cover multiple groups, repeated definitions, identity collisions,
 partial groups and the full reader-to-export path. The licensed corpus is absent
 in this checkout, so a new sweep over its era variants remains outstanding.
+
+**Assignment visibility (fixed 2026-10-10).** In each complete legacy 20-byte
+tag-1009 group, the **u16 at +10 has a hide flag in bit 0 (`0x0001`)**.
+The adapter emits the EnigmaXML presence flag `hide` when that bit is set;
+other bits do not imply hidden notation. All articulation-derived resolvers
+(articulations, fingerings, ornaments, fermatas and arpeggios) exclude hidden
+and linked-part assignments from the score IR. The normalized records retain
+the flag and source-row link. Deduplication includes visibility, so an earlier
+hidden copy of a definition cannot swallow a later visible assignment.
+
+Evidence: read-only inspection of the released RGP Lua 0.79 binary referenced
+below finds `FCArticulation::GetVisible` at x86_64 VM **0x4df13c** testing bit 0
+of object **+0x4a**, returning true when clear. `SetVisible` at **0x4df15a**
+sets or clears that same bit inversely. Subtracting the established assignment
+base +0x40 gives serialized group +10. The published
+[visibility API](https://pdk.finalelua.com/class_f_c_articulation.html)
+gates the getter on Finale 2014b; this is API availability, not evidence that
+the file field began in that version. Scars' Finale-2012-converter file already
+uses it: upper m59 entry **1005** and lower m59 entry **1251** each pack visible
+staccato def3 with hidden accent def7 (`+10=1`). Its PDF prints staccatos and
+the separate `sfz`, without the two accents. Forty-seven pedal assignments
+also carry the bit; they remain outside the current notation resolvers.
+This does not change the meaning of visible accent glyph 62 or convert it to
+a dynamic. Authored tests exercise each resolver and hidden/visible duplicates.
 
 ### Known format facts — arpeggios and their vertical extent
 
@@ -1010,6 +1037,7 @@ The legacy tag-1009 adapter retains these fields in each complete 20-byte group:
 | +4 | `horzAdd` | signed i16 EVPUs | `posadder` |
 | +6 | `vertOff` | signed i16 EVPUs | `noteadd` |
 | +8 | `vertAdd` | signed i16 EVPUs | `lonoadd` |
+| +10 bit 0 | `hide` | u16 flag | inverse of `GetVisible()` |
 
 Evidence: the ETF specification's `IM` example orders the definition and four
 positioning words; published PDK
@@ -1074,7 +1102,7 @@ licensed corpus and a MuseScore runtime are absent here.
 ### Known format facts — fermatas
 
 `enigma/fermatas.py` uses the existing `articAssign -> articDef -> charMain` join.
-Only assigned score records place symbols; unused definitions and linked-part
+Only assigned visible score records place symbols; unused definitions and linked-part
 variants do not. Glyph **85**, uppercase `U`, is a normal upright fermata;
 glyph **117**, lowercase `u`, is its inverted counterpart. The positions agree
 in Finale's official [Maestro](https://usermanuals.finalemusic.com/FinaleWin/Content/Finale/font-maestro.htm),
@@ -1192,6 +1220,52 @@ or two semitones, exported as `trill-step="half"` or `"whole"`. This matters for
 F# -> G and B -> C in E minor. Other distances remain unknown and leave the
 consumer's ornament playback defaults in effect. Auxiliary accidental signs and
 exact performance timing are not decoded. Unknown glyphs still produce no ornament.
+
+### Known format facts — Unicode expression descriptions and dynamics
+
+Numeric-pool `.mus` **others tag 241** stores the expression description at
+serialized **payload +36**. Earlier files use an 8-bit string; a **Finale 2012
+or newer banner selects UTF-16LE**. The old adapter stopped at the first NUL
+byte, reducing `pianissimo`, `mezzo piano` and `sforzato` to `p`, `m` and `s`.
+Decode complete 16-bit code units and stop at an aligned `0000` unit or the
+record boundary. A cross-unit pair of zero bytes is not a terminator. Odd tails
+and malformed surrogate sequences before the terminator raise a clear
+`CorruptScoreError`; bytes after a complete terminator are outside the string.
+Older 8-bit platform decoding is unchanged.
+
+The serialized offset is established by the earlier paired-container audit in
+`docs/formats/expressions-and-dynamics.md` and the full words at +36 in Scars'
+2012-converter payloads. Encoding/era evidence is independent: the published
+[PDK header](https://pdk.finalelua.com/ff__other_8h_source.html) selects
+`EDTTextExpression2012` for Finale 2012+, and read-only inspection of RGP Lua
+0.79's `FCTextExpressionDef::GetDescription` at x86_64 VM **0x4c38c8** chooses
+`FCString::SetUnicodeString(unsigned short const*, int)` from host version
+**0x11000000** (2012). Its live PDK member offset +0x22 does **not** establish
+the serialized +36 offset. Finale's
+[Unicode documentation](https://usermanuals.finalemusic.com/Finale2012Win/Content/Finale/Unicode_Fonts.htm)
+corroborates the version transition. No plugin code is copied or executed.
+
+Graded dynamics are named from the complete description, retaining the file's
+own playback value. Attack descriptions alone can be ambiguous. Legacy Maestro
+character **167** (decoded as U+00A7 `§`) is specifically **`sfz`**, shown in the
+official [Maestro chart](https://usermanuals.finalemusic.com/FinaleWin/Content/Finale/font-maestro.htm)
+at ALT+0167 and also in the
+[Engraver chart](https://usermanuals.finalemusic.com/FinaleWin/Content/Finale/font-engraver.htm).
+Scars assigns expression14, glyph 167, description `sforzato` at m59; its PDF
+independently prints `sfz`. With unresolved legacy font markup, require the
+matching glyph and attack description. The other `sforzato` glyph `\x8d` and
+the `S` sforzando variant remain unnamed pending their own evidence. Neither
+MIDI velocities nor articulation accents supply a dynamic name.
+
+Local verification restores eight assigned staff-1 dynamics: **m1 pp, m6 mp,
+m20 mf, m28 f, m36 mf, m44 mp, m52 f, m59 sfz**. The existing `Expression` IR
+and exporter produce real MusicXML `<dynamics>` elements; m59's hidden accents
+stay out while its visible staccatos survive. All 928 pitches, notes, metric
+onsets, ties, beams, grace slashes, mordents, arpeggios, the fermata and other
+directions match the prior corrected file. Official-schema and three-page
+Verovio checks cover this local input; authored regression fragments cover
+Unicode, malformed data, attack ambiguity and assignment visibility. Historical
+corpus counts above are not remeasured: the licensed corpus is absent here.
 
 ### Explicit metronome markings
 
