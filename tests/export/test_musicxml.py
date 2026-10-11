@@ -59,6 +59,20 @@ def test_emits_a_well_formed_document() -> None:
     assert root.findtext("./part/measure/note/pitch/step") == "C"
 
 
+def test_caesura_and_fermata_on_a_chord_are_emitted_once() -> None:
+    root = _tree(
+        _score(
+            _note(
+                pitches=(Pitch("C", 4, 0), Pitch("E", 4, 0)),
+                articulations=("caesura",),
+                fermatas=(Fermata(),),
+            )
+        )
+    )
+    assert len(root.findall(".//caesura")) == len(root.findall(".//fermata")) == 1
+    assert root.find("./part/measure/note/notations/articulations/caesura") is not None
+
+
 def test_divisions_accommodate_triplets() -> None:
     """A triplet eighth is 1/12 of a whole note.
 

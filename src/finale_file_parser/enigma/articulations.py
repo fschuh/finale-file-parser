@@ -40,6 +40,7 @@ ARTICULATION_CHARACTERS = {
     45: "tenuto",  # -
     94: "strong-accent",  # ^  (marcato)
     44: "breath-mark",  # ,
+    34: "caesura",  # double quote (railroad tracks)
 }
 """Music-font character -> MusicXML articulation element.
 

@@ -316,6 +316,18 @@ Layers are distinct from Finale's **voice 1 / voice 2** within a layer (`eeppd.t
 "V2 launch" and `CNTLBIT`). No voice-2 marker has been located in EnigmaXML entry records yet, and the
 measure sums above do not require one, so it remains unmodelled.
 
+### Assigned caesuras (2026-10-11)
+
+Music-font character 34 (double quote, Shift+apostrophe) is a caesura in the
+official [Maestro](https://usermanuals.finalemusic.com/FinaleWin/Content/Finale/font-maestro.htm),
+[Engraver](https://usermanuals.finalemusic.com/FinaleWin/Content/Finale/font-engraver.htm), and
+[Broadway Copyist](https://usermanuals.finalemusic.com/FinaleWin/Content/Finale/font-broadway-copyist.htm)
+charts. Resolve only assigned, visible score articulations using the existing
+glyph resolver, and export `<articulations><caesura/></articulations>` once per
+chord. Literal quotes in text are unaffected. ActRaiser bar 8 entry 1054 has
+definition 35/character 34 alongside its fermata, corroborated by the source PDF.
+Written time and tempo remain unchanged; performance holds are not tempo marks.
+
 ### Expression rhythmic attachment (2026-10-11)
 
 `measExprAssign.horzEduOff` is a rhythmic EDU position (4096 per whole note),

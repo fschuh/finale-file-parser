@@ -8,6 +8,8 @@ nothing, rather than a guess.
 
 from __future__ import annotations
 
+from dataclasses import replace
+
 import pytest
 
 from finale_file_parser.enigma.articulations import (
@@ -63,7 +65,14 @@ def document(
 
 @pytest.mark.parametrize(
     ("character", "name"),
-    [(46, "staccato"), (62, "accent"), (45, "tenuto"), (94, "strong-accent"), (44, "breath-mark")],
+    [
+        (46, "staccato"),
+        (62, "accent"),
+        (45, "tenuto"),
+        (94, "strong-accent"),
+        (44, "breath-mark"),
+        (34, "caesura"),
+    ],
 )
 def test_each_known_character_resolves(character: int, name: str) -> None:
     doc = document(definitions={1: character}, assignments=((7, 1),))
@@ -116,4 +125,16 @@ def test_a_part_variant_definition_is_ignored() -> None:
 def test_the_table_covers_only_characters_with_evidence() -> None:
     """A regression guard on scope: the table is deliberately small, and
     growing it should be a deliberate act with evidence attached."""
-    assert set(ARTICULATION_CHARACTERS) == {44, 45, 46, 62, 94}
+    assert set(ARTICULATION_CHARACTERS) == {34, 44, 45, 46, 62, 94}
+
+
+def test_a_caesura_requires_a_visible_score_assignment() -> None:
+    doc = document(definitions={1: 34, 2: 34}, assignments=((7, 1), (8, 1), (9, 1)))
+    doc.details = DetailsPool(
+        records=(
+            doc.details.records[0],
+            replace(doc.details.records[1], fields={"articDef": "1", "hide": ""}),
+            replace(doc.details.records[2], attrs={"entnum": "9", "inci": "0", "part": "1"}),
+        )
+    )
+    assert articulations_by_entry(doc) == {7: ("caesura",)}
