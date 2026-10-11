@@ -316,6 +316,29 @@ Layers are distinct from Finale's **voice 1 / voice 2** within a layer (`eeppd.t
 "V2 launch" and `CNTLBIT`). No voice-2 marker has been located in EnigmaXML entry records yet, and the
 measure sums above do not require one, so it remains unmodelled.
 
+### Mid-measure clefs (2026-10-11)
+
+Legacy GF/numeric 1044 payload +0 is a **clef-list ID**, rather than a literal
+clef index, when flag word +2 has `GF_CLEFISLIST` (0x0400). The published
+[FCCellFrameHold source](https://pdk.finalelua.com/ff__celldetails_8h_source.html)
+names the flag; released RGP Lua 0.79 x86_64 `GetIsClefList` at 0x31f198 tests
+object byte +0x43 bit 0x04, while `GetClefIndex` reads +0x40. This confirms both
+the field-relative offset and mask without executing or copying plugin code.
+
+Others CE/numeric 127 contains packed 12-byte list elements, keyed by that ID.
+The published `ff_others.h` `__EDTMidClef` is six signed 16-bit words: clef +0,
+EDU +2, vertical adjustment +4, percent +6, horizontal adjustment +8, flags +10.
+Its `GetClefShow` getter tests flag 0x02 for hidden, else 0x08 for forced.
+Split these into normalized `clefEnum(cmper, inci)` records (`clef`, `xEduPos`,
+`yEvpuPos`, `percent`, `xEvpuOffset`, `clefMode`). DCL reads its own byte order;
+2011/2012 reads little-endian. Reject truncated lists, more than 4096 elements,
+missing references, negative positions, or non-increasing times. Incidence zero
+must be at EDU zero. Literal clef index 1 remains a valid C clef.
+
+ActRaiser lower bar 8 references list 1, whose two elements are clef 0 at EDU 0
+and clef 3 at EDU 1536, both 75 percent. The PDF corroborates treble followed by
+bass before its last two sixteenths. Clef changes do not alter decoded pitches.
+
 ### Assigned caesuras (2026-10-11)
 
 Music-font character 34 (double quote, Shift+apostrophe) is a caesura in the

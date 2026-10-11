@@ -18,8 +18,10 @@ so one record occupies `16 + length` bytes, against the `others` pool's
 `gfhold` (tag 1044) is the reason this pool matters: it is what ties a measure
 on a staff to the entry frames that fill it. Its 20-byte payload:
 
-    +0   clefID       0 means "the staff's `defaultClef`", which a `.musx`
+    +0   clefID       or clefListID when the +2 word has GF_CLEFISLIST (0x0400)
+                      Literal 0 means "the staff's `defaultClef`", which a `.musx`
                       export materialises into the record
+    +2   flags
     +4   clefPercent
     +6   frame1
 

@@ -95,13 +95,20 @@ def _events_at(parts: tuple[Part, ...]) -> dict[EventPosition, tuple[Event, Meas
         for measure in part.measures:
             if measure.clef_sign is not None:
                 clef_sign, clef_line = measure.clef_sign, measure.clef_line
-            geometry = replace(measure, clef_sign=clef_sign, clef_line=clef_line)
+            initial_sign, initial_line = clef_sign, clef_line
             for voice in measure.voices:
                 onset = Fraction(0)
                 for index, event in enumerate(voice.events):
+                    sign, line = initial_sign, initial_line
+                    for change in measure.clef_changes:
+                        if change.offset <= onset:
+                            sign, line = change.sign, change.line
+                    geometry = replace(measure, clef_sign=sign, clef_line=line)
                     out[part.id, measure.number, voice.number, index] = (event, geometry, onset)
                     if not event.is_grace:
                         onset += event.duration
+            if measure.clef_changes:
+                clef_sign, clef_line = measure.clef_changes[-1].sign, measure.clef_changes[-1].line
     return out
 
 

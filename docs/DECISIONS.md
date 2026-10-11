@@ -866,3 +866,14 @@ at cursor zero with an exact MusicXML offset, including sound, without moving no
 Include the offset denominator in divisions and preserve it through score-wide and
 connected-staff placement. Duplicate score/staff assignments must also agree in time.
 This fixes ActRaiser's bar-8 mf at 1536 EDU without changing its velocity policy.
+
+## 2026-10-11 — DECIDED: timed clefs on the existing Measure
+
+Append `Measure.clef_changes`, containing immutable `ClefChange(offset, sign,
+line, visible)` objects. Offsets use the IR's whole-note units. Source change
+lists include their initial clef at zero; literal measure-start clefs continue
+to use the existing fields. Carry the final effective clef into following bars
+and use the event-time clef for arpeggio geometry. Pitches remain key-relative
+and are unaffected. MusicXML forwards/backup place attributes at exact times
+before serializing voices, including changes during sustained notes; projected
+staves retain every timed attribute with the correct staff number.

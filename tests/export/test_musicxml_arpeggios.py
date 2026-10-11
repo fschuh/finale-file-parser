@@ -13,6 +13,7 @@ from finale_file_parser.export.musicxml import ExportError, to_musicxml
 from finale_file_parser.ir import (
     Arpeggio,
     Beam,
+    ClefChange,
     Event,
     Expression,
     Fermata,
@@ -148,6 +149,46 @@ def test_expression_time_survives_connected_staff_projection() -> None:
         ("2", "1"),
     ]
     assert [d.tag for d in directions[0]] == ["direction-type", "offset", "staff"]
+
+
+def test_timed_clefs_survive_projection_and_voice_backups_once_per_staff() -> None:
+    score = _score()
+    parts = tuple(
+        replace(
+            part,
+            measures=(
+                replace(
+                    part.measures[0],
+                    clef_changes=(ClefChange(Fraction(1, 8), "C", 3, False),),
+                    voices=(
+                        *part.measures[0].voices,
+                        Voice(2, (_event(Pitch("G", 4, 0), marked=False),)),
+                    ),
+                ),
+            ),
+        )
+        for part in score.parts
+    )
+    root = _tree(replace(score, parts=parts))
+    cursor = 0
+    changes = []
+    onsets = []
+    measure = root.find("part/measure")
+    assert measure is not None
+    for node in measure:
+        if node.tag == "backup":
+            cursor -= int(node.findtext("duration", "0"))
+        elif node.tag == "forward":
+            cursor += int(node.findtext("duration", "0"))
+        elif node.tag == "attributes":
+            for clef in node.findall("clef"):
+                if clef.findtext("sign") == "C":
+                    changes.append((clef.get("number"), cursor, clef.get("print-object")))
+        elif node.tag == "note" and node.find("chord") is None:
+            onsets.append(cursor)
+            cursor += int(node.findtext("duration", "0"))
+    assert changes == [("1", 1, "no"), ("2", 1, "no")]
+    assert onsets == [0, 0, 0, 0]
 
 
 def test_a_brace_and_simultaneous_independent_rolls_keep_separate_parts() -> None:

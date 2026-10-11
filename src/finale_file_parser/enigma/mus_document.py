@@ -80,6 +80,7 @@ from finale_file_parser.enigma.mus_entries import read_mus_entry_records
 from finale_file_parser.enigma.mus_others import (
     OPTIONS_CMPER,
     TAG_ARTIC_DEF,
+    TAG_CLEF_ENUM,
     TAG_CLEF_OPTIONS,
     TAG_FRAME_SPEC,
     TAG_GRACE_SLASH_OPTIONS,
@@ -641,6 +642,8 @@ def _rows_others(rows: MusRows, frames: dict[int, tuple[int, int, int | None]]) 
                     fields=_staff_spec(record.payload, rows.byte_order),
                 )
             )
+        elif tag == "CE":
+            out.extend(_clef_enums(record.payload, attrs, rows.byte_order))
         elif tag == "FR" and cmper in frames:
             start, end, start_time = frames[cmper]
             fields: dict[str, str | tuple[str, ...] | Record | tuple[Record, ...]] = {
@@ -659,9 +662,7 @@ def _rows_details(rows: MusRows, dropped: set[int]) -> list[Record]:
     for (tag, cmper1, cmper2), record in rows.details.items():
         if tag != "GF":
             continue
-        fields: dict[str, str | tuple[str, ...] | Record | tuple[Record, ...]] = {
-            "clefID": str(_u16(record.payload, 0, rows.byte_order))
-        }
+        fields = _gfhold_clef(record.payload, rows.byte_order)
         for layer in range(_FRAME_LAYERS):
             frame = _u16(record.payload, base + 2 * layer, rows.byte_order)
             # A dropped frame's reference goes too: a gfhold naming a frameSpec
@@ -996,7 +997,9 @@ def _others_records(
             # A part-variant record; `part` absent means the score record, which
             # is the convention every downstream module filters on.
             attrs["part"] = str(record.part)
-        if record.tag == TAG_SMART_SHAPE:
+        if record.tag == TAG_CLEF_ENUM:
+            out.extend(_clef_enums(record.payload, attrs))
+        elif record.tag == TAG_SMART_SHAPE:
             out.append(_smart_shape(record.payload, attrs))
         elif record.tag == TAG_SMART_SHAPE_MEAS_MARK:
             if not record.payload or len(record.payload) % _SMART_SHAPE_MARK_SLOT:
@@ -1257,15 +1260,44 @@ def _staff_group(payload: bytes) -> dict[str, str | tuple[str, ...] | Record | t
     return fields
 
 
+def _gfhold_clef(
+    payload: bytes, order: ByteOrder = "little"
+) -> dict[str, str | tuple[str, ...] | Record | tuple[Record, ...]]:
+    if len(payload) < 4:
+        raise CorruptScoreError("gfhold: truncated clef/flag fields")
+    name = "clefListID" if _u16(payload, 2, order) & 0x0400 else "clefID"
+    return {name: str(_u16(payload, 0, order))}
+
+
+def _clef_enums(payload: bytes, attrs: dict[str, str], order: ByteOrder = "little") -> list[Record]:
+    # Published __EDTMidClef: six 16-bit words; CE / numeric tag 127.
+    if not payload or len(payload) % 12 or len(payload) > 12 * 4096:
+        raise CorruptScoreError("clefEnum: expected at most 4096 complete 12-byte records")
+    out = []
+    for inci, at in enumerate(range(0, len(payload), 12)):
+        flag = _u16(payload, at + 10, order)
+        fields = {
+            name: str(int.from_bytes(payload[at + off : at + off + 2], order, signed=True))
+            for name, off in (
+                ("clef", 0),
+                ("xEduPos", 2),
+                ("yEvpuPos", 4),
+                ("percent", 6),
+                ("xEvpuOffset", 8),
+            )
+        }
+        fields["clefMode"] = "hidden" if flag & 2 else "forced" if flag & 8 else "whenNeeded"
+        out.append(Record("clefEnum", {**attrs, "inci": str(inci)}, "", fields))
+    return out
+
+
 def _gfhold(payload: bytes) -> dict[str, str | tuple[str, ...] | Record | tuple[Record, ...]]:
-    """`clefID` at +0, then a frame number per layer from +6.
+    """Clef index or list reference at +0, then a frame number per layer from +6.
 
     A frame of 0 means the layer is empty and is omitted, matching a `.musx`,
     where `locate_entries` reads an absent slot as "this layer holds nothing".
     """
-    fields: dict[str, str | tuple[str, ...] | Record | tuple[Record, ...]] = {
-        "clefID": str(_u16(payload, 0)),
-    }
+    fields = _gfhold_clef(payload)
     for layer, offset in ((1, 6), (2, 8)):
         frame = _u16(payload, offset)
         if frame:

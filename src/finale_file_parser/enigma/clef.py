@@ -1,14 +1,15 @@
 """Clefs: the definition table, and which clef is in force where.
 
 Enigma keeps a document-wide table of clef definitions (`clefOptions.clefDef`,
-18 entries) and refers to them by index. Two things carry an index:
+18 entries) and refers to them by index:
 
 * `staffSpec.defaultClef` -- the staff's clef, omitted when it is 0.
-* `gfhold.clefID` -- the clef at that (staff, measure).
+* `gfhold.clefID` -- the initial clef at that (staff, measure).
+* `gfhold.clefListID` -- a list of `clefEnum` records with exact EDU positions.
 
-`clefID` is present on **every** `gfhold` in the corpus (4,214 of 4,214), so it is
-the *effective* clef at that measure rather than only a change marker. Unlike the
-key signature, there is no inheritance to apply.
+The original paired corpus had only literal clefs. Change lists also occur in
+legacy scores; their first element supplies the initial clef and their final
+element supplies the clef inherited by a following measure without a holder.
 
 A definition gives a font character (`clefChar`) plus staff placement, or, when
 `isShape` is set, a drawn shape instead of a character.
@@ -18,6 +19,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
+from fractions import Fraction
 
 from finale_file_parser.enigma.document import EnigmaDocument, Record
 from finale_file_parser.enigma.models import CorruptScoreError
@@ -27,6 +29,7 @@ __all__ = [
     "ClefSign",
     "clef_definitions",
     "clefs_by_measure",
+    "clef_changes_by_measure",
     "default_clefs",
 ]
 
@@ -151,11 +154,11 @@ def default_clefs(document: EnigmaDocument) -> dict[int, int]:
 def clefs_by_measure(document: EnigmaDocument) -> dict[tuple[int, int], int]:
     """Effective clef index at each (staff, measure).
 
-    Taken from `gfhold.clefID`, which every corpus `gfhold` carries. A `gfhold`
-    without one falls back to the staff's default rather than being dropped, so a
-    caller never has to distinguish "no clef" from "treble".
+    Taken from `gfhold.clefID` or the first element of its change list. A holder
+    without either falls back to the staff's default rather than being dropped.
     """
     defaults = default_clefs(document)
+    changes = clef_changes_by_measure(document)
     out: dict[tuple[int, int], int] = {}
     for record in document.details.of_tag(_GFHOLD):
         if "part" in record.attrs:
@@ -163,5 +166,60 @@ def clefs_by_measure(document: EnigmaDocument) -> dict[tuple[int, int], int]:
         staff = int(record.attrs["cmper1"])
         measure = int(record.attrs["cmper2"])
         clef = _optional_int(record, "clefID")
+        if (staff, measure) in changes:
+            clef = changes[staff, measure][0].index
         out[(staff, measure)] = defaults.get(staff, 0) if clef is None else clef
+    return out
+
+
+@dataclass(frozen=True)
+class ClefPosition:
+    offset: Fraction
+    index: int
+    visible: bool = True
+
+
+def clef_changes_by_measure(
+    document: EnigmaDocument,
+) -> dict[tuple[int, int], tuple[ClefPosition, ...]]:
+    """Resolve score clef lists, ordered by incidence and measured in whole notes."""
+    lists: dict[int, list[tuple[int, ClefPosition]]] = {}
+    for record in document.others.of_tag("clefEnum"):
+        if "part" in record.attrs:
+            continue
+        try:
+            number = int(record.attrs["cmper"])
+            inci = int(record.attrs.get("inci", "0"))
+            clef = int(str(record.fields.get("clef", "0")))
+            edu = int(str(record.fields.get("xEduPos", "0")))
+        except (ValueError, KeyError) as exc:
+            raise CorruptScoreError("clefEnum: invalid identity or position") from exc
+        if number <= 0 or inci < 0 or clef < 0 or not 0 <= edu < (1 << 31):
+            raise CorruptScoreError("clefEnum: invalid clef or position")
+        lists.setdefault(number, []).append(
+            (
+                inci,
+                ClefPosition(Fraction(edu, 4096), clef, record.fields.get("clefMode") != "hidden"),
+            )
+        )
+    out = {}
+    for holder in document.details.of_tag(_GFHOLD):
+        if "part" in holder.attrs or "clefListID" not in holder.fields:
+            continue
+        list_id = _optional_int(holder, "clefListID")
+        changes = tuple(
+            change for _, change in sorted(lists.get(list_id or 0, []), key=lambda row: row[0])
+        )
+        if (
+            not changes
+            or changes[0].offset != 0
+            or any(
+                right.offset <= left.offset
+                for left, right in zip(changes, changes[1:], strict=False)
+            )
+        ):
+            raise CorruptScoreError(f"gfhold: missing or unordered clef list {list_id}")
+        if "clefID" in holder.fields:
+            raise CorruptScoreError("gfhold: both clefID and clefListID")
+        out[int(holder.attrs["cmper1"]), int(holder.attrs["cmper2"])] = changes
     return out

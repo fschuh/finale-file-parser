@@ -45,6 +45,7 @@ __all__ = [
     "OPTIONS_CMPER",
     "TAG_ARTIC_DEF",
     "TAG_CLEF_OPTIONS",
+    "TAG_CLEF_ENUM",
     "TAG_GRACE_SLASH_OPTIONS",
     "TAG_INST_USED",
     "TAG_FRAME_SPEC",
@@ -74,6 +75,9 @@ TAG_FRAME_SPEC = 146
 """`frameSpec` — confirmed by payload, not only by key sequence."""
 TAG_MEAS_SPEC = 176
 """`measSpec` — confirmed by payload, not only by key sequence."""
+
+TAG_CLEF_ENUM = 127
+"""Packed 12-byte CE clef-list elements; published PDK and source corroboration."""
 
 TAG_SMART_SHAPE = 217
 """`smartShape` — published PDK layout and RGP Lua getters; see ARCHITECTURE."""

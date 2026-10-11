@@ -225,6 +225,8 @@ def _divisions_for(part: Part) -> int:
     for measure in part.measures:
         for expression in measure.expressions:
             denominator = math.lcm(denominator, (expression.offset * 4).denominator)
+        for change in measure.clef_changes:
+            denominator = math.lcm(denominator, (change.offset * 4).denominator)
         for voice in measure.voices:
             for event in voice.events:
                 if event.is_grace:
@@ -442,12 +444,15 @@ def _assign_staff(part: ET.Element, staff: int, voices: dict[str, str]) -> None:
                 staff_element = ET.Element("staff")
                 staff_element.text = str(staff)
                 element.insert(at, staff_element)
+            elif element.tag == "attributes":
+                for clef in element.findall("clef"):
+                    clef.set("number", str(staff))
 
 
 def _merged_attributes(
     measures: tuple[ET.Element, ...], symbol: str | None, *, first: bool
 ) -> ET.Element | None:
-    sources = [measure.find("attributes") for measure in measures]
+    sources = [_initial_attributes(measure) for measure in measures]
     if not first and all(source is None for source in sources):
         return None
     result = ET.Element("attributes")
@@ -472,6 +477,15 @@ def _merged_attributes(
             clef.set("number", str(staff))
             result.append(clef)
     return result
+
+
+def _initial_attributes(measure: ET.Element) -> ET.Element | None:
+    for element in measure:
+        if element.tag in {"forward", "backup", "note"}:
+            break
+        if element.tag == "attributes":
+            return element
+    return None
 
 
 def _merge_staff_measures(
@@ -502,8 +516,9 @@ def _merge_staff_measures(
         if cursor:
             ET.SubElement(ET.SubElement(result, "backup"), "duration").text = str(cursor)
             cursor = 0
+        initial = _initial_attributes(measure)
         for element in measure:
-            if element.tag == "attributes":
+            if element is initial:
                 continue
             if element.tag == "barline":
                 continue
@@ -855,6 +870,7 @@ def _append_measure(
         ET.SubElement(ET.SubElement(direction, "direction-type"), "words").text = words
     _append_expressions(element, measure, divisions)
     _append_wedges(element, wedges, divisions)
+    _append_clef_changes(element, measure, divisions)
 
     for index, voice in enumerate(measure.voices):
         if index:
@@ -884,6 +900,41 @@ def _append_measure(
             _append_event(element, event, voice, divisions, arpeggio_numbers=numbers, slurs=slurs)
 
     _append_barline(element, measure, "right")
+
+
+def _append_clef_changes(element: ET.Element, measure: Measure, divisions: int) -> None:
+    cursor = Fraction(0)
+    extent = max(
+        (
+            sum((e.duration for e in v.events if not e.is_grace), Fraction(0))
+            for v in measure.voices
+        ),
+        default=Fraction(0),
+    )
+    if measure.time is not None:
+        extent = max(extent, Fraction(measure.time.beats, measure.time.beat_type))
+    for index, change in enumerate(measure.clef_changes):
+        if not 0 <= change.offset <= extent or (index and change.offset <= cursor):
+            raise ExportError("clef changes require ordered positions within the measure")
+        if change.sign not in {"G", "F", "C", "percussion", "TAB", "none", "jianpu"}:
+            raise ExportError(f"unsupported clef sign {change.sign!r}")
+        if change.line is not None and not 1 <= change.line <= 5:
+            raise ExportError("clef line must be in 1..5")
+        if change.offset > cursor:
+            ET.SubElement(ET.SubElement(element, "forward"), "duration").text = str(
+                _duration_in_divisions(change.offset - cursor, divisions)
+            )
+        clef = ET.SubElement(ET.SubElement(element, "attributes"), "clef")
+        if not change.visible:
+            clef.set("print-object", "no")
+        ET.SubElement(clef, "sign").text = change.sign
+        if change.line is not None:
+            ET.SubElement(clef, "line").text = str(change.line)
+        cursor = change.offset
+    if cursor:
+        ET.SubElement(ET.SubElement(element, "backup"), "duration").text = str(
+            _duration_in_divisions(cursor, divisions)
+        )
 
 
 def _append_barline(element: ET.Element, measure: Measure, location: str) -> None:

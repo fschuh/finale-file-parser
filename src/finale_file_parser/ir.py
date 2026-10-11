@@ -22,6 +22,7 @@ from fractions import Fraction
 __all__ = [
     "Arpeggio",
     "Beam",
+    "ClefChange",
     "Ending",
     "Event",
     "Expression",
@@ -352,6 +353,16 @@ class Expression:
 
 
 @dataclass(frozen=True)
+class ClefChange:
+    """One timed clef, in whole-note units from the measure start."""
+
+    offset: Fraction
+    sign: str
+    line: int | None = None
+    visible: bool = True
+
+
+@dataclass(frozen=True)
 class Measure:
     """One measure of one part."""
 
@@ -398,6 +409,9 @@ class Measure:
     endings: tuple[Ending, ...] = ()
     """Ending brackets opening or closing at this measure. A single-measure
     ending does both, so this can hold two."""
+
+    clef_changes: tuple[ClefChange, ...] = ()
+    """Timed clefs, including a source list's initial clef at offset zero."""
 
 
 @dataclass(frozen=True)

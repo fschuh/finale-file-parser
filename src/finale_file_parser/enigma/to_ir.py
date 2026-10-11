@@ -18,7 +18,9 @@ from finale_file_parser.enigma.barlines import barline_styles
 from finale_file_parser.enigma.beams import BeamedNote, beams_for
 from finale_file_parser.enigma.clef import (
     Clef,
+    ClefPosition,
     ClefSign,
+    clef_changes_by_measure,
     clef_definitions,
     clefs_by_measure,
     default_clefs,
@@ -35,6 +37,7 @@ from finale_file_parser.enigma.key import Mode, decode_key
 from finale_file_parser.enigma.location import effective_keys, locate_entries
 from finale_file_parser.enigma.lyrics import Lyric as EnigmaLyric
 from finale_file_parser.enigma.lyrics import lyrics_by_entry
+from finale_file_parser.enigma.models import CorruptScoreError
 from finale_file_parser.enigma.music import read_entry
 from finale_file_parser.enigma.ornaments import ornaments_by_entry
 from finale_file_parser.enigma.pitch import StaffTransposition, read_transposition, spell_note
@@ -46,6 +49,7 @@ from finale_file_parser.enigma.timesig import time_signatures
 from finale_file_parser.enigma.tuplet import entry_chain, sounded_durations, tuplets_by_entry
 from finale_file_parser.ir import (
     Arpeggio,
+    ClefChange,
     Event,
     Expression,
     Fermata,
@@ -187,6 +191,7 @@ def build_score(document: EnigmaDocument) -> Score:
     signatures = time_signatures(document)
     clef_table = clef_definitions(document)
     clef_at = clefs_by_measure(document)
+    clef_changes = clef_changes_by_measure(document)
     names = staff_names(document)
     info = file_info(document)
     repeats = repeats_for(document)
@@ -199,7 +204,7 @@ def build_score(document: EnigmaDocument) -> Score:
     staves = _ordered_staves(document, {staff for staff, _ in cells})
     keys = effective_keys(document)
     numbers = _measure_numbers(keys, cells)
-    clef_at = _carried_clefs(document, staves, numbers, clef_at)
+    clef_at = _carried_clefs(document, staves, numbers, clef_at, clef_changes)
     expressions = _place_score_wide(expressions, staves)
     parts = [
         Part(
@@ -219,6 +224,7 @@ def build_score(document: EnigmaDocument) -> Score:
                     signatures=signatures,
                     clef_table=clef_table,
                     clef_at=clef_at,
+                    clef_changes=clef_changes,
                     repeats=repeats,
                     directions=directions,
                     barlines=barlines,
@@ -311,6 +317,7 @@ def _carried_clefs(
     staves: list[int],
     numbers: list[int],
     clef_at: dict[tuple[int, int], int],
+    changes: dict[tuple[int, int], tuple[ClefPosition, ...]] | None = None,
 ) -> dict[tuple[int, int], int]:
     """The clef in force at every (staff, measure), not only where notes are.
 
@@ -326,6 +333,8 @@ def _carried_clefs(
         for number in numbers:
             current = clef_at.get((staff, number), current)
             out[(staff, number)] = current
+            if positions := (changes or {}).get((staff, number)):
+                current = positions[-1].index
     return out
 
 
@@ -547,6 +556,7 @@ def _measure(
     directions: dict[int, tuple[str, ...]] | None = None,
     barlines: dict[int, str] | None = None,
     expressions: dict[tuple[int, int], tuple[Expression, ...]] | None = None,
+    clef_changes: dict[tuple[int, int], tuple[ClefPosition, ...]] | None = None,
 ) -> Measure:
     cell = cells.get((staff, number))
 
@@ -554,6 +564,8 @@ def _measure(
     previous_signature = signatures.get(previous) if previous is not None else None
     clef_index = clef_at.get((staff, number))
     previous_clef_index = clef_at.get((staff, previous)) if previous is not None else None
+    if positions := (clef_changes or {}).get((staff, previous)) if previous is not None else None:
+        previous_clef_index = positions[-1].index
     clef = clef_table.get(clef_index) if clef_index is not None else None
     clef_changed = clef is not None and clef_index != previous_clef_index
 
@@ -583,8 +595,13 @@ def _measure(
             if signature is not None and signature != previous_signature
             else None
         ),
-        clef_sign=_MUSICXML_SIGNS.get(clef.sign) if clef_changed and clef else None,
-        clef_line=_clef_line(clef) if clef_changed and clef else None,
+        clef_sign=_MUSICXML_SIGNS.get(clef.sign)
+        if clef_changed and clef and not (clef_changes or {}).get((staff, number))
+        else None,
+        clef_line=_clef_line(clef)
+        if clef_changed and clef and not (clef_changes or {}).get((staff, number))
+        else None,
+        clef_changes=_timed_clefs((clef_changes or {}).get((staff, number), ()), clef_table),
         # Repeats belong to the measure, not the staff: every part carries the
         # same barline, which is what a reader of one part expects to see.
         # A marking belongs to the measure, so every part shows it -- which is
@@ -599,3 +616,16 @@ def _measure(
         repeat_passes=here.passes,
         endings=here.endings,
     )
+
+
+def _timed_clefs(
+    positions: tuple[ClefPosition, ...], table: dict[int, Clef]
+) -> tuple[ClefChange, ...]:
+    out = []
+    for position in positions:
+        clef = table.get(position.index)
+        if clef is None:
+            raise CorruptScoreError(f"clefEnum: unknown clef index {position.index}")
+        if sign := _MUSICXML_SIGNS.get(clef.sign):
+            out.append(ClefChange(position.offset, sign, _clef_line(clef), position.visible))
+    return tuple(out)
