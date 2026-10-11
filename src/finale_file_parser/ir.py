@@ -344,6 +344,12 @@ class Expression:
     tempo: Tempo | None = None
     """An explicit metronome marking; ``text`` still retains the source wording."""
 
+    offset: Fraction = Fraction(0)
+    """Rhythmic attachment from the measure start, in whole-note units.
+
+    Independent of drawing adjustments; signed offsets are preserved.
+    """
+
 
 @dataclass(frozen=True)
 class Measure:

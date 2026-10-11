@@ -316,6 +316,21 @@ Layers are distinct from Finale's **voice 1 / voice 2** within a layer (`eeppd.t
 "V2 launch" and `CNTLBIT`). No voice-2 marker has been located in EnigmaXML entry records yet, and the
 measure sums above do not require one, so it remains unmodelled.
 
+### Expression rhythmic attachment (2026-10-11)
+
+`measExprAssign.horzEduOff` is a rhythmic EDU position (4096 per whole note),
+separate from `horzEvpuOff` and `vertOff` drawing adjustments. The existing legacy
+assignment adapter already decodes it at payload +2; the normalized reader now
+preserves it in `Expression.offset`. The ActRaiser bar-8 mf assignment stores 1536
+EDU: 3/8 whole notes, after the fermata. The source PDF and MIDI velocity transition
+corroborate the attachment. The published PDK FCExpression measure-position accessor
+and musxdom MeasureExprAssign `eduPosition` describe the same normalized field.
+
+MusicXML directions at measure cursor zero use `<offset sound="yes">` before
+staff/sound, with denominators included in divisions. MuseScore 4.7.5's inspected
+`importmusicxmlpass2.cpp` reads the offset and places dynamics at tick + offset.
+This is source inspection, not a claim of runtime MuseScore validation.
+
 ### Known format facts — the `.mus` entry pool
 
 `read_mus_entries(path)` returns the same `Entry`/`Note`/`Duration` objects the `.musx` path builds,

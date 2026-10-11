@@ -223,6 +223,8 @@ def _divisions_for(part: Part) -> int:
     """
     denominator = 1
     for measure in part.measures:
+        for expression in measure.expressions:
+            denominator = math.lcm(denominator, (expression.offset * 4).denominator)
         for voice in measure.voices:
             for event in voice.events:
                 if event.is_grace:
@@ -736,7 +738,7 @@ is for.
 """
 
 
-def _append_expressions(element: ET.Element, measure: Measure) -> None:
+def _append_expressions(element: ET.Element, measure: Measure, divisions: int) -> None:
     """Emit this staff's markings.
 
     Structured markings keep their notation and playback meaning:
@@ -758,7 +760,7 @@ def _append_expressions(element: ET.Element, measure: Measure) -> None:
     """
     for expression in measure.expressions:
         if expression.tempo is not None:
-            _append_tempo(element, expression.tempo)
+            direction = _append_tempo(element, expression.tempo)
         elif expression.is_rehearsal:
             # `<rehearsal>`, not `<words>`: the two are different elements and a
             # consumer treats them differently -- a rehearsal mark is a
@@ -777,6 +779,17 @@ def _append_expressions(element: ET.Element, measure: Measure) -> None:
             direction = ET.SubElement(element, "direction", placement="above")
             words = ET.SubElement(ET.SubElement(direction, "direction-type"), "words")
             words.text = expression.text
+        else:
+            continue
+        if expression.offset:
+            offset = ET.Element("offset", sound="yes")
+            offset.text = str(_duration_in_divisions(expression.offset, divisions))
+            # MusicXML places offset before voice/staff/sound. Directions are
+            # emitted at cursor zero, so neither this nor backups move notes.
+            at = next(
+                (i for i, child in enumerate(direction) if child.tag == "sound"), len(direction)
+            )
+            direction.insert(at, offset)
 
 
 def _decimal_number(value: Fraction) -> str:
@@ -784,7 +797,7 @@ def _decimal_number(value: Fraction) -> str:
     return text.rstrip("0").rstrip(".") if "." in text else text
 
 
-def _append_tempo(element: ET.Element, tempo: Tempo) -> None:
+def _append_tempo(element: ET.Element, tempo: Tempo) -> ET.Element:
     if tempo.per_minute <= 0 or not 0 <= tempo.dots <= 3:
         raise ExportError("tempo must have a positive rate and zero to three dots")
     unit = _NOTE_TYPES.get(tempo.beat_unit.denominator)
@@ -799,6 +812,7 @@ def _append_tempo(element: ET.Element, tempo: Tempo) -> None:
         ET.SubElement(metronome, "beat-unit-dot")
     ET.SubElement(metronome, "per-minute").text = _decimal_number(tempo.per_minute)
     ET.SubElement(direction, "sound", tempo=_decimal_number(tempo.quarter_bpm))
+    return direction
 
 
 def prints_as_words(expression: Expression) -> bool:
@@ -839,7 +853,7 @@ def _append_measure(
         # placed after them would read as belonging to the next bar.
         direction = ET.SubElement(element, "direction", placement="above")
         ET.SubElement(ET.SubElement(direction, "direction-type"), "words").text = words
-    _append_expressions(element, measure)
+    _append_expressions(element, measure, divisions)
     _append_wedges(element, wedges, divisions)
 
     for index, voice in enumerate(measure.voices):

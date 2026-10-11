@@ -9,6 +9,7 @@ definitions prints a fortissimo in every part of every file.
 
 from __future__ import annotations
 
+from dataclasses import replace
 from fractions import Fraction
 
 import pytest
@@ -24,6 +25,7 @@ from finale_file_parser.enigma.document import (
     TextsPool,
 )
 from finale_file_parser.enigma.expressions import SCORE_WIDE_STAFF, expressions_by_measure
+from finale_file_parser.enigma.models import CorruptScoreError
 
 EMPTY: tuple[Record, ...] = ()
 
@@ -72,6 +74,7 @@ def assignment(
     layer: int | None = 1,
     inci: int = 0,
     part: str | None = None,
+    edu: str | None = None,
 ) -> Record:
     attrs = {"cmper": str(measure), "inci": str(inci)}
     if part is not None:
@@ -79,7 +82,36 @@ def assignment(
     fields = {"textExprID": str(expr_id), "staffAssign": str(staff)}
     if layer is not None:
         fields["layer"] = str(layer)
+    if edu is not None:
+        fields["horzEduOff"] = edu
     return Record(tag="measExprAssign", attrs=attrs, text="", fields=fields)
+
+
+@pytest.mark.parametrize("edu", [None, "0", "1536", "-256", "4096"])
+def test_rhythmic_expression_attachment_is_independent_of_drawing(edu: str | None) -> None:
+    assigned = assignment(8, 4, edu=edu)
+    assigned = replace(assigned, fields={**assigned.fields, "horzEvpuOff": "73", "vertOff": "-9"})
+    result = expressions_by_measure(document(*library(), assigned))
+    assert result[1, 8][0].offset == Fraction(int(edu or "0"), 4096)
+
+
+@pytest.mark.parametrize("edu", ["abc", "1.5", str(1 << 31), str(-(1 << 31) - 1)])
+def test_malformed_expression_attachment_is_rejected(edu: str) -> None:
+    with pytest.raises(CorruptScoreError, match="horzEduOff"):
+        expressions_by_measure(document(*library(), assignment(8, 4, edu=edu)))
+
+
+def test_score_wide_duplicate_is_only_removed_at_the_same_time() -> None:
+    result = expressions_by_measure(
+        document(
+            *library(),
+            assignment(8, 4, edu="0"),
+            assignment(8, 4, staff=-1, inci=1, edu="1536"),
+            assignment(8, 4, staff=-1, inci=2, edu="0"),
+        )
+    )
+    assert result[-1, 8][0].offset == Fraction(3, 8)
+    assert len(result[-1, 8]) == 1
 
 
 def library() -> tuple[Record, ...]:

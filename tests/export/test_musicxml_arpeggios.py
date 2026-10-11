@@ -127,6 +127,29 @@ def test_a_connected_roll_exports_one_part_with_two_clefs_and_distinct_voices() 
     )
 
 
+def test_expression_time_survives_connected_staff_projection() -> None:
+    score = _score()
+    parts = tuple(
+        replace(
+            part,
+            measures=(
+                replace(
+                    part.measures[0],
+                    expressions=(Expression("mf", "", marking="mf", offset=Fraction(1, 8)),),
+                ),
+            ),
+        )
+        for part in score.parts
+    )
+    root = _tree(replace(score, parts=parts))
+    directions = root.findall("part/measure/direction")
+    assert [(d.findtext("staff"), d.findtext("offset")) for d in directions] == [
+        ("1", "1"),
+        ("2", "1"),
+    ]
+    assert [d.tag for d in directions[0]] == ["direction-type", "offset", "staff"]
+
+
 def test_a_brace_and_simultaneous_independent_rolls_keep_separate_parts() -> None:
     score = _score()
     parts = tuple(

@@ -855,3 +855,14 @@ does not retain their percentages for duration. Restoring the source slashes
 changes its grace classification but does not recreate Finale's measured
 77–80 ms performance automatically. A policy for optional performance timing,
 including player compatibility and Human Playback behavior, remains open.
+
+## 2026-10-11 — DECIDED: exact expression attachment in the canonical IR
+
+Append default-zero `Expression.offset`, a signed Fraction in whole-note units.
+It preserves `measExprAssign.horzEduOff` (4096 EDU per whole note) independently
+from EVPU drawing adjustments. Negative and measure-end attachments remain valid;
+malformed or out-of-signed-32-bit values raise a clear input error. Export directions
+at cursor zero with an exact MusicXML offset, including sound, without moving notes.
+Include the offset denominator in divisions and preserve it through score-wide and
+connected-staff placement. Duplicate score/staff assignments must also agree in time.
+This fixes ActRaiser's bar-8 mf at 1536 EDU without changing its velocity policy.

@@ -126,6 +126,7 @@ from dataclasses import dataclass
 from fractions import Fraction
 
 from finale_file_parser.enigma.document import EnigmaDocument, Record, field_int
+from finale_file_parser.enigma.models import CorruptScoreError
 from finale_file_parser.enigma.text import plain_text
 from finale_file_parser.formats.dynamics import (
     DYNAMICS_CATEGORY,
@@ -256,7 +257,8 @@ def expressions_by_measure(
         definition = definitions.get(expr_id)
         if definition is None:
             continue
-        if staff == SCORE_WIDE_STAFF and (measure, expr_id) in on_a_staff:
+        offset = _offset(record)
+        if staff == SCORE_WIDE_STAFF and (measure, expr_id, offset) in on_a_staff:
             # The same expression is already placed on a real staff in this
             # measure, so the score-wide copy would print it twice. 102 of the
             # corpus's 746 list assignments are this shape.
@@ -290,6 +292,7 @@ def expressions_by_measure(
                 is_rehearsal=label is not None,
                 layer=field_int(record.fields.get("layer")),
                 tempo=_tempo(printed) if marking is None and label is None else None,
+                offset=offset,
             )
         )
     return {where: tuple(items) for where, items in out.items()}
@@ -353,13 +356,20 @@ def _letter(position: int) -> str:
     return letters
 
 
-def _staffed(document: EnigmaDocument) -> set[tuple[int, int]]:
+def _offset(record: Record) -> Fraction:
+    edu = field_int(record.fields.get("horzEduOff", "0"))
+    if edu is None or not -(1 << 31) <= edu < (1 << 31):
+        raise CorruptScoreError("measExprAssign: invalid horzEduOff")
+    return Fraction(edu, 4096)
+
+
+def _staffed(document: EnigmaDocument) -> set[tuple[int, int, Fraction]]:
     """(measure, expression id) pairs already assigned to a real staff.
 
     A score expression is drawn once; where the document also assigns the same
     expression to a staff in that measure, the score-wide copy is redundant.
     """
-    out: set[tuple[int, int]] = set()
+    out: set[tuple[int, int, Fraction]] = set()
     for record in document.others.of_tag(_ASSIGN):
         if "part" in record.attrs:
             continue
@@ -368,7 +378,7 @@ def _staffed(document: EnigmaDocument) -> set[tuple[int, int]]:
         expr_id = field_int(record.fields.get("textExprID"))
         if staff is None or staff < 0 or measure is None or expr_id is None:
             continue
-        out.add((measure, expr_id))
+        out.add((measure, expr_id, _offset(record)))
     return out
 
 

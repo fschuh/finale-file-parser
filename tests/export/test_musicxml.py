@@ -841,6 +841,29 @@ def test_an_unidentified_glyph_is_not_printed_as_text() -> None:
     assert root.find("./part/measure/direction") is None
 
 
+@pytest.mark.parametrize("offset", [Fraction(3, 8), Fraction(1, 20), Fraction(-1, 16)])
+@pytest.mark.parametrize("kind", ["dynamic", "tempo", "words", "rehearsal"])
+def test_expression_offsets_are_exact_without_moving_notes(offset: Fraction, kind: str) -> None:
+    expression = Expression(
+        text="Andante",
+        category="",
+        offset=offset,
+        marking="mf" if kind == "dynamic" else None,
+        tempo=Tempo(QUARTER, Fraction(96)) if kind == "tempo" else None,
+        is_rehearsal=kind == "rehearsal",
+    )
+    root = _tree(_score(_note(), expressions=(expression,)))
+    divisions = int(root.findtext("./part/measure/attributes/divisions") or "0")
+    direction = root.find("./part/measure/direction")
+    assert direction is not None
+    assert direction.findtext("offset") == str(offset * 4 * divisions)
+    assert direction.find("offset").get("sound") == "yes"
+    assert int(root.findtext("./part/measure/note/duration") or "0") == divisions
+    assert root.find("./part/measure/forward") is None
+    if kind == "tempo":
+        assert [child.tag for child in direction] == ["direction-type", "offset", "sound"]
+
+
 def test_expressions_are_emitted_before_the_notes() -> None:
     """A direction placed after the notes reads as belonging to the next bar."""
     root = _tree(_score(_note(), expressions=(_expr(),)))
