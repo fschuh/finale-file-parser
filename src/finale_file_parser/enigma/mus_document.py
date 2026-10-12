@@ -891,15 +891,17 @@ def _expression_description(payload: bytes, fallback: str, year: int | None) -> 
 def _text_expr_def(
     payload: bytes, fallback: str, year: int | None
 ) -> dict[str, str | tuple[str, ...] | Record | tuple[Record, ...]]:
-    """The two fields an expression definition needs, plus its description.
+    """The raw text-block reference, playback value and description.
 
-    Only what is confirmed at 100% against the paired corpus. `categoryID` is
+    `textBlockID` makes the raw reference space explicit without changing the
+    normalized MUSX convention. `categoryID` is
     absent because it is not identified, so a `.mus` expression has no category
     and `enigma.expressions` names its dynamics from the description instead --
     the stronger signal anyway.
     """
     fields: dict[str, str | tuple[str, ...] | Record | tuple[Record, ...]] = {
         "textIDKey": str(_u16(payload, 0)),
+        "textBlockID": str(_u16(payload, 0)),
     }
     value = _u16(payload, 4)
     if value:

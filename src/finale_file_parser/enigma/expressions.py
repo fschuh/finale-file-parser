@@ -127,7 +127,7 @@ from fractions import Fraction
 
 from finale_file_parser.enigma.document import EnigmaDocument, Record, field_int
 from finale_file_parser.enigma.models import CorruptScoreError
-from finale_file_parser.enigma.text import plain_text
+from finale_file_parser.enigma.text import plain_text, text_block
 from finale_file_parser.formats.dynamics import (
     DYNAMICS_CATEGORY,
     described_dynamic,
@@ -463,10 +463,24 @@ def _texts(document: EnigmaDocument) -> dict[int, _Text]:
         number = field_int(record.attrs.get("number"))
         if number is None:
             continue
-        markup = record.text or ""
-        out[number] = _Text(
-            printed=plain_text(markup),
-            in_music_font=bool(_MUSIC_FONT.search(markup)),
-            is_rehearsal=bool(_REHEARSAL.search(markup)),
-        )
+        out[number] = _as_text(record.text or "")
+    for number, definition in _definitions(document).items():
+        if "textBlockID" not in definition.fields:
+            continue
+        # Raw legacy IDs name a text block, not the expression's text section.
+        # A missing/empty reference must never fall back to an unrelated section
+        # that merely has the same number as the definition.
+        out.pop(number, None)
+        block = field_int(definition.fields.get("textBlockID"))
+        markup = text_block(document, block) if block is not None else None
+        if markup is not None:
+            out[number] = _as_text(markup)
     return out
+
+
+def _as_text(markup: str) -> _Text:
+    return _Text(
+        printed=plain_text(markup),
+        in_music_font=bool(_MUSIC_FONT.search(markup)),
+        is_rehearsal=bool(_REHEARSAL.search(markup)),
+    )

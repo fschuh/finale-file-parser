@@ -7,6 +7,23 @@ Updated 2026-10-10: Finale-2012 Unicode descriptions and the evidenced `§`/`sfz
 variant now reach the existing IR/export path. Counts from the earlier corpus
 audit below remain historical; the licensed corpus is absent in this checkout.
 
+Updated 2026-10-11: the complete supplied legacy MUS audit shows that raw
+expression text requires `textIDKey -> textBlock -> textID/textTag -> text
+pool` indirection. The direct definition-number join described below remains
+the observed normalized MUSX convention, but is not reliable for raw MUS
+sections: 51 active placements in 14 supplied scores resolve to different
+text. See `docs/ARCHITECTURE.md`, "Legacy expression text indirection", and
+`files/ninsheetmusic-audit/corpus-fix-plan.md`. The legacy adapter now exposes
+`textBlockID` to the shared resolver, which follows the reference and preserves
+the existing MUSX convention. Missing/empty references cannot use unrelated
+same-number raw sections as a fallback.
+
+The same audit records 44 unnamed graded-dynamic assignments in 21 files after
+that join is corrected. Generic descriptions need decoded source music-font
+context before the glyph can be named; the separate `S` attack variant still
+requires rendered-glyph evidence. These are planned fixes, not a claim that the
+legacy dynamic path already covers every assigned mark.
+
 ## A dynamic is a character, not a word
 
 `"ff"` appears nowhere in a Finale file. Searching every record payload and the

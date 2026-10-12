@@ -1565,6 +1565,82 @@ All75 production exports now validate against the official MusicXML4 schema.
 This resolves text validity, not the outstanding text-block join or font-backed
 dynamic semantics. The input scores/MIDIs remain byte-identical.
 
+### Legacy expression text indirection — corpus audit (2026-10-11)
+
+The normalized EnigmaXML expression-text convention is not a universally valid
+join for the raw legacy text pool. In the supplied 75-file NinSheetMusic audit,
+an assigned legacy definition reaches its actual text through:
+
+```
+textExprDef.textIDKey -> others.textBlock[cmper]
+                     -> textID/textTag -> the selected raw text pool
+```
+
+These fields are already decoded: definition payload +0; others tag183 text
+reference +0 and text-pool selector +24 (2006 means expression text). This is
+the same bounded text-block indirection used for staff and group names. It does
+not establish a new serialized offset, and does not change the historical
+401-document MUSX observations about normalized expression numbers.
+
+Independent source references and printed-score corroboration:
+
+| Legacy score | Definition | Text-block key | Raw expression section | Correct text |
+| --- | ---: | ---: | ---: | --- |
+| SMB2 Player Select | 82 | 104 | 83 | half note =145 |
+| SMB2 Title Theme | 83 | 105 | 84 | quarter note =216 |
+| SMW Ending Theme | 49 | 54 | 82 | Swing eighths |
+| SMW Sub Castle | 78 | 13 | 79 | half note =126 |
+| SMW Sub Castle | 85 | 107 | 86 | Ghastly quarter note =105 |
+| SMW Sub Castle | 86 | 108 | 87 | Frighteningly quarter note =125 |
+
+A direct definition-number lookup previously gave Player Select quarter=75,
+Title Theme half=145, and Sub Castle the wrong tempo texts at all three
+positions. The source MIDI nominal rates corroborate the referenced beat
+markings. Across all score-scope assignments, the reference resolves 401
+placements; eight intentionally empty/missing text sections remain (seven
+copied Athletic dynamics still have usable naming descriptions). Raw lookup
+differences affect 63 placements in 15 files, of which 51 placements in 14
+files lie on current musical staves and measures. Out-of-scope records are
+not evidence for introducing new printed directions.
+
+The legacy adapter now retains an explicit `textBlockID` reference alongside
+the source `textIDKey`. The shared resolver follows that reference using keyed
+text-pool lookup, removing any same-number fallback when the reference is
+missing or empty. Definitions without this field retain the established MUSX
+normalization. Raw definitions, blocks and text sections remain available.
+Authored crossed-ID, missing/empty text, copied-dynamic, pool-selection and
+MUSX-compatibility tests exercise the join. The audit
+and evidence ledger are local files under
+`files/ninsheetmusic-audit/current-midi-audit.{md,json}`; all supplied musical
+inputs remain external and unlicensed for inclusion as git fixtures.
+
+Additional findings are catalogued in the corresponding corpus fix plan:
+50 in-score octave spans in 18 files (plus one stale record), nine delayed
+frame starts in six files, trills/ornament accidentals, two-note tremolos,
+glissandi, composite articulations, explicit pedal signs and note-attached
+dynamics. The recorded repeat target/action, entry-playback flag and custom
+symbol hypotheses require serialized-layout evidence before becoming parser
+constants; live PDK object offsets alone are not file-offset evidence.
+
+The corrected text join also exposes 44 assigned graded-dynamic glyphs in 21
+files whose descriptions do not name a dynamic (for example "Imported from
+MusicXML" and "Below Staff"). The current legacy text resolver does not retain
+compiled music-font identity, so these remain unnamed even when the glyph is
+in the known ladder. Spider Dance's PDF corroborates its bar-26 `mp` and bar-34
+`mf`; Spear of Justice has seven corresponding unnamed placements. Preserve
+font identity before interpreting an ASCII glyph as a dynamic. A separate
+three-assignment `S` sforzando variant (SM64 Main Theme and Athletic) remains
+subject to font/render evidence; it is not part of this 44-placement count.
+
+Printed and playback tempos also need distinct interpretation. Dr Wily prints
+quarter=180 but its expression value is178 and MIDI starts near178; Athletic
+prints150 but has value152 and MIDI near152. These observations do not decode
+the serialized playback type. 1UP (printed225/MIDI100), Get Treasure Fanfare and
+Uncover Secret (printed100/MIDI120) remain settings/reference investigations.
+Invincibility Theme's `h=130` is in blockText25 rather than an assigned expression
+and agrees with MIDI260; its page-placement reference still needs decoding.
+No source tempo or playback field has been changed on this evidence alone.
+
 ### Known format facts — crescendo and diminuendo hairpins
 
 Finale stores these dynamics as **SmartShapes**, separately from text

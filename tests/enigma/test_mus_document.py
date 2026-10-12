@@ -36,6 +36,7 @@ from finale_file_parser.enigma.mus_others import (
     TAG_ARTIC_DEF,
     TAG_CLEF_OPTIONS,
     TAG_STAFF_SPEC,
+    TAG_TEXT_BLOCK,
     MusOther,
 )
 from finale_file_parser.enigma.pitch import read_transposition
@@ -1186,6 +1187,14 @@ def text_expr_def_payload(
     return bytes(payload)
 
 
+def expression_text_block_payload(text_id: int) -> bytes:
+    """Authored text-block reference to the expression text pool."""
+    payload = bytearray(26)
+    payload[:4] = text_id.to_bytes(4, "little")
+    payload[24:26] = (2006).to_bytes(2, "little")
+    return bytes(payload)
+
+
 def meas_expr_assign_slot(*, expr_id: int, staff: int, flags: int = 0x02) -> bytes:
     slot = bytearray(24)
     slot[0:2] = expr_id.to_bytes(2, "little")
@@ -1357,6 +1366,7 @@ def test_a_unicode_dynamic_and_hidden_accent_reach_musicxml_correctly(
                 ),
             ),
             MusOther(MEAS_EXPR_ASSIGN, 1, 0, meas_expr_assign_slot(expr_id=1, staff=1)),
+            MusOther(TAG_TEXT_BLOCK, 14, 0, expression_text_block_payload(27)),
         ),
         details=(
             MusDetailRecord(GFHOLD, 1, 1, 0, gfhold_payload(0, 3)),
@@ -1369,7 +1379,7 @@ def test_a_unicode_dynamic_and_hidden_accent_reach_musicxml_correctly(
         texts=(
             Record(
                 tag="expression",
-                attrs={"number": "1"},
+                attrs={"number": "27"},
                 text="^¥\x01\x01\x01\x01" + glyph,
                 fields={},
             ),

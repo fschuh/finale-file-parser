@@ -70,10 +70,8 @@ def text_block(document: EnigmaDocument, number: int) -> str | None:
     )
     if tag is None:
         return None
-    for record in document.texts.of_tag(tag):
-        if record.attrs.get("number") == text_id:
-            return record.text
-    return None
+    record = document.texts.get(tag, text_id)
+    return record.text if record is not None else None
 
 
 def _named(document: EnigmaDocument, record_field: object) -> str:
