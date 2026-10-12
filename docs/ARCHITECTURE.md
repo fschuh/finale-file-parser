@@ -2641,6 +2641,28 @@ remain unplaced. All105 production paths and schema checks pass after decoding
 these records. Canonical span projection and custom endpoint graphics remain
 the next R02 work; this foundation alone does not claim line export recovery.
 
+#### Green Hill's written tie gap versus held MIDI (2026-10-12, R03)
+
+Green Hill Zone upper staff1/layer2/bar26 has contiguous F4 entries776,929,777.
+Their written durations are512,1024,1024 EDU. Source note IDs are1 throughout;
+their flags are respectively start-only, end-only, start-and-end. Entry929 has
+no onward tie start. The numeric detail pool has no score entry/note overrides
+for any of these three entries. The production reader preserves those flags.
+
+The original one-page PDF independently shows the incoming tie from the eighth
+note to the following quarter and the later outgoing tie across the barline,
+with no forward arc from the middle quarter to the next quarter. The paired
+performance MIDI holds F4 through that written reattack, on both traversals.
+This explains the two source-only attacks in the original comparison; it is
+not evidence for an unread tie override or dropped flag. Preserve the written
+notation and report this specific source/reference playback difference. Do not
+fill unrelated unmatched tie starts/ends throughout the corpus or suppress
+written notes merely to match this MIDI.
+
+The local source-detail trace is green-hill-ties.log and the rendered original
+PDF is green-hill-source.png in the generated validation directory. These
+third-party score artifacts remain outside git. R03 requires no parser change.
+
 The same SmartShape definitions carry phrase slurs. Solid types **0** (`slurDown`),
 **1** (`slurUp`) and **15** (`slurAuto`) are documented by the published PDK
 [SmartShape enums and structs](https://pdk.finalelua.com/ff__smartshapes_8h_source.html)
