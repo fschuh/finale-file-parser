@@ -1801,6 +1801,27 @@ symbol placement is independent of identifying this symbol's components.
 
 ### Known format facts — Unicode expression descriptions and dynamics
 
+#### Auxiliary ornament accidentals (2026-10-12, F16)
+
+Maestro's small accidental characters105/73/233 mean flat/sharp/natural (official
+chart). Resolve a visible score assignment only when it accompanies exactly one
+ornament on the same entry and its signed `vertOff` places it above that ornament.
+Keep competing ornaments, unrelated text fonts and ordinary adjacent-note
+accidentals separate. These use existing signed assignment positioning fields;
+there is no new byte offset. The explicit accidental is absolute vs the natural
+auxiliary, overriding its key accidental, never altering the main written note.
+
+MEGALOVANIA entry3116, upper-staff bar14, assigns small flat definition65 with
+Maestro font12, horzOff11/vertOff75 and mordent definition18 at0/0. The PDF draws
+the flat above the mordent and both MIDI traversals use Ab5 above G5. Store
+`Ornament.auxiliary_alteration=-1`, update the neighbor distance to1, and export
+`accidental-mark placement=above` with the mordent. Above-chord mordents, like
+trills, select the upper written note, independent of serialized chord order.
+MuseScore4.7.5's inspected ornaments importer skips accidental-mark and ignores
+trill-step; runtime support must be distinguished from standard XML preservation.
+Authored tests cover altered keys, explicit natural/sharp, chords, visibility and
+ambiguous competing ornaments. No performance attacks become written notes.
+
 Numeric-pool `.mus` **others tag 241** stores the expression description at
 serialized **payload +36**. Earlier files use an 8-bit string; a **Finale 2012
 or newer banner selects UTF-16LE**. The old adapter stopped at the first NUL

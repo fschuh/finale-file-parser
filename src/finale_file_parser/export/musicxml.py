@@ -1522,6 +1522,15 @@ def _append_note(
                     "trill-mark" if ornament.kind == "trill" else "inverted-mordent",
                     attributes,
                 )
+                if ornament.auxiliary_alteration is not None:
+                    accidental = {-1: "flat", 0: "natural", 1: "sharp"}.get(
+                        ornament.auxiliary_alteration
+                    )
+                    if accidental is None:
+                        raise ExportError("unsupported ornament auxiliary accidental")
+                    ET.SubElement(
+                        ornament_group, "accidental-mark", placement="above"
+                    ).text = accidental
         if digits:
             # All of a chord's fingerings sit on its principal note rather than
             # one per pitch. Enigma attaches them to the entry, not to a note,

@@ -1048,3 +1048,11 @@ it means inverted marcato and exports to `strong-accent type="down"`. This keeps
 the established component expansion for combined marks and avoids discarding
 their orientation. Unknown-font and blank-character definitions are excluded.
 
+# 2026-10-12: keep auxiliary accidentals independent of the main pitch
+
+Append `Ornament.auxiliary_alteration` as an optional explicit alteration of the
+natural auxiliary. Preserve both that printed sign and the derived interval;
+an explicit natural is different from absence. Resolve only unique same-entry,
+music-font small signs positioned above an ornament. Export a standard ornament
+accidental-mark without changing the written pitch or generating MIDI notes.
+

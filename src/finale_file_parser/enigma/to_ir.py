@@ -573,13 +573,15 @@ def _resolve_ornament(
     # useTopNote flag is a separate positioning option, not a playback selector.
     index = (
         max(range(len(notes)), key=lambda i: notes[i].harm_lev)
-        if ornament.kind == "trill"
+        if ornament.kind in {"trill", "upper-mordent"}
         else ornament.pitch_index
     )
     main = spell_note(notes[index], key, transposition).written
     upper = spell_note(
         replace(notes[index], harm_lev=notes[index].harm_lev + 1, harm_alt=0), key, transposition
     ).written
+    if ornament.auxiliary_alteration is not None:
+        upper = replace(upper, alteration=ornament.auxiliary_alteration)
     semitones = {"C": 0, "D": 2, "E": 4, "F": 5, "G": 7, "A": 9, "B": 11}
     distance = (
         12 * (upper.octave - main.octave)
