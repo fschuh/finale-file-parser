@@ -1030,3 +1030,14 @@ Reject shape definitions in all character-based semantic resolvers, including
 normalized MUSX, rather than interpreting a shape ID or stale character as a
 fermata/accent. Unsupported layouts remain unguessed; new extended glyph mappings
 must establish their font context before introducing visible notation.
+# 2026-10-12: preserve the principal note of a chord ornament
+
+Append `Ornament.pitch_index` to the canonical IR. Above-chord trills select the
+upper written note following Finale's documented Human Playback semantics, and
+their auxiliary interval is derived from that note's key. Export once on the
+corresponding MusicXML note. Preserve written chord structure and durations.
+MuseScore4.7.5 attaches imported ornaments to the whole chord and can trill all
+its pitches; report that renderer limitation instead of changing the score to
+match one consumer's playback. Human Playback's ornament speed/acceleration is
+also a performance realization, not a source notation correction.
+

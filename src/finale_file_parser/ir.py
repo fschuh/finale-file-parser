@@ -76,10 +76,13 @@ class Ornament:
     """An ornament attached to an event, rather than additional written notes."""
 
     kind: str
-    """Currently ``upper-mordent``: main note, upper neighbor, main note."""
+    """upper-mordent or trill, retained as notation rather than written MIDI notes."""
 
     auxiliary_semitones: int | None = None
     """Distance to the auxiliary note when established by the key. None when unknown."""
+
+    pitch_index: int = 0
+    """The principal note's index in the event's pitches, independent of chord order."""
 
 
 @dataclass(frozen=True)

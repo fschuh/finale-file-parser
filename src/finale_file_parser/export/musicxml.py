@@ -26,6 +26,7 @@ from finale_file_parser.ir import (
     Measure,
     NoteTies,
     OctaveShift,
+    Ornament,
     Part,
     PartGroup,
     Pitch,
@@ -1376,6 +1377,8 @@ def _append_event(
 ) -> None:
     if event.note_ties and len(event.note_ties) != len(event.pitches):
         raise ExportError("per-note tie flags must match the number of pitches")
+    if any(not 0 <= mark.pitch_index < len(event.pitches) for mark in event.ornaments):
+        raise ExportError("ornament principal note is outside the event's pitches")
     legacy_ties = NoteTies(event.tie_start, event.tie_end)
     if event.is_rest:
         _append_note(element, event, voice, divisions, pitch=None, chord=False, ties=legacy_ties)
@@ -1395,6 +1398,7 @@ def _append_event(
             ties=ties,
             arpeggio_numbers=arpeggio_numbers,
             slurs=slurs if not index else (),
+            ornaments=tuple(mark for mark in event.ornaments if mark.pitch_index == index),
         )
 
 
@@ -1409,6 +1413,7 @@ def _append_note(
     ties: NoteTies,
     arpeggio_numbers: tuple[str, ...] = (),
     slurs: tuple[_SlurNotation, ...] = (),
+    ornaments: tuple[Ornament, ...] = (),
 ) -> None:
     note = ET.SubElement(element, "note")
     if not event.visible:
@@ -1474,7 +1479,6 @@ def _append_note(
     # them -- repeating per pitch would print the staccato three times.
     marks = () if chord else event.articulations
     digits = () if chord else event.fingerings
-    ornaments = () if chord else event.ornaments
     fermatas = () if chord else event.fermatas
     arpeggios = event.arpeggios if pitch is not None else ()
     if ties.start or ties.stop or marks or digits or ornaments or fermatas or arpeggios or slurs:
@@ -1502,17 +1506,19 @@ def _append_note(
         if ornaments:
             ornament_group = ET.SubElement(notations, "ornaments")
             for ornament in ornaments:
-                if ornament.kind != "upper-mordent":
+                if ornament.kind not in {"upper-mordent", "trill"}:
                     raise ExportError(f"unsupported ornament {ornament.kind!r}")
                 attributes = {"placement": "above", "start-note": "main"}
                 if ornament.auxiliary_semitones is not None:
                     step = {1: "half", 2: "whole"}.get(ornament.auxiliary_semitones)
                     if step is None:
-                        raise ExportError(
-                            "upper mordent auxiliary note must be one or two semitones"
-                        )
+                        raise ExportError("ornament auxiliary note must be one or two semitones")
                     attributes["trill-step"] = step
-                ET.SubElement(ornament_group, "inverted-mordent", attributes)
+                ET.SubElement(
+                    ornament_group,
+                    "trill-mark" if ornament.kind == "trill" else "inverted-mordent",
+                    attributes,
+                )
         if digits:
             # All of a chord's fingerings sit on its principal note rather than
             # one per pitch. Enigma attaches them to the entry, not to a note,

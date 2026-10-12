@@ -33,12 +33,12 @@ from finale_file_parser.enigma.graces import grace_slash, slash_flagged_grace_no
 from finale_file_parser.enigma.groups import staff_groups, staff_order
 from finale_file_parser.enigma.hairpins import hairpins_by_staff
 from finale_file_parser.enigma.jumps import jumps_by_measure, navigation_by_measure
-from finale_file_parser.enigma.key import Mode, decode_key
+from finale_file_parser.enigma.key import KeySignature, Mode, decode_key
 from finale_file_parser.enigma.location import effective_keys, locate_entries
 from finale_file_parser.enigma.lyrics import Lyric as EnigmaLyric
 from finale_file_parser.enigma.lyrics import lyrics_by_entry
 from finale_file_parser.enigma.models import CorruptScoreError
-from finale_file_parser.enigma.music import read_entry
+from finale_file_parser.enigma.music import Note, read_entry
 from finale_file_parser.enigma.octaves import octaves_by_staff
 from finale_file_parser.enigma.ornaments import ornaments_by_entry
 from finale_file_parser.enigma.pitch import StaffTransposition, read_transposition, spell_note
@@ -526,23 +526,8 @@ def _event(
     # carry a pointless <time-modification>.
     ratio = duration / written if written and duration != written else None
     if ornaments and entry.notes:
-        main = spell_note(entry.notes[0], key, transposition).written
-        upper = spell_note(
-            replace(entry.notes[0], harm_lev=entry.notes[0].harm_lev + 1, harm_alt=0),
-            key,
-            transposition,
-        ).written
-        semitones = {"C": 0, "D": 2, "E": 4, "F": 5, "G": 7, "A": 9, "B": 11}
-        distance = (
-            12 * (upper.octave - main.octave)
-            + semitones[upper.letter]
-            - semitones[main.letter]
-            + upper.alteration
-            - main.alteration
-        )
         ornaments = tuple(
-            replace(ornament, auxiliary_semitones=distance if distance in (1, 2) else None)
-            for ornament in ornaments
+            _resolve_ornament(ornament, entry.notes, key, transposition) for ornament in ornaments
         )
     return Event(
         duration=duration,
@@ -574,6 +559,37 @@ def _event(
         ornaments=ornaments,
         fermatas=fermatas,
         arpeggios=arpeggios if pitches else (),
+    )
+
+
+def _resolve_ornament(
+    ornament: Ornament,
+    notes: tuple[Note, ...],
+    key: KeySignature,
+    transposition: StaffTransposition,
+) -> Ornament:
+    # An above-chord trill acts on the upper note (Finale Human Playback's
+    # documented rule), irrespective of serialized chord order. Drawing's
+    # useTopNote flag is a separate positioning option, not a playback selector.
+    index = (
+        max(range(len(notes)), key=lambda i: notes[i].harm_lev)
+        if ornament.kind == "trill"
+        else ornament.pitch_index
+    )
+    main = spell_note(notes[index], key, transposition).written
+    upper = spell_note(
+        replace(notes[index], harm_lev=notes[index].harm_lev + 1, harm_alt=0), key, transposition
+    ).written
+    semitones = {"C": 0, "D": 2, "E": 4, "F": 5, "G": 7, "A": 9, "B": 11}
+    distance = (
+        12 * (upper.octave - main.octave)
+        + semitones[upper.letter]
+        - semitones[main.letter]
+        + upper.alteration
+        - main.alteration
+    )
+    return replace(
+        ornament, pitch_index=index, auxiliary_semitones=distance if distance in (1, 2) else None
     )
 
 

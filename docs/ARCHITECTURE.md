@@ -1024,7 +1024,7 @@ final ending unless the source resets them. No filename/MIDI routes are used.
 All source controls in the supplied scores operate at bar boundaries; EVPU
 drawing positions do not become rhythmic offsets or partial-note stops.
 
-Nine navigation-bearing paired scores now match every source/MIDI attack using
+Ten navigation-bearing paired scores now match every source/MIDI attack using
 the source route (including optional Dire Dire Docks). SM64 has two silent-anchor
 source attacks and 34 glissando realizations; Spider has 40 trill/tremolo
 realizations; MEGALOVANIA has 16 optional coincident unisons and four ornament
@@ -1749,6 +1749,35 @@ or two semitones, exported as `trill-step="half"` or `"whole"`. This matters for
 F# -> G and B -> C in E minor. Other distances remain unknown and leave the
 consumer's ornament playback defaults in effect. Auxiliary accidental signs and
 exact performance timing are not decoded. Unknown glyphs still produce no ornament.
+
+#### Assigned trills and principal chord notes (2026-10-12, F15)
+
+Maestro character **217** is the trill symbol in the official font chart. Require
+the decoded main font to be Maestro, a character definition, and a visible score
+assignment; a text font's character217 is not an ornament. The supplied corpus
+has exactly three placements: Hikari upper-staff bars22/23 and Spider Dance
+upper-staff bar41. Authored tests cover keys, reversed chord ordering, hidden and
+linked-part assignments and unrelated fonts.
+
+An above-chord trill ornaments its upper note. This is Finale's documented
+[Human Playback rule](https://usermanuals.finalemusic.com/FinaleWin/Content/Finale/Human_Playback_Custom_Style.htm),
+independently corroborated by Spider's reference: the C6 alternates with Db6,
+while G5 remains held. Preserve `Ornament.pitch_index` and derive the key neighbor
+from that note, then put `trill-mark` on that exact MusicXML chord note. The
+separate articulation drawing flag `useTopNote` is **not** the playback selector:
+RGP's getter0x216AE8 tests flag1 mask0x80 (flag1 at serialized+10), but all three
+trill definitions have flag1=0x501A with that bit clear. Do not mistake a drawing
+anchor for the musical principal.
+
+The four performed Hikari trills explain44 extra reference attacks; the two
+performed Spider trills explain24. Keep their written notes/durations intact.
+Human Playback's acceleration is not an additional written rhythm. Actual
+MuseScore4.7.5 import recognizes the symbols but attaches ornaments to ChordRest
+(`MusicXmlParserNotations::addNotation` -> `addTurnToChord`), discarding the
+individual note attachment. Runtime export consequently trills both Spider
+chord pitches, even with the mark on C6. This importer limitation and its fixed
+trill cadence remain separate from source recovery; no extra written notes or
+voice split are manufactured to work around it.
 
 ### Known format facts — Unicode expression descriptions and dynamics
 
