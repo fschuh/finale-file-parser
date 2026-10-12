@@ -95,6 +95,7 @@ from finale_file_parser.enigma.mus_others import (
     TAG_REPEAT_ENDING_START,
     TAG_REPEAT_PASS_LIST,
     TAG_SMART_SHAPE,
+    TAG_SMART_SHAPE_CUSTOM_LINE,
     TAG_SMART_SHAPE_MEAS_MARK,
     TAG_STAFF_SPEC,
     TAG_TEXT_BLOCK,
@@ -269,7 +270,8 @@ _TEXT_STREAM = 3
 """The payload stream holding ETF tagged text (`^verse(1)...^end`)."""
 
 _TEXT_SECTION = re.compile(
-    rb"\^(verse|chorus|section|expression|fileInfo|block)\((\d+)\)(.*?)\^end", re.DOTALL
+    rb"\^(verse|chorus|section|expression|fileInfo|block|smartshape)\((\d+)\)(.*?)\^end",
+    re.DOTALL,
 )
 """One tagged text section. The body keeps its markup; `plain_text` strips it."""
 
@@ -741,6 +743,8 @@ def _texts_records(path: str | os.PathLike[str]) -> list[Record]:
         tag = match.group(1).decode("ascii")
         if tag == "block":
             tag = "blockText"
+        elif tag == "smartshape":
+            tag = "smartShapeText"
         number = match.group(2).decode("ascii")
         if tag == "fileInfo":
             kind = _FILE_INFO_TYPES.get(match.group(2))
@@ -1081,13 +1085,77 @@ def _smart_shape(payload: bytes, attrs: dict[str, str]) -> Record:
         note_id = _s16(payload, at)
         if note_id:
             fields[name] = str(note_id)
+    line_id = _u16(payload, 80)
+    if line_id:
+        fields["ssLineStyleID"] = str(line_id)
     return Record(tag="smartShape", attrs=attrs, text="", fields=fields)
+
+
+def _custom_line_layout(records: tuple[MusOther, ...], year: int | None) -> bool | None:
+    """True for Unicode, False for legacy, None for an unestablished layout.
+
+    NotePad banners can lack a version year. The published cap enums then
+    discriminate the pool's complete definition layout only if one layout fits
+    every definition and the other does not. A palette's text IDs are not used
+    to choose a layout or to guess references.
+    """
+    if year is not None:
+        return year >= 2012
+    definitions = [r.payload for r in records if r.tag == TAG_SMART_SHAPE_CUSTOM_LINE]
+    if not definitions or any(len(p) != 72 for p in definitions):
+        return None
+    legacy = all(_u16(p, at) in {0, 1, 2, 3} for p in definitions for at in (14, 16))
+    modern = all(_u16(p, at) in {0, 1, 2, 3} for p in definitions for at in (16, 18))
+    return modern if legacy != modern else None
+
+
+def _custom_line(payload: bytes, *, modern: bool | None) -> Record:
+    """Published 72-byte layouts anchored by FCCustomSmartLineDef getters."""
+    if len(payload) != 72:
+        raise CorruptScoreError("smartShapeCustomLine: expected 72-byte definition")
+    style = {0: "solid", 1: "dashed", 2: "char"}.get(_u16(payload, 0))
+    fields: dict[str, str | tuple[str, ...] | Record | tuple[Record, ...]] = {}
+    if style is None:
+        raise CorruptScoreError("smartShapeCustomLine: unsupported line style")
+    fields["lineStyle"] = style
+    if modern is None:
+        return Record("smartShapeCustomLine", {"sourceLayout": "unknown"}, "", fields)
+    if style == "char":
+        parameters: dict[str, str | tuple[str, ...] | Record | tuple[Record, ...]] = {
+            "lineChar": str(_u32(payload, 2) if modern else _u16(payload, 2)),
+            "fontID": str(_u16(payload, 6 if modern else 4)),
+            "fontSize": str(_u16(payload, 8 if modern else 6)),
+        }
+        fields["charParams"] = Record("charParams", {}, "", parameters)
+    else:
+        parameters = {"lineWidth": str(_s16(payload, 2))}
+        name = "solidParams" if style == "solid" else "dashedParams"
+        fields[name] = Record(name, {}, "", parameters)
+    for name, at, data in (
+        ("Start", 16 if modern else 14, 20 if modern else 18),
+        ("End", 18 if modern else 16, 24 if modern else 22),
+    ):
+        kind = {0: "none", 1: "arrowheadPreset", 2: "arrowheadCustom", 3: "hook"}.get(
+            _u16(payload, at)
+        )
+        if kind is None:
+            raise CorruptScoreError("smartShapeCustomLine: unsupported line cap")
+        fields[f"lineCap{name}Type"] = kind
+        if kind in {"arrowheadPreset", "arrowheadCustom"}:
+            fields[f"lineCap{name}ArrowID"] = str(_u16(payload, data))
+        if kind == "hook" and modern:
+            fields[f"lineCap{name}HookLength"] = str(_s16(payload, data))
+    text_base = 30 if modern else 28
+    for i, name in enumerate(("leftStart", "leftCont", "rightEnd", "centerFull", "centerAbbr")):
+        fields[f"{name}RawTextID"] = str(_u16(payload, text_base + 2 * i))
+    return Record("smartShapeCustomLine", {}, "", fields)
 
 
 def _others_records(
     records: tuple[MusOther, ...], fallback: str, *, year: int | None = None
 ) -> list[Record]:
     out: list[Record] = []
+    line_layout = _custom_line_layout(records, year)
     for record in records:
         attrs = {"cmper": str(record.cmper)}
         if record.part:
@@ -1105,6 +1173,16 @@ def _others_records(
             out.append(Record("fontName", attrs, "", {"name": name}))
         elif record.tag == TAG_TEXT_BLOCK:
             out.append(Record("textBlock", attrs, "", _text_block(record.payload)))
+        elif record.tag == TAG_SMART_SHAPE_CUSTOM_LINE:
+            translated = _custom_line(record.payload, modern=line_layout)
+            out.append(
+                Record(
+                    translated.tag,
+                    {**attrs, **translated.attrs},
+                    translated.text,
+                    translated.fields,
+                )
+            )
         elif record.tag == TAG_PAGE_TEXT_ASSIGN:
             if not record.payload or len(record.payload) % 24:
                 raise CorruptScoreError("pageTextAssign: expected complete 24-byte records")

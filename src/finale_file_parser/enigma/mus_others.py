@@ -54,6 +54,7 @@ __all__ = [
     "TAG_MEAS_SPEC",
     "TAG_SMART_SHAPE",
     "TAG_SMART_SHAPE_MEAS_MARK",
+    "TAG_SMART_SHAPE_CUSTOM_LINE",
     "TAG_STAFF_SPEC",
     "TAG_TEXT_BLOCK",
     "TAG_PAGE_TEXT_ASSIGN",
@@ -88,6 +89,9 @@ TAG_SMART_SHAPE = 217
 """`smartShape` — published PDK layout and RGP Lua getters; see ARCHITECTURE."""
 TAG_SMART_SHAPE_MEAS_MARK = 218
 """`smartShapeMeasMark` — packed 12-byte measure assignments to smart shapes."""
+
+TAG_SMART_SHAPE_CUSTOM_LINE = 222
+"""72-byte custom line definitions; Unicode-era fields differ within the same size."""
 
 TAG_STAFF_SPEC = 231
 """`staffSpec` — confirmed by payload (rest offsets, staff lines, repeat-dot

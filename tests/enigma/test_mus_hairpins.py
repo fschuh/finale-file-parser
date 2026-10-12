@@ -57,6 +57,18 @@ def _read(monkeypatch: pytest.MonkeyPatch, *records: MusOther) -> EnigmaDocument
 
 
 @pytest.mark.parametrize(("source", "kind"), [(2, "diminuendo"), (3, "crescendo")])
+def test_smart_shape_custom_line_reference_keeps_its_separate_word(
+    monkeypatch: pytest.MonkeyPatch, source: int, kind: str
+) -> None:
+    payload = bytearray(_payload(kind=source))
+    payload[80:82] = (17).to_bytes(2, "little")
+    document = _read(monkeypatch, MusOther(TAG_SMART_SHAPE, 7, 0, bytes(payload)))
+    shape = document.others.get("smartShape", 7)
+    assert shape is not None and shape.fields["ssLineStyleID"] == "17"
+    assert shape.fields["shapeType"] == ("cresc" if kind == "crescendo" else "decresc")
+
+
+@pytest.mark.parametrize(("source", "kind"), [(2, "diminuendo"), (3, "crescendo")])
 def test_binary_hairpins_reach_the_shared_resolver(
     monkeypatch: pytest.MonkeyPatch, source: int, kind: str
 ) -> None:

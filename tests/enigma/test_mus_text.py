@@ -68,3 +68,16 @@ def test_eight_argument_commands_do_not_leak_control_bytes_from_an_expression_st
     assert record.tag == "expression"
     assert plain_text(record.text) == "q = 112"
     assert all(ord(char) >= 32 for char in record.text)
+
+
+def test_smart_shape_text_has_its_own_pool_and_compiled_font_boundaries(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    body = b"^\x85" + bytes([1]) * 4 + b"Ped."
+    stream = b"^smartshape(7)" + body + b"^end^expression(7)quarter = 120^end"
+    monkeypatch.setattr(adapter, "read_mus_streams", lambda _: [b"", b"", b"", stream])
+    monkeypatch.setattr(adapter, "_banner_platform", lambda _: "WIN")
+    records = adapter._texts_records(Path("not-opened.mus"))
+    assert [r.tag for r in records] == ["smartShapeText", "expression"]
+    assert [r.attrs["number"] for r in records] == ["7", "7"]
+    assert [plain_text(r.text) for r in records] == ["Ped.", "quarter = 120"]

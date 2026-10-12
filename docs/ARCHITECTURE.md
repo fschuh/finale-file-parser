@@ -2592,6 +2592,55 @@ reference is unproven. Retain this as pending source-placement research rather
 than placing an unused palette label. The explicit playback preference96 is
 already retained independently.
 
+#### Custom-line definition and text joins (2026-10-12, R02 foundation)
+
+The expanded105-file inventory contains46 additional visible assigned lines:
+nine dashed type10, nineteen solid type11, seventeen custom type29 and one
+left-hooked dashed type32. Octave types4/5/20/21 are separate, already recovered.
+Numeric SmartShape217 retains ssLineStyleID at+80 u16; the published
+[SmartShape struct](https://pdk.finalelua.com/ff__smartshapes_8h_source.html)
+and GetLineID VM2c8aa6 (object+0x88 relative to shapeType+0x38) establish it.
+Definitions are a palette; neither a line definition nor its label places a span.
+
+Numeric others222 supplies72-byte smartShapeCustomLine definitions. The
+published FCCustomSmartLineDef and read-only released getters anchor two
+layouts of equal total length, with object bases+0x38/+0x80. Constructor4f5ce8
+sets loaded size0x48. The relevant fields are:
+
+| Field | Legacy | Unicode era |
+|---|---|---|
+| line style0 solid/1 dashed/2 character | +0 i16 | same |
+| character for character-style line | +2 u16 | +2 u32 |
+| character font ID / size | +4/+6 i16 | +6/+8 i16 |
+| line width for solid/dashed, Efix | +2 i16 | same |
+| start/end cap0 none/1 preset/2 custom/3 hook | +14/+16 i16 | +16/+18 i16 |
+| endpoint data, custom arrow ID | +18/+22 | +20/+24 |
+| signed hook length, Efix | getter unsupported | +20/+24 i16 |
+| five raw label IDs | +28,+30,...,+36 u16 | +30,+32,...,+38 u16 |
+
+Evidence getter VMs: style2cf78e, character2d1190, font2d06c2, width2d0bc6,
+start cap2d1aa4, hook2d1a76 and raw text2d037a. Unicode character fields here
+are one little-endian32-bit field, unlike articulation definitions' two-word
+character storage. The used wavy definition39 has character126, Maestro0,
+size24 and no endpoint caps; source raw bytes and font chart corroborate it.
+
+Spring Yard's NotePad banner has no parsed version year. A default legacy
+choice misreads modern baseline-shift=-88 as a cap enum. For versionless files,
+validate both complete layouts over the definition pool using published cap
+values; select only a uniquely fitting layout. If both fit, retain an explicit
+sourceLayout=unknown with the common line-style field. Never choose a label
+reference merely because it matches a convenient text number. Authored tests
+cover known eras, the NotePad case, ambiguous palettes and partial records.
+
+Raw ^smartshape(N) text sections now decode bounded compiled commands through
+the existing text decoder and normalize to smartShapeText, independently of
+blockText/expression numbering. The published CreateTextString uses
+tx_SmartShape; the [primary text model](https://github.com/openmusx/musxdom/blob/main/src/musx/dom/Texts.h)
+corroborates smartShapeText. Unused Glissando, pedal and harmonic label palettes
+remain unplaced. All105 production paths and schema checks pass after decoding
+these records. Canonical span projection and custom endpoint graphics remain
+the next R02 work; this foundation alone does not claim line export recovery.
+
 The same SmartShape definitions carry phrase slurs. Solid types **0** (`slurDown`),
 **1** (`slurUp`) and **15** (`slurAuto`) are documented by the published PDK
 [SmartShape enums and structs](https://pdk.finalelua.com/ff__smartshapes_8h_source.html)

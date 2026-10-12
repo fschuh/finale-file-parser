@@ -530,6 +530,70 @@ def test_partial_page_text_slots_are_rejected(pools: Callable[..., None], length
         read_mus_document(PATH)
 
 
+@pytest.mark.parametrize("year", [2011, 2012])
+def test_custom_line_fonts_caps_and_raw_text_references_use_the_complete_era_layout(
+    pools: Callable[..., None], year: int
+) -> None:
+    modern = year >= 2012
+    payload = bytearray(72)
+    payload[0:2] = (2).to_bytes(2, "little")
+    payload[2 : 6 if modern else 4] = (126).to_bytes(4 if modern else 2, "little")
+    font_at, cap_at, text_at = (6, 16, 30) if modern else (4, 14, 28)
+    payload[font_at : font_at + 2] = (7).to_bytes(2, "little")
+    payload[font_at + 2 : font_at + 4] = (24).to_bytes(2, "little")
+    payload[cap_at : cap_at + 2] = (3).to_bytes(2, "little")
+    payload[text_at : text_at + 2] = (17).to_bytes(2, "little")
+    if modern:
+        payload[20:22] = (-1536).to_bytes(2, "little", signed=True)
+    pools(year=year, others=(MusOther(222, 11, 0, bytes(payload)),))
+    line = read_mus_document(PATH).others.get("smartShapeCustomLine", 11)
+    assert line is not None
+    parameters = line.fields["charParams"]
+    assert isinstance(parameters, Record)
+    assert parameters.fields == {"lineChar": "126", "fontID": "7", "fontSize": "24"}
+    assert line.fields["lineCapStartType"] == "hook"
+    assert line.fields["leftStartRawTextID"] == "17"
+    if modern:
+        assert line.fields["lineCapStartHookLength"] == "-1536"
+
+
+def test_unknown_banner_uses_only_a_uniquely_validated_line_definition_layout(
+    pools: Callable[..., None],
+) -> None:
+    glyph = bytearray(72)
+    glyph[0:2] = (2).to_bytes(2, "little")
+    glyph[2:6] = (126).to_bytes(4, "little")
+    glyph[8:10] = (24).to_bytes(2, "little")
+    # The modern baseline-shift field is not a valid legacy line-cap enum.
+    glyph[14:16] = (-88).to_bytes(2, "little", signed=True)
+    solid = bytearray(72)
+    solid[16:20] = (3).to_bytes(2, "little") * 2
+    solid[20:22] = (1536).to_bytes(2, "little")
+    pools(year=None, others=(MusOther(222, 1, 0, bytes(glyph)), MusOther(222, 6, 0, bytes(solid))))
+    doc = read_mus_document(PATH)
+    line = doc.others.get("smartShapeCustomLine", 6)
+    assert line is not None and line.fields["lineCapStartType"] == "hook"
+    assert line.fields["lineCapEndType"] == "hook"
+
+
+def test_ambiguous_versionless_line_definitions_retain_an_explicit_unknown_layout(
+    pools: Callable[..., None],
+) -> None:
+    pools(year=None, others=(MusOther(222, 1, 0, bytes(72)),))
+    line = read_mus_document(PATH).others.get("smartShapeCustomLine", 1)
+    assert line is not None and line.attrs["sourceLayout"] == "unknown"
+    assert line.fields == {"lineStyle": "solid"}
+
+
+@pytest.mark.parametrize("length", [0, 71, 73])
+def test_partial_custom_line_definitions_raise_clear_errors(
+    pools: Callable[..., None], length: int
+) -> None:
+    pools(others=(MusOther(222, 1, 0, bytes(length)),))
+    with pytest.raises(CorruptScoreError, match="smartShapeCustomLine"):
+        read_mus_document(PATH)
+
+
 def test_a_repeated_articulation_assignment_is_emitted_once(
     pools: Callable[..., None],
 ) -> None:
