@@ -31,6 +31,7 @@ __all__ = [
     "Lyric",
     "Measure",
     "NoteTies",
+    "OctaveShift",
     "Ornament",
     "Part",
     "PartGroup",
@@ -440,6 +441,25 @@ class Hairpin:
 
 
 @dataclass(frozen=True)
+class OctaveShift:
+    """A staff-wide sounding displacement over inclusive source onsets."""
+
+    octaves: int
+    """Positive sounds above the written notes; negative sounds below."""
+    start_measure: int
+    start_offset: Fraction
+    end_measure: int
+    end_offset: Fraction
+
+    def contains(self, measure: int, offset: Fraction) -> bool:
+        return (
+            (self.start_measure, self.start_offset)
+            <= (measure, offset)
+            <= (self.end_measure, self.end_offset)
+        )
+
+
+@dataclass(frozen=True)
 class SlurEndpoint:
     """An exact event on a staff-part, including a particular grace note.
 
@@ -487,6 +507,8 @@ class Part:
 
     abbreviation: str = ""
     """The staff's abbreviated name, kept separately from a group label."""
+    octave_shifts: tuple[OctaveShift, ...] = ()
+    """Written Event pitches remain unchanged; these determine sounding octaves."""
 
 
 @dataclass(frozen=True)

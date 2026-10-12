@@ -24,6 +24,7 @@ from finale_file_parser.ir import (
     Lyric,
     Measure,
     NoteTies,
+    OctaveShift,
     Part,
     PartGroup,
     Pitch,
@@ -79,6 +80,18 @@ class _Wedge:
 
 
 _HairpinDirections = dict[tuple[str, int], tuple[_Wedge, ...]]
+
+
+@dataclass(frozen=True)
+class _OctaveDirection:
+    offset: Fraction
+    type: str
+    size: str
+    number: str
+    placement: str
+
+
+_OctaveDirections = dict[tuple[str, int], tuple[_OctaveDirection, ...]]
 
 _MAX_SLUR_NUMBER = 16
 """MusicXML's number-level bound on overlapping slurs in document order."""
@@ -243,6 +256,9 @@ def _divisions_for(part: Part) -> int:
     for hairpin in part.hairpins:
         for offset in (hairpin.start_offset, hairpin.end_offset):
             denominator = math.lcm(denominator, (offset * 4).denominator)
+    for span in part.octave_shifts:
+        for offset in (span.start_offset, span.end_offset):
+            denominator = math.lcm(denominator, (offset * 4).denominator)
     if denominator > _MAX_DIVISIONS:
         raise ExportError(f"durations require {denominator} divisions per quarter; refusing")
     return denominator
@@ -282,6 +298,7 @@ def _append_part(
     arpeggio_numbers: _ArpeggioNumbers | None = None,
     hairpin_directions: _HairpinDirections | None = None,
     slur_notations: _SlurNotations | None = None,
+    octave_directions: _OctaveDirections | None = None,
 ) -> None:
     element = ET.SubElement(root, "part", id=part.id)
     divisions = _divisions_for(part) if divisions is None else divisions
@@ -289,6 +306,8 @@ def _append_part(
         hairpin_directions = _hairpin_directions((part,))
     if slur_notations is None:
         slur_notations = _slur_notations((part,))
+    if octave_directions is None:
+        octave_directions = _octave_directions((part,))
     first = True
     for measure in part.measures:
         _append_measure(
@@ -300,6 +319,8 @@ def _append_part(
             arpeggio_numbers=arpeggio_numbers,
             wedges=hairpin_directions.get((part.id, measure.number), ()),
             slur_notations=slur_notations,
+            octaves=octave_directions.get((part.id, measure.number), ()),
+            octave_spans=part.octave_shifts,
         )
         first = False
 
@@ -402,6 +423,7 @@ def _append_multistaff_part(
     arpeggio_numbers = _arpeggio_numbers(parts)
     hairpin_directions = _hairpin_directions(parts)
     slur_notations = _slur_notations(parts)
+    octave_directions = _octave_directions(parts)
     next_voice = 1
     for staff, part in enumerate(parts, start=1):
         _append_part(
@@ -411,6 +433,7 @@ def _append_multistaff_part(
             arpeggio_numbers=arpeggio_numbers,
             hairpin_directions=hairpin_directions,
             slur_notations=slur_notations,
+            octave_directions=octave_directions,
         )
         voices = sorted({voice.number for measure in part.measures for voice in measure.voices})
         voice_ids = {str(voice): str(next_voice + index) for index, voice in enumerate(voices)}
@@ -589,6 +612,112 @@ def _hairpin_endpoints(
     if (end, span.end_offset) <= (start, span.start_offset):
         raise ExportError("hairpin end must follow its start")
     return start, end
+
+
+def _octave_stop(part: Part, span: OctaveShift, length: Fraction) -> Fraction:
+    """Finale includes an attack at the endpoint; XML stops before that attack.
+
+    Extend an exact attack endpoint through its note, capped at the next onset.
+    A point span thus covers its source note and associated grace notes, without
+    shifting the next attack. The IR retains the unmodified source endpoint.
+    """
+    measure = next(m for m in part.measures if m.number == span.end_measure)
+    durations: list[Fraction] = []
+    following: list[Fraction] = []
+    for voice in measure.voices:
+        onset = voice.start_offset
+        for event in voice.events:
+            if event.pitches and onset == span.end_offset:
+                durations.append(event.duration)
+            if onset > span.end_offset:
+                following.append(onset)
+            if not event.is_grace:
+                onset += event.duration
+    if not durations:
+        if (span.start_measure, span.start_offset) == (span.end_measure, span.end_offset):
+            raise ExportError("point octave span must cover a pitched attack")
+        return span.end_offset
+    following.extend(
+        other.start_offset
+        for other in part.octave_shifts
+        if other.start_measure == span.end_measure and other.start_offset > span.end_offset
+    )
+    stop = min(span.end_offset + max(durations), min(following, default=length))
+    if stop <= span.end_offset:
+        # A grace-only endpoint can extend to the next onset or the barline.
+        stop = min(following, default=length)
+    if stop <= span.end_offset:
+        raise ExportError("octave endpoint has no following metric position")
+    return stop
+
+
+def _octave_directions(parts: tuple[Part, ...]) -> _OctaveDirections:
+    endpoints: list[tuple[int, int, Fraction, int, int, OctaveShift]] = []
+    for staff, part in enumerate(parts):
+        if not part.octave_shifts:
+            continue
+        positions = _hairpin_measure_positions(part)
+        intervals: list[tuple[tuple[int, Fraction], tuple[int, Fraction]]] = []
+        for index, span in enumerate(part.octave_shifts):
+            if span.octaves not in {-2, -1, 1, 2}:
+                raise ExportError("octave displacement must be one or two octaves")
+            for measure, offset in (
+                (span.start_measure, span.start_offset),
+                (span.end_measure, span.end_offset),
+            ):
+                if measure not in positions or not 0 <= offset <= positions[measure][1]:
+                    raise ExportError("octave endpoint is outside the part's measures")
+            start = positions[span.start_measure][0], span.start_offset
+            end = positions[span.end_measure][0], span.end_offset
+            if end < start:
+                raise ExportError("octave end must not precede its start")
+            intervals.append((start, end))
+            stop = _octave_stop(part, span, positions[span.end_measure][1])
+            endpoints.append((start[0], staff, start[1], 1, index, span))
+            endpoints.append((end[0], staff, stop, 0, index, span))
+        ordered = sorted(intervals)
+        if any(right[0] <= left[1] for left, right in zip(ordered, ordered[1:], strict=False)):
+            raise ExportError("overlapping octave spans on one staff are ambiguous")
+    active: dict[tuple[int, int], str] = {}
+    result: dict[tuple[str, int], list[_OctaveDirection]] = {}
+    for _, staff, offset, starting, index, span in sorted(endpoints, key=lambda item: item[:5]):
+        key = staff, index
+        if starting:
+            number = next((str(n) for n in range(1, 17) if str(n) not in active.values()), None)
+            if number is None:
+                raise ExportError("more than 16 octave lines overlap in MusicXML document order")
+            active[key] = number
+        else:
+            number = active.pop(key)
+        kind = ("down" if span.octaves > 0 else "up") if starting else "stop"
+        measure = span.start_measure if starting else span.end_measure
+        result.setdefault((parts[staff].id, measure), []).append(
+            _OctaveDirection(
+                offset,
+                kind,
+                str(7 * abs(span.octaves) + 1),
+                number,
+                "above" if span.octaves > 0 else "below",
+            )
+        )
+    return {key: tuple(value) for key, value in result.items()}
+
+
+def _append_octaves(
+    element: ET.Element, directions: tuple[_OctaveDirection, ...], divisions: int
+) -> None:
+    for mark in directions:
+        direction = ET.SubElement(element, "direction", placement=mark.placement)
+        ET.SubElement(
+            ET.SubElement(direction, "direction-type"),
+            "octave-shift",
+            type=mark.type,
+            size=mark.size,
+            number=mark.number,
+        )
+        ET.SubElement(direction, "offset", sound="yes").text = str(
+            _duration_in_divisions(mark.offset, divisions)
+        )
 
 
 def _hairpin_directions(parts: tuple[Part, ...]) -> _HairpinDirections:
@@ -885,6 +1014,8 @@ def _append_measure(
     arpeggio_numbers: _ArpeggioNumbers | None = None,
     wedges: tuple[_Wedge, ...] = (),
     slur_notations: _SlurNotations | None = None,
+    octaves: tuple[_OctaveDirection, ...] = (),
+    octave_spans: tuple[OctaveShift, ...] = (),
 ) -> None:
     element = ET.SubElement(parent, "measure", number=str(measure.number))
     _append_barline(element, measure, "left")
@@ -896,6 +1027,7 @@ def _append_measure(
         ET.SubElement(ET.SubElement(direction, "direction-type"), "words").text = words
     _append_expressions(element, measure, divisions)
     _append_wedges(element, wedges, divisions)
+    _append_octaves(element, octaves, divisions)
     _append_clef_changes(element, measure, divisions)
 
     for index, voice in enumerate(measure.voices):
@@ -919,6 +1051,7 @@ def _append_measure(
                 _duration_in_divisions(voice.start_offset, divisions)
             )
             ET.SubElement(forward, "voice").text = str(voice.number)
+        onset = voice.start_offset
         for event_index, event in enumerate(voice.events):
             numbers = (
                 ()
@@ -930,7 +1063,20 @@ def _append_measure(
                 if slur_notations is None
                 else slur_notations.get((part_id, measure.number, voice.number, event_index), ())
             )
-            _append_event(element, event, voice, divisions, arpeggio_numbers=numbers, slurs=slurs)
+            displacement = sum(
+                span.octaves for span in octave_spans if span.contains(measure.number, onset)
+            )
+            _append_event(
+                element,
+                event,
+                voice,
+                divisions,
+                arpeggio_numbers=numbers,
+                slurs=slurs,
+                octave_displacement=displacement,
+            )
+            if not event.is_grace:
+                onset += event.duration
 
     _append_barline(element, measure, "right")
 
@@ -1055,6 +1201,7 @@ def _append_event(
     *,
     arpeggio_numbers: tuple[str, ...] = (),
     slurs: tuple[_SlurNotation, ...] = (),
+    octave_displacement: int = 0,
 ) -> None:
     if event.note_ties and len(event.note_ties) != len(event.pitches):
         raise ExportError("per-note tie flags must match the number of pitches")
@@ -1063,6 +1210,9 @@ def _append_event(
         _append_note(element, event, voice, divisions, pitch=None, chord=False, ties=legacy_ties)
         return
     for index, pitch in enumerate(event.pitches):
+        pitch = replace(pitch, octave=pitch.octave + octave_displacement)
+        if not 0 <= pitch.octave <= 9:
+            raise ExportError("sounding pitch octave is outside MusicXML's 0..9 range")
         ties = event.note_ties[index] if event.note_ties else legacy_ties
         _append_note(
             element,

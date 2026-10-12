@@ -1504,6 +1504,38 @@ Verovio checks cover this local input; authored regression fragments cover
 Unicode, malformed data, attack ambiguity and assignment visibility. Historical
 corpus counts above are not remeasured: the licensed corpus is absent here.
 
+### Assigned octave SmartShapes (2026-10-11)
+
+The Finale PDK `FCSmartShape` enum identifies type 4 as octave down, 5 as
+octave up, 20 as two octaves down and 21 as two octaves up. These types use the
+same measure/staff/EDU termination segments as hairpins, with 4096 EDU per whole
+note. Score measure assignments establish ownership; hidden/palette/linked-part
+copies do not create score lines. The NinSheetMusic audit has 51 visible assigned
+records in 18 files: 50 within the score and one stale Spring Yard record already
+covered by the structured stale-shape diagnostic. No in-score intervals overlap
+on a staff. MIDI/PDF evidence corroborates both displacement signs and sizes.
+
+Endpoint attacks are included. In particular Memories of Green's shape 32 has
+identical endpoints at staff 2, measure 22, EDU 0: it lowers that attack only.
+`Part.octave_shifts` retains the source interval and signed sounding displacement;
+the events retain written pitch spelling. MusicXML requires *performed* note
+pitch values: a positive displacement changes the XML octave and emits type
+`down`, size 8 or 15; negative displacement uses type `up`. The MuseScore 4.7.5
+importer's `octaveShift()` maps these to 8va/15ma and 8vb/15mb, respectively.
+The W3C octave-shift reference explicitly specifies this performed-pitch rule.
+
+An XML stop takes effect before its timed attack. When the source end is exactly
+an attack onset, export therefore stops after the covered note, capped by the
+next event onset or following line start. This also preserves grace/anchor point
+spans. Endpoints between attacks and ordinary barline endpoints remain exact.
+Malformed endpoints and ambiguous overlapping staff intervals fail explicitly;
+no octave is inferred from clef or MIDI. The existing staff-transposition pitch
+spelling runs before this independent displacement.
+
+Evidence: [PDK enum](https://pdk.finalelua.com/class_f_c_smart_shape.html),
+[MusicXML octave-shift semantics](https://www.w3.org/2021/06/musicxml40/musicxml-reference/elements/octave-shift/),
+read-only local source/MIDI audit and MuseScore importer revision 3654226.
+
 ### Graphical slurs on one event (2026-10-11)
 
 Memories of Green's assigned shape33 has the same source entry230 at both

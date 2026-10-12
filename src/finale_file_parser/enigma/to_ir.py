@@ -39,6 +39,7 @@ from finale_file_parser.enigma.lyrics import Lyric as EnigmaLyric
 from finale_file_parser.enigma.lyrics import lyrics_by_entry
 from finale_file_parser.enigma.models import CorruptScoreError
 from finale_file_parser.enigma.music import read_entry
+from finale_file_parser.enigma.octaves import octaves_by_staff
 from finale_file_parser.enigma.ornaments import ornaments_by_entry
 from finale_file_parser.enigma.pitch import StaffTransposition, read_transposition, spell_note
 from finale_file_parser.enigma.repeats import Repeats, repeats_for
@@ -209,6 +210,7 @@ def build_score(document: EnigmaDocument) -> Score:
     ignored_shapes, diagnostics = stale_smart_shapes(document, numbers)
     hairpins = hairpins_by_staff(document, ignored_shapes=ignored_shapes)
     slurs = slurs_by_staff(document, slur_positions, ignored_shapes=ignored_shapes)
+    octaves = octaves_by_staff(document, ignored_shapes=ignored_shapes)
     clef_at = _carried_clefs(document, staves, numbers, clef_at, clef_changes)
     expressions = _place_score_wide(expressions, staves)
     parts = [
@@ -240,6 +242,7 @@ def build_score(document: EnigmaDocument) -> Score:
             hairpins=hairpins.get(staff, ()),
             slurs=slurs.get(staff, ()),
             abbreviation=names[staff].abbreviated if staff in names else "",
+            octave_shifts=octaves.get(staff, ()),
         )
         for staff in staves
     ]

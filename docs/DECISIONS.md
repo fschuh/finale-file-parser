@@ -930,3 +930,15 @@ recovering a group name does not rename each staff or merge its instrument.
 MusicXML emits a staff's abbreviation with its score-part, or the group label
 when an existing connected-arpeggio projection produces a combined part.
 Appending the field preserves existing positional Part construction.
+
+## 2026-10-11 — DECIDED: source octave spans preserve written pitches
+
+Append `Part.octave_shifts` containing signed one/two-octave displacements with
+exact inclusive source endpoints. Keep canonical Event pitches written. Export
+performed pitch octaves once alongside MusicXML octave-shift directions; do not
+rewrite the IR or multiply this displacement by staff transposition. Source
+point spans cover their attack and graces. Translate inclusive attack endpoints
+to a stop after that attack for standard XML interval semantics. Reject ambiguous
+overlapping source octave spans until their combined meaning is evidenced; the
+current 50 active corpus records do not overlap. Preserve stale records in the
+raw document and its existing diagnostic rather than extending the score.
