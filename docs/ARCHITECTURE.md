@@ -2444,6 +2444,24 @@ limitation is recorded independently; do not unroll the written score or invent
 extra signs. Authored tests cover frame offsets, chords, re-pedaling and fonts;
 rendered Sub Castle and native cross-staff span endpoints were checked.
 
+#### Dynamics assigned as articulations (2026-10-12, F22)
+
+A visible score articAssign can place a dynamic character rather than an
+ordinary note articulation. Resolve the decoded main font first and require
+Maestro before using the established dynamic glyph registry. Shape definitions,
+text-font letters and hidden/linked-part assignments remain separate. Convert
+the recognized symbol to a timed Expression with readable marking and no
+invented source category or default key velocity. Use the same linear exact
+entry-offset scan as pedal directions, including frame starts and grace notes.
+
+Simone's Theme has one such placement: Maestro P/character80, mp on the first
+treble entry. The93-file before/after inventory changes exactly that one mp
+count; ordinary expression dynamics are retained. Export a single dynamics/mp
+direction for a chord, rather than an articulation named mp on each pitch.
+Authored font/shape/scope/chord/offset tests pass and actual MuseScore4.7.5 imports
+the first-note mp as a native Dynamic. No new byte range or playback value is
+decoded by identifying this notation.
+
 The same SmartShape definitions carry phrase slurs. Solid types **0** (`slurDown`),
 **1** (`slurUp`) and **15** (`slurAuto`) are documented by the published PDK
 [SmartShape enums and structs](https://pdk.finalelua.com/ff__smartshapes_8h_source.html)

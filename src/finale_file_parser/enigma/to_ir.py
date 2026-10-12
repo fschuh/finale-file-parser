@@ -41,6 +41,7 @@ from finale_file_parser.enigma.lyrics import Lyric as EnigmaLyric
 from finale_file_parser.enigma.lyrics import lyrics_by_entry
 from finale_file_parser.enigma.models import CorruptScoreError
 from finale_file_parser.enigma.music import Note, read_entry
+from finale_file_parser.enigma.note_dynamics import dynamics_by_entry
 from finale_file_parser.enigma.octaves import octaves_by_staff
 from finale_file_parser.enigma.ornaments import ornaments_by_entry
 from finale_file_parser.enigma.pedals import pedals_by_entry
@@ -226,6 +227,12 @@ def build_score(document: EnigmaDocument) -> Score:
     navigation = navigation_by_measure(document)
     barlines = barline_styles(document)
     expressions = expressions_by_measure(document)
+    note_dynamics = dynamics_by_entry(document)
+    for staff, measure, entry, offset in _entry_attachment_offsets(
+        cells, slur_positions, set(note_dynamics)
+    ):
+        note_marks = tuple(replace(mark, offset=offset) for mark in note_dynamics[entry])
+        expressions[staff, measure] = expressions.get((staff, measure), ()) + note_marks
     staves = _ordered_staves(document, {staff for staff, _ in cells})
     keys = effective_keys(document)
     numbers = _measure_numbers(keys, cells)
