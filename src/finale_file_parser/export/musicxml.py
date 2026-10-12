@@ -89,6 +89,8 @@ class _SlurNotation:
     type: str
     number: str
     placement: str | None
+    x_offset: Fraction = Fraction(0)
+    y_offset: Fraction = Fraction(0)
 
 
 @dataclass(frozen=True)
@@ -686,6 +688,10 @@ def _slur_endpoints(
         raise ExportError("slur refers to a missing measure, voice or event")
     if not start.pitched or not end.pitched:
         raise ExportError("slur endpoints must be pitched events")
+    if span.graphical:
+        if span.start != span.end or span.start_x_offset == span.end_x_offset:
+            raise ExportError("a graphical slur needs distinct drawing endpoints on one event")
+        return start, end
     start_time, end_time = (start.order[0], start.onset), (end.order[0], end.onset)
     if end_time < start_time or (
         end_time == start_time
@@ -714,7 +720,14 @@ def _slur_notations(parts: tuple[Part, ...]) -> _SlurNotations:
                 endpoints.append((measure, staff, voice, event, starting, index, span))
     active: dict[tuple[int, int], str] = {}
     result: dict[tuple[str, int, int, int], list[_SlurNotation]] = {}
-    for _, staff, _, _, starting, index, span in sorted(endpoints, key=lambda item: item[:6]):
+    for _, staff, _, _, starting, index, span in sorted(
+        endpoints,
+        key=lambda item: (
+            *item[:4],
+            2 if item[6].graphical and not item[4] else int(item[4]),
+            item[5],
+        ),
+    ):
         identity = staff, index
         number = active.pop(identity, None)
         if number is None:
@@ -732,7 +745,15 @@ def _slur_notations(parts: tuple[Part, ...]) -> _SlurNotations:
         point = span.start if starting else span.end
         result.setdefault(
             (parts[staff].id, point.measure, point.voice, point.event_index), []
-        ).append(_SlurNotation("start" if starting else "stop", number, span.placement))
+        ).append(
+            _SlurNotation(
+                "start" if starting else "stop",
+                number,
+                span.placement,
+                span.start_x_offset if starting else span.end_x_offset,
+                span.start_y_offset if starting else span.end_y_offset,
+            )
+        )
     return {key: tuple(marks) for key, marks in result.items()}
 
 
@@ -1127,6 +1148,10 @@ def _append_note(
             if slur.placement is not None:
                 attrs["placement"] = slur.placement
                 attrs["orientation"] = "over" if slur.placement == "above" else "under"
+            if slur.x_offset:
+                attrs["relative-x"] = _decimal_number(slur.x_offset * 10)
+            if slur.y_offset:
+                attrs["relative-y"] = _decimal_number(slur.y_offset * 10)
             ET.SubElement(notations, "slur", attrs)
         for fermata in fermatas:
             ET.SubElement(notations, "fermata", type="inverted" if fermata.inverted else "upright")

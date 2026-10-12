@@ -231,6 +231,35 @@ def test_invalid_placement_does_not_become_an_invalid_xml_attribute() -> None:
         to_musicxml(_score(span))
 
 
+def test_a_graphical_same_event_curve_preserves_geometry_without_playback_ties() -> None:
+    endpoint = SlurEndpoint(1, 1, 2)
+    curve = Slur(
+        endpoint, endpoint, "above", True, Fraction(-4), Fraction(1), Fraction(0), Fraction(1, 2)
+    )
+    root = _tree(_score(curve))
+    marks = root.findall("part/measure/note/notations/slur")
+    assert [mark.get("type") for mark in marks] == ["start", "stop"]
+    assert [mark.get("number") for mark in marks] == ["1", "1"]
+    assert marks[0].get("relative-x") == "-40"
+    assert [mark.get("relative-y") for mark in marks] == ["10", "5"]
+    assert root.findall(".//tie") == []
+    assert root.findall(".//tied") == []
+    assert [note.findtext("duration") for note in root.findall("part/measure/note")] == ["1"] * 8
+
+
+@pytest.mark.parametrize("different_note", [False, True])
+def test_a_graphical_curve_does_not_relax_ordinary_slur_endpoint_validation(
+    different_note: bool,
+) -> None:
+    start = SlurEndpoint(1, 1, 0)
+    end = SlurEndpoint(1, 1, 1) if different_note else start
+    curve = Slur(
+        start, end, graphical=True, start_x_offset=Fraction(-4) if different_note else Fraction(0)
+    )
+    with pytest.raises(ExportError, match="distinct drawing endpoints on one event"):
+        to_musicxml(_score(curve))
+
+
 def test_more_than_sixteen_overlapping_slurs_fail_clearly() -> None:
     span = Slur(SlurEndpoint(1, 1, 0), SlurEndpoint(2, 1, 3))
     with pytest.raises(ExportError, match="more than 16 slurs overlap"):

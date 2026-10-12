@@ -452,12 +452,20 @@ class SlurEndpoint:
 
 @dataclass(frozen=True)
 class Slur:
-    """A complete phrase slur between two events on one staff-part."""
+    """A phrase span, or an explicitly positioned curve on one event."""
 
     start: SlurEndpoint
     end: SlurEndpoint
     placement: str | None = None
     """``above`` or ``below`` when explicit; None leaves direction automatic."""
+
+    graphical: bool = False
+    """A same-event drawing with distinct endpoints, independent of playback."""
+    start_x_offset: Fraction = Fraction(0)
+    start_y_offset: Fraction = Fraction(0)
+    end_x_offset: Fraction = Fraction(0)
+    end_y_offset: Fraction = Fraction(0)
+    """Active drawing adjustments in staff spaces, without invented notes."""
 
 
 @dataclass(frozen=True)

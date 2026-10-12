@@ -10,6 +10,20 @@ and resolved ones **DECIDED**.
 
 ---
 
+## 2026-10-11 — DECIDED: keep same-event slur geometry separate from phrase timing
+
+**Context.** Memories of Green contains a real incoming curve at its second
+ending, drawn between distinct offsets attached to the same note. An ordinary
+timed-slur invariant rejects it and prevents the whole score from exporting.
+
+**Decision.** Extend canonical Slur with explicit graphical geometry, requiring
+distinct drawing endpoints for the same-event case. Export standard positioned
+slur notation while retaining every written note and playback tie unchanged.
+Ordinary zero/reversed phrase spans remain errors. Document MuseScore4.7.5's
+same-chord-to-l.v. conversion as an importer limitation; do not invent note
+anchors or claim faithful display there. This fulfills the approved source
+preservation path while exposing the specific renderer limit for user review.
+
 ## 2026-10-11 — DECIDED: preserve dormant legacy frames outside musical placement
 
 **Context.** Reserved-template scope exposes active entry chains in stored

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from fractions import Fraction
+
 import pytest
 
 from finale_file_parser.enigma import mus_document as adapter
@@ -105,3 +107,40 @@ def test_chord_note_ids_survive_normalization_without_inventing_an_entry_attachm
     shape = document.others.get("smartShape", 7)
     assert shape is not None and shape.fields["startNoteID"] == "2"
     assert slurs_by_staff(document, _POSITIONS) == {}
+
+
+@pytest.mark.parametrize("active", [False, True])
+def test_same_entry_graphical_curves_need_active_distinct_drawing_endpoints(
+    monkeypatch: pytest.MonkeyPatch, active: bool
+) -> None:
+    payload = bytearray(_payload())
+    payload[38:40] = (1).to_bytes(2, "little")
+    payload[40:44] = (1).to_bytes(4, "little")
+    for base, x, y in ((6, -96, 24), (36, 0, 12)):
+        payload[base + 8 : base + 10] = x.to_bytes(2, "little", signed=True)
+        payload[base + 10 : base + 12] = y.to_bytes(2, "little", signed=True)
+        payload[base + 12 : base + 14] = (0x4000 if active else 0).to_bytes(2, "little")
+    doc = _read(
+        monkeypatch,
+        (MusOther(TAG_SMART_SHAPE, 7, 0, bytes(payload)),),
+        (MusDetailRecord(TAG_SMART_SHAPE_ENTRY_MARK, 0, 1, 0, _slot(7)),),
+    )
+    if not active:
+        with pytest.raises(CorruptScoreError, match="end must follow"):
+            slurs_by_staff(doc, _POSITIONS)
+    else:
+        endpoint = SlurEndpoint(1, 1, 0)
+        assert slurs_by_staff(doc, _POSITIONS) == {
+            1: (
+                Slur(
+                    endpoint,
+                    endpoint,
+                    None,
+                    True,
+                    Fraction(-4),
+                    Fraction(1),
+                    Fraction(0),
+                    Fraction(1, 2),
+                ),
+            )
+        }

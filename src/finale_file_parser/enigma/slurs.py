@@ -8,6 +8,7 @@ confusing phrase slurs with per-pitch ties. See docs/ARCHITECTURE.md.
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
+from fractions import Fraction
 
 from finale_file_parser.enigma.document import EnigmaDocument, Record, field_int
 from finale_file_parser.enigma.models import CorruptScoreError
@@ -19,6 +20,27 @@ _PLACEMENTS: dict[str, str | None] = {"slurDown": "below", "slurUp": "above", "s
 _DIRECTIONS: dict[str, str | None] = {"automatic": None, "over": "above", "under": "below"}
 _UNSUPPORTED = frozenset({"hidden", "noPresetShape", "lyricBased"})
 _MAX_ENTRY_NUMBER = 0x7FFFFFFF
+
+
+def _drawing_adjustment(record: Record, name: str) -> tuple[Fraction, Fraction]:
+    segment = record.fields.get(name)
+    adjustment = segment.fields.get("endPtAdj") if isinstance(segment, Record) else None
+    if adjustment is None:
+        return Fraction(0), Fraction(0)
+    if not isinstance(adjustment, Record):
+        raise CorruptScoreError(
+            f"smartShape {record.attrs.get('cmper')}: invalid drawing adjustment"
+        )
+    if "on" not in adjustment.fields:
+        return Fraction(0), Fraction(0)
+    values = [field_int(adjustment.fields.get(axis, "0")) for axis in ("x", "y")]
+    if any(value is None or not -(2**31) <= value < 2**31 for value in values):
+        raise CorruptScoreError(
+            f"smartShape {record.attrs.get('cmper')}: invalid drawing coordinates"
+        )
+    x, y = values
+    assert x is not None and y is not None
+    return Fraction(x, 24), Fraction(y, 24)
 
 
 def _endpoint(
@@ -103,10 +125,21 @@ def slurs_by_staff(
         end_staff, end = _endpoint(document, record, "endTermSeg", positions)
         if staff != end_staff:
             continue
+        graphical = start == end
+        start_x, start_y = (
+            _drawing_adjustment(record, "startTermSeg") if graphical else (Fraction(0), Fraction(0))
+        )
+        end_x, end_y = (
+            _drawing_adjustment(record, "endTermSeg") if graphical else (Fraction(0), Fraction(0))
+        )
+        if graphical and start_x == end_x:
+            raise CorruptScoreError(
+                f"smartShape {record.attrs.get('cmper')}: slur end must follow its start"
+            )
         if end.measure < start.measure or (
             end.measure == start.measure
             and start.voice == end.voice
-            and end.event_index <= start.event_index
+            and end.event_index < start.event_index
         ):
             raise CorruptScoreError(
                 f"smartShape {record.attrs.get('cmper')}: slur end must follow its start"
@@ -117,5 +150,7 @@ def slurs_by_staff(
                 f"smartShape {record.attrs.get('cmper')}: invalid slur direction"
             )
         placement = _DIRECTIONS[direction] or _PLACEMENTS[kind]
-        result.setdefault(staff, []).append(Slur(start, end, placement))
+        result.setdefault(staff, []).append(
+            Slur(start, end, placement, graphical, start_x, start_y, end_x, end_y)
+        )
     return {staff: tuple(spans) for staff, spans in result.items()}

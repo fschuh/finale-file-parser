@@ -1485,6 +1485,31 @@ Verovio checks cover this local input; authored regression fragments cover
 Unicode, malformed data, attack ambiguity and assignment visibility. Historical
 corpus counts above are not remeasured: the licensed corpus is absent here.
 
+### Graphical slurs on one event (2026-10-11)
+
+Memories of Green's assigned shape33 has the same source entry230 at both
+ends in staff1 measure13, but distinct active drawing adjustments: start
+(-112,13) EVPU and end(0,12), with flags16897. The PDF shows an incoming curve
+at the second ending. This is geometry on one event, not an invalid zero-time
+phrase and not an instruction to manufacture an earlier note or playback tie.
+The canonical Slur retains a graphical discriminator and exact endpoint
+adjustments in staff spaces (24EVPU per space). Same-event curves require
+distinct active horizontal endpoints; ordinary zero/reversed spans still fail.
+
+MusicXML retains a start/stop slur pair on that note with relative endpoint
+coordinates in tenths (10tenths per staff space), without any `tie`/`tied`
+playback changes. The official [slur reference](https://www.w3.org/2021/06/musicxml40/musicxml-reference/elements/slur/)
+provides these drawing-position attributes. Numbering starts a graphical pair
+before stopping it while preserving the usual close-before-open order for
+ordinary touching spans. Authored binary and export tests cover coordinates,
+inactive adjustments, ordinary invalid spans and unchanged note durations.
+
+**Importer limitation:** MuseScore4.7.5's [importer](https://github.com/musescore/MuseScore/blob/3654226/src/importexport/musicxml/internal/import/importmusicxmlpass2.cpp)
+converts slurs anchored to the same chord into a laissez-vibrer item and does
+not honor these relative endpoint coordinates. The standard XML and canonical
+geometry are preserved, but this curve needs manual graphical correction in
+MuseScore. Do not claim the imported display matches the source PDF.
+
 ### Known format facts — crescendo and diminuendo hairpins
 
 Finale stores these dynamics as **SmartShapes**, separately from text
