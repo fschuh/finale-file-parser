@@ -1126,3 +1126,12 @@ from MIDI. Standard other-notation preserves the remaining symbols; MuseScore's
 importer treats them as articulations and ignores coordinates, so those seven
 placements require manual review. This is an explicit F24 format/import limit.
 
+# 2026-10-12: project explicitly assigned first-page metronomes as display headers
+
+Decode page-text assignments in the normalized document, retaining their page
+IDs and coordinates. Promote visible first-page metronomes to score-wide
+Expression with page=1 above the first musical measure, using existing tempo
+syntax and font evidence. Such text has no expression playback; document
+preferences remain independent. Unassigned labels, repeated/later-page text
+and ambiguous font letters do not establish tempo or rhythmic placement.
+

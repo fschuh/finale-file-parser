@@ -2553,6 +2553,45 @@ cover fonts, visibility, duplicates, signed era-specific offsets, unmatched
 marks, chords, spans and invalid attachments. No MIDI notes or velocities are
 changed to imply that parenthesized notes were omitted in playback.
 
+#### First-page metronome text (2026-10-12, F14)
+
+Numeric others194 contains packed24-byte pageTextAssign slots, keyed by page
+assignment ID and incidence, not measure. Source Invincibility Theme page1 has
+six slots: the half-note130 metronome is slot5, byte120, block97 -> blockText25.
+Reading only the leading slot misses it. Published
+[FCPageText getters](https://pdk.finalelua.com/class_f_c_page_text.html) and the
+[primary page-assignment model](https://github.com/openmusx/musxdom/blob/main/src/musx/dom/Others.h)
+establish the fields. Released RGP getters use block at object+0x38 as the
+anchor: xdisp+2 signed i16 (VM1983aa), ydisp+4 signed i16 (199b0a), startPage+6
+signed i16 (199e50), endPage+8 signed i16 (1998ee), flags+10 u16; annotation
+mask0x80 means postIt/hidden (198be2). Preserve the remaining flags as source
+attributes rather than guessing page alignment or odd/even behavior.
+
+Normalize all complete slots with independent incidences and bounds checks.
+Only visible score assignments explicitly keyed to page1 promote a metronome
+header above the first musical measure. Require an established beat-symbol
+font or explicit unit words/Unicode notes; arbitrary text-font h is not a half
+note. Use the existing tempo-syntax and text/font joins. Expression.page retains
+the source page, category stays empty, and typed playback=none distinguishes
+printed page text from a playback expression. Playback preferences supply the
+actual document rate. All other page assignments remain in the document;
+later or repeated page headers cannot establish a measure position by themselves.
+
+The105-file inventory recovers exactly one new header, Sonic Invincibility
+Theme half130. Actual MuseScore4.7.5 prints it and stores260 quarter BPM,
+agreeing with source playback and MIDI. Authored packed-slot/signed/hidden/font/
+page/palette tests and all105 schema checks pass. This is a projection above
+the first system, not a reconstruction of absolute page typography.
+
+Simone's block46 resolves to blockText11, Met - 96. It is not one of that
+file's decoded page-text or measure-expression placements. Definition11
+instead resolves block15 to expression11, an unused fp glyph; identical raw
+text numbers in different pools are not interchangeable. Numeric tag151
+offset134 and detail1056 offset20 also contain46 but their role as a text
+reference is unproven. Retain this as pending source-placement research rather
+than placing an unused palette label. The explicit playback preference96 is
+already retained independently.
+
 The same SmartShape definitions carry phrase slurs. Solid types **0** (`slurDown`),
 **1** (`slurUp`) and **15** (`slurAuto`) are documented by the published PDK
 [SmartShape enums and structs](https://pdk.finalelua.com/ff__smartshapes_8h_source.html)

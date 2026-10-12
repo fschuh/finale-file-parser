@@ -27,7 +27,11 @@ from finale_file_parser.enigma.clef import (
     default_clefs,
 )
 from finale_file_parser.enigma.document import EnigmaDocument, Record
-from finale_file_parser.enigma.expressions import SCORE_WIDE_STAFF, expressions_by_measure
+from finale_file_parser.enigma.expressions import (
+    SCORE_WIDE_STAFF,
+    expressions_by_measure,
+    first_page_tempos,
+)
 from finale_file_parser.enigma.fermatas import fermatas_by_entry
 from finale_file_parser.enigma.fingerings import fingerings_by_entry
 from finale_file_parser.enigma.glissandi import glissandi_by_staff
@@ -240,6 +244,10 @@ def build_score(document: EnigmaDocument) -> Score:
     staves = _ordered_staves(document, {staff for staff, _ in cells})
     keys = effective_keys(document)
     numbers = _measure_numbers(keys, cells)
+    headers = first_page_tempos(document)
+    if headers and numbers:
+        where = SCORE_WIDE_STAFF, numbers[0]
+        expressions[where] = headers + expressions.get(where, ())
     ignored_shapes, diagnostics = stale_smart_shapes(document, numbers)
     placed_entries = {entry for _, _, entry in slur_positions}
     diagnostics += tuple(

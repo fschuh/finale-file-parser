@@ -508,6 +508,28 @@ def test_articulation_symbol_handle_positions_and_note_anchor_are_signed_and_era
     assert "useTopNote" in record.fields
 
 
+def test_packed_page_text_assignments_keep_the_later_slot_and_signed_positions(
+    pools: Callable[..., None],
+) -> None:
+    def slot(block: int, hidden: bool) -> bytes:
+        words = (block, -38, -267, 1, 1, 0x80 if hidden else 0)
+        return b"".join(v.to_bytes(2, "little", signed=True) for v in words) + bytes(12)
+
+    pools(others=(MusOther(194, 1, 0, slot(7, True) + slot(97, False)),))
+    rows = read_mus_document(PATH).others.of_tag("pageTextAssign")
+    assert [r.fields["block"] for r in rows] == ["7", "97"]
+    assert [r.attrs["inci"] for r in rows] == ["0", "1"]
+    assert "postIt" in rows[0].fields and "postIt" not in rows[1].fields
+    assert rows[1].fields["xdisp"] == "-38" and rows[1].fields["ydisp"] == "-267"
+
+
+@pytest.mark.parametrize("length", [0, 23, 25])
+def test_partial_page_text_slots_are_rejected(pools: Callable[..., None], length: int) -> None:
+    pools(others=(MusOther(194, 1, 0, bytes(length)),))
+    with pytest.raises(CorruptScoreError, match="pageTextAssign"):
+        read_mus_document(PATH)
+
+
 def test_a_repeated_articulation_assignment_is_emitted_once(
     pools: Callable[..., None],
 ) -> None:

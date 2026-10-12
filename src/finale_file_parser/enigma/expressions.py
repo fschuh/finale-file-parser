@@ -137,7 +137,7 @@ from finale_file_parser.formats.dynamics import (
 )
 from finale_file_parser.ir import Expression, ExpressionPlayback, Tempo
 
-__all__ = ["SCORE_WIDE_STAFF", "expressions_by_measure"]
+__all__ = ["SCORE_WIDE_STAFF", "expressions_by_measure", "first_page_tempos"]
 
 SCORE_WIDE_STAFF = -1
 """The `staffAssign` a score expression carries instead of a staff number.
@@ -320,6 +320,62 @@ def expressions_by_measure(
             )
         )
     return {where: tuple(items) for where, items in out.items()}
+
+
+def first_page_tempos(document: EnigmaDocument) -> tuple[Expression, ...]:
+    """Visible page-one metronomes, independent of expression palette definitions.
+
+    A page text has no rhythmic playback instruction. Preserve it as a printed
+    header with explicitly disabled expression playback. Later-page and repeated
+    header text cannot establish a bar attachment and is not promoted to a tempo.
+    The normalized document retains every assignment and its page coordinates.
+    """
+    result = []
+    for record in document.others.of_tag("pageTextAssign"):
+        if "part" in record.attrs or "postIt" in record.fields:
+            continue
+        if field_int(record.attrs.get("cmper")) != 1:
+            continue
+        block = field_int(record.fields.get("block"))
+        if block is None:
+            continue
+        markup = text_block(document, block)
+        if markup is None:
+            continue
+        printed = plain_text(markup)
+        runs = text_runs(document, markup)
+        explicit_unit = bool(re.search(r"\b(?:quarter|half|eighth|whole)\b|[♩♪𝅘𝅥𝅗𝅥𝅝]", printed))
+        known_beat_font = any(
+            run.name is not None
+            and run.name.casefold()
+            in {
+                "maestro",
+                "maestrotimes",
+                "engraverfontset",
+                "engraver font set",
+                "jazz",
+                "engravertextt",
+                "engravertexth",
+                "engravertextncs",
+            }
+            and re.search(r"(?<!\w)[qhewŒÓ‰\uf0ce](?:d|\.)?(?=\s|=|$)", run.text)
+            for run in runs
+        )
+        if not explicit_unit and not known_beat_font:
+            continue
+        tempo = _tempo(printed, runs=runs)
+        if tempo is not None:
+            result.append(
+                Expression(
+                    printed,
+                    "",
+                    tempo=tempo,
+                    score_wide=True,
+                    playback=ExpressionPlayback("none", 0),
+                    page=1,
+                )
+            )
+    return tuple(result)
 
 
 def _swing_units(document: EnigmaDocument) -> dict[int, Fraction]:

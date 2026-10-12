@@ -90,6 +90,7 @@ from finale_file_parser.enigma.mus_others import (
     TAG_INST_USED,
     TAG_MEAS_EXPR_ASSIGN,
     TAG_MEAS_SPEC,
+    TAG_PAGE_TEXT_ASSIGN,
     TAG_REPEAT_BACK,
     TAG_REPEAT_ENDING_START,
     TAG_REPEAT_PASS_LIST,
@@ -1104,6 +1105,29 @@ def _others_records(
             out.append(Record("fontName", attrs, "", {"name": name}))
         elif record.tag == TAG_TEXT_BLOCK:
             out.append(Record("textBlock", attrs, "", _text_block(record.payload)))
+        elif record.tag == TAG_PAGE_TEXT_ASSIGN:
+            if not record.payload or len(record.payload) % 24:
+                raise CorruptScoreError("pageTextAssign: expected complete 24-byte records")
+            for inci, at in enumerate(range(0, len(record.payload), 24)):
+                raw = record.payload[at : at + 24]
+                page_fields: dict[str, str | tuple[str, ...] | Record | tuple[Record, ...]] = {
+                    "block": str(_u16(raw, 0)),
+                    "xdisp": str(_s16(raw, 2)),
+                    "ydisp": str(_s16(raw, 4)),
+                    "startPage": str(_s16(raw, 6)),
+                    "endPage": str(_s16(raw, 8)),
+                }
+                flags = _u16(raw, 10)
+                if flags & 0x80:
+                    page_fields["postIt"] = ""
+                out.append(
+                    Record(
+                        "pageTextAssign",
+                        {**attrs, "inci": str(inci), "sourceFlags": str(flags)},
+                        "",
+                        page_fields,
+                    )
+                )
         elif record.tag == TAG_TEXT_REPEAT_ASSIGN:
             if not record.payload or len(record.payload) % 24:
                 raise CorruptScoreError("textRepeatAssign: expected complete 24-byte records")

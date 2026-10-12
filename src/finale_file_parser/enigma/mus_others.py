@@ -56,6 +56,7 @@ __all__ = [
     "TAG_SMART_SHAPE_MEAS_MARK",
     "TAG_STAFF_SPEC",
     "TAG_TEXT_BLOCK",
+    "TAG_PAGE_TEXT_ASSIGN",
     "TAG_TEXT_EXPR_DEF",
     "MusOther",
     "read_mus_others",
@@ -94,6 +95,9 @@ offsets), not by key sequence."""
 
 TAG_TEXT_BLOCK = 183
 """`textBlock` / ETF TX: textID +0, raw text-pool selector +24; see ARCHITECTURE."""
+
+TAG_PAGE_TEXT_ASSIGN = 194
+"""Packed 24-byte page-text assignments; source page IDs are distinct from bars."""
 
 TAG_ARTIC_DEF = 121
 """`articDef` — an articulation's definition. Its `charMain` is the music-font

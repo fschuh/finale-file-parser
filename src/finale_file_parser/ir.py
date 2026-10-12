@@ -396,7 +396,7 @@ class Expression:
     """
 
     score_wide: bool = False
-    """The file attached this to a **staff list** rather than to one staff.
+    """A staff-list expression or a metronome header applying to the score.
 
     596 corpus markings are placed this way. Kept because the reader found it and
     the placement is a convention rather than a reading: `enigma.to_ir` puts such
@@ -415,6 +415,8 @@ class Expression:
     Independent of drawing adjustments; signed offsets are preserved.
     """
     playback: ExpressionPlayback | None = None
+    page: int | None = None
+    """Original page placement when a first-page tempo header is projected above the score."""
 
 
 @dataclass(frozen=True)
