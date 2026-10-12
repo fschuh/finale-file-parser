@@ -1529,6 +1529,42 @@ The hairpin/slur resolvers accept these source-scope IDs, and future shape
 features must reuse the same eligibility decision. Authored scope tests and
 the 75-file production sweep cover this policy; Spring and Hurry now validate.
 
+### Compiled legacy text command boundaries (2026-10-11)
+
+The 75-file raw text-stream inventory disproves the old fixed-four-byte
+Unicode-strip rule. Opcode81 appears30times and has **eight** argument bytes
+before the literal note glyph/words. Opcode95 appears90times with eight bytes
+as well. Consuming four leaves U+0001/U+0004 in ten exported tempo strings.
+For example Coin's expression63 has opcode81, seven01bytes plus04, then the
+literal `q`; its reset has eight01bytes, then ` = 225`. No argument byte is
+written notation. Opcode95's eight01bytes end at the next command/section.
+
+Observed argument widths:
+
+| Bytes | Opcodes (hex) |
+|---|---|
+| 8 | 81,95 |
+| 4 | 84,85,86,A4,A5,A6 |
+| 0 | 8A,8B,8E,8F,92,94,96,99,9C,A0,A2,A3,A7 |
+
+Zero-argument commands can precede literal copyright years or instrument
+words; a four-character strip also destroys that content. Both single-byte
+opcodes and UTF-8 encodings of those high-byte scalars occur, while argument
+data stays byte-valued. `decode_mus_text` uses the evidenced constant widths
+before decoding literal chunks as UTF-8 or the banner's legacy codepage. It
+retains opcode and exact arguments as opaque `^legacycmd(OP,hexbytes)` tags,
+without guessing command meaning, font identity or typed values. This is a
+normalization for the existing text/Record pipeline, not a second score model.
+Known truncated commands and illegal literal XML characters raise clear errors.
+Unknown caret sequences remain literal; unrelated Unicode carets are not
+swallowed by a generic non-ASCII regex. Already decoded legacy strings retain
+compatibility for the known spellings/arities. Authored command-boundary,
+Unicode/codepage, literal-caret, insert and malformed-input tests cover it.
+
+All75 production exports now validate against the official MusicXML4 schema.
+This resolves text validity, not the outstanding text-block join or font-backed
+dynamic semantics. The input scores/MIDIs remain byte-identical.
+
 ### Known format facts — crescendo and diminuendo hairpins
 
 Finale stores these dynamics as **SmartShapes**, separately from text

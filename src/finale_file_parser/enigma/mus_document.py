@@ -102,6 +102,7 @@ from finale_file_parser.enigma.mus_others import (
 )
 from finale_file_parser.enigma.mus_payload import ByteOrder, read_mus_pools, read_mus_streams
 from finale_file_parser.enigma.mus_rows import MusRows, read_mus_rows
+from finale_file_parser.enigma.mus_text import decode_mus_text
 from finale_file_parser.version import mus as mus_header
 
 __all__ = ["UNTRANSLATED", "read_mus_document"]
@@ -268,7 +269,6 @@ _TEXT_SECTION = re.compile(
 )
 """One tagged text section. The body keeps its markup; `plain_text` strips it."""
 
-_BINARY_FONT_COMMAND = re.compile(rb"(\^[\x84-\x86].{4})", re.DOTALL)
 """Font/style/size commands have four byte arguments, independently of text encoding."""
 
 _TEXT_BLOCK_TAGS = {2004: "block", 2006: "expression"}
@@ -720,8 +720,9 @@ def _texts_records(path: str | os.PathLike[str]) -> list[Record]:
     """The text stream's tagged sections as Enigma text records.
 
     A `.mus` keeps these as ETF tagged text rather than as binary records, so
-    they are read straight out of the stream. The body keeps its markup, exactly
-    as the `.musx` texts pool does, and `plain_text` handles both dialects.
+    they are read straight out of the stream. Known compiled commands retain
+    their opcode/argument data in opaque named tokens; literal content is
+    decoded independently. `plain_text` handles these and ordinary Enigma tags.
 
     Lyric and expression sections are keyed by `number`. A `fileInfo` section's
     numeric kind is translated to the semantic `type` that `file_info` expects.
@@ -752,7 +753,7 @@ def _texts_records(path: str | os.PathLike[str]) -> list[Record]:
             continue
         seen.add(identity)
         body = match.group(3)
-        text = _decode_block(body, fallback) if tag == "blockText" else _decode(body, fallback)
+        text = decode_mus_text(body, fallback)
         out.append(Record(tag=tag, attrs=attrs, text=text, fields={}))
     return out
 
@@ -762,16 +763,6 @@ def _decode(raw: bytes, fallback: str) -> str:
         return raw.decode("utf-8")
     except UnicodeDecodeError:
         return raw.decode(fallback, errors="replace")
-
-
-def _decode_block(raw: bytes, fallback: str) -> str:
-    # Decode byte-valued font commands separately: otherwise their non-UTF-8
-    # opcodes force a UTF-8 instrument name through the legacy code page.
-    chunks = _BINARY_FONT_COMMAND.split(raw)
-    return "".join(
-        chunk.decode(fallback, errors="replace") if i % 2 else _decode(chunk, fallback)
-        for i, chunk in enumerate(chunks)
-    )
 
 
 def _banner_platform(path: str | os.PathLike[str]) -> str | None:
