@@ -84,6 +84,7 @@ from finale_file_parser.enigma.mus_others import (
     TAG_ARTIC_DEF,
     TAG_CLEF_ENUM,
     TAG_CLEF_OPTIONS,
+    TAG_FONT_NAME,
     TAG_FRAME_SPEC,
     TAG_GRACE_SLASH_OPTIONS,
     TAG_INST_USED,
@@ -1034,6 +1035,13 @@ def _others_records(
             attrs["part"] = str(record.part)
         if record.tag == TAG_CLEF_ENUM:
             out.extend(_clef_enums(record.payload, attrs))
+        elif record.tag == TAG_FONT_NAME:
+            if len(record.payload) <= 12:
+                raise CorruptScoreError("fontName: truncated registry name")
+            name = _decode(record.payload[12:].split(b"\0", 1)[0], fallback)
+            if any(ord(char) < 32 for char in name):
+                raise CorruptScoreError("fontName: illegal character in registry name")
+            out.append(Record("fontName", attrs, "", {"name": name}))
         elif record.tag == TAG_TEXT_BLOCK:
             out.append(Record("textBlock", attrs, "", _text_block(record.payload)))
         elif record.tag == TAG_SMART_SHAPE:

@@ -1616,6 +1616,32 @@ All75 production exports now validate against the official MusicXML4 schema.
 This resolves text validity, not the outstanding text-block join or font-backed
 dynamic semantics. The input scores/MIDIs remain byte-identical.
 
+### Legacy font registry and expression runs (2026-10-11)
+
+Numeric others tag 144 is the existing paired-corpus `fontName` match. In the
+2011/2012 inputs its bounded payload begins with twelve bytes of registry flags
+and metrics, followed by the font name through NUL or the payload end. The key
+is the font ID. Names include Maestro, EngraverFontSet, MaestroTimes, EngraverTextT,
+Times New Roman and ordinary text fonts; flags are retained raw, not interpreted.
+
+Compiled text commands 85/A4/A5/A6 carry four biased hexadecimal digits: each
+byte 1..16 encodes a nibble 0..15, most significant first. For example
+`01 01 02 02` is font ID 17, not 1; `01 01 01 01` is ID 0. This interpretation
+links every observed dynamic font run to its registry and makes the known
+size-24 argument `01 01 02 09` coherent without treating a size as a font ID.
+The opcode's font-class variant is not needed to guess an unknown registry name.
+Unsupported names and absent registry entries do not identify a musical letter.
+
+The 75-file source audit shows 224 active graded-dynamic glyph assignments with
+an explicit registry-backed font command (168 A5/Maestro, 49 A5/EngraverFontSet,
+7 85/Maestro). Of these, 44 assignments in 21 files were previously unnamed:
+19 mf, 14 f, 8 mp, 2 ff and 1 p. All 44 resolve to the supported source music
+font; no category or velocity inference is necessary. Font changes are applied
+in sequence to literal runs. A preceding music command does not relabel a later
+text-font letter; whitespace or a trailing font command does not erase the
+context of an already printed glyph. Existing explicit descriptions, including
+copied dynamics with empty text, remain authoritative.
+
 ### Legacy expression text indirection — corpus audit (2026-10-11)
 
 The normalized EnigmaXML expression-text convention is not a universally valid

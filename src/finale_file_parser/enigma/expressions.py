@@ -126,6 +126,7 @@ from dataclasses import dataclass
 from fractions import Fraction
 
 from finale_file_parser.enigma.document import EnigmaDocument, Record, field_int
+from finale_file_parser.enigma.fonts import text_runs
 from finale_file_parser.enigma.models import CorruptScoreError
 from finale_file_parser.enigma.text import plain_text, text_block
 from finale_file_parser.formats.dynamics import (
@@ -165,19 +166,6 @@ label out. See `_rehearsal_labels`.
 _MEASURE_NUMBER_STYLE = "measNum"
 _LETTER_STYLE = "letters"
 _NUMBER_STYLE = "numbers"
-
-_MUSIC_FONT = re.compile(r"\^fontMus\(")
-"""EnigmaXML's marker for text set in a music font.
-
-`fontName` cmper 0 is `Maestro` in every corpus document, so a character behind
-this markup is a glyph rather than a letter to read.
-
-A `.mus` has no equivalent: its dialect spells the command `^font(` without
-saying whether the font is a music one, and it carries no `fontName` records to
-resolve the id against. That is why the description is the primary signal -- a
-`.mus` dynamic is named from `descStr` alone.
-"""
-
 
 _TEMPO = re.compile(
     r"(?<!\w)(?P<unit>quarter|half|eighth|whole|[qhew♩♪𝅘𝅥𝅗𝅥𝅝])"
@@ -463,7 +451,7 @@ def _texts(document: EnigmaDocument) -> dict[int, _Text]:
         number = field_int(record.attrs.get("number"))
         if number is None:
             continue
-        out[number] = _as_text(record.text or "")
+        out[number] = _as_text(document, record.text or "")
     for number, definition in _definitions(document).items():
         if "textBlockID" not in definition.fields:
             continue
@@ -474,13 +462,14 @@ def _texts(document: EnigmaDocument) -> dict[int, _Text]:
         block = field_int(definition.fields.get("textBlockID"))
         markup = text_block(document, block) if block is not None else None
         if markup is not None:
-            out[number] = _as_text(markup)
+            out[number] = _as_text(document, markup)
     return out
 
 
-def _as_text(markup: str) -> _Text:
+def _as_text(document: EnigmaDocument, markup: str) -> _Text:
+    runs = tuple(run for run in text_runs(document, markup) if run.text.strip())
     return _Text(
         printed=plain_text(markup),
-        in_music_font=bool(_MUSIC_FONT.search(markup)),
+        in_music_font=bool(runs) and all(run.is_music for run in runs),
         is_rehearsal=bool(_REHEARSAL.search(markup)),
     )

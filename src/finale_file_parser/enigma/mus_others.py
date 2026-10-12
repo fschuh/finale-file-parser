@@ -48,6 +48,7 @@ __all__ = [
     "TAG_CLEF_ENUM",
     "TAG_GRACE_SLASH_OPTIONS",
     "TAG_INST_USED",
+    "TAG_FONT_NAME",
     "TAG_FRAME_SPEC",
     "TAG_MEAS_EXPR_ASSIGN",
     "TAG_MEAS_SPEC",
@@ -74,6 +75,8 @@ ignoring it leaves the walk short by that much. A record therefore occupies
 
 TAG_FRAME_SPEC = 146
 """`frameSpec` — confirmed by payload, not only by key sequence."""
+TAG_FONT_NAME = 144
+"""Font registry: name begins at +12 in the 2011 numeric payload."""
 TAG_MEAS_SPEC = 176
 """`measSpec` — confirmed by payload, not only by key sequence."""
 
