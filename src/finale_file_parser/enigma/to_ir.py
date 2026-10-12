@@ -43,6 +43,7 @@ from finale_file_parser.enigma.ornaments import ornaments_by_entry
 from finale_file_parser.enigma.pitch import StaffTransposition, read_transposition, spell_note
 from finale_file_parser.enigma.repeats import Repeats, repeats_for
 from finale_file_parser.enigma.slurs import slurs_by_staff
+from finale_file_parser.enigma.smart_shapes import stale_smart_shapes
 from finale_file_parser.enigma.text import file_info, staff_names
 from finale_file_parser.enigma.timesig import TimeSignature as EnigmaTimeSignature
 from finale_file_parser.enigma.timesig import time_signatures
@@ -198,12 +199,12 @@ def build_score(document: EnigmaDocument) -> Score:
     directions = jumps_by_measure(document)
     barlines = barline_styles(document)
     expressions = expressions_by_measure(document)
-    hairpins = hairpins_by_staff(document)
-    slurs = slurs_by_staff(document, slur_positions)
-
     staves = _ordered_staves(document, {staff for staff, _ in cells})
     keys = effective_keys(document)
     numbers = _measure_numbers(keys, cells)
+    ignored_shapes, diagnostics = stale_smart_shapes(document, numbers)
+    hairpins = hairpins_by_staff(document, ignored_shapes=ignored_shapes)
+    slurs = slurs_by_staff(document, slur_positions, ignored_shapes=ignored_shapes)
     clef_at = _carried_clefs(document, staves, numbers, clef_at, clef_changes)
     expressions = _place_score_wide(expressions, staves)
     parts = [
@@ -245,6 +246,7 @@ def build_score(document: EnigmaDocument) -> Score:
         title=info.get("title", ""),
         composer=info.get("composer", ""),
         metadata={k: v for k, v in info.items() if k not in {"title", "composer"}},
+        diagnostics=diagnostics,
     )
 
 

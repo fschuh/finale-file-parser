@@ -7,6 +7,7 @@ do not establish a visible measure-based span; see docs/ARCHITECTURE.md.
 
 from __future__ import annotations
 
+from collections.abc import Collection
 from fractions import Fraction
 
 from finale_file_parser.enigma.document import EnigmaDocument, Record, field_int
@@ -64,7 +65,9 @@ def _horizontal_adjustment(record: Record, name: str) -> Fraction:
     return Fraction(x, _EVPU_PER_SPACE)
 
 
-def hairpins_by_staff(document: EnigmaDocument) -> dict[int, tuple[Hairpin, ...]]:
+def hairpins_by_staff(
+    document: EnigmaDocument, *, ignored_shapes: Collection[int] = ()
+) -> dict[int, tuple[Hairpin, ...]]:
     """Join score measure assignments once per visible standard hairpin."""
     assigned = {
         shape
@@ -74,6 +77,7 @@ def hairpins_by_staff(document: EnigmaDocument) -> dict[int, tuple[Hairpin, ...]
         and shape > 0
     }
     result: dict[int, list[Hairpin]] = {}
+    assigned.difference_update(ignored_shapes)
     for record in document.others.of_tag("smartShape"):
         shape = field_int(record.attrs.get("cmper"))
         kind = _KINDS.get(str(record.fields.get("shapeType")))

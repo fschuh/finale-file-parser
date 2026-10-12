@@ -505,6 +505,15 @@ class PartGroup:
 
 
 @dataclass(frozen=True)
+class ScoreDiagnostic:
+    """A source condition requiring review, carried without changing the music."""
+
+    code: str
+    message: str
+    source_ref: str = ""
+
+
+@dataclass(frozen=True)
 class Score:
     """A whole score."""
 
@@ -518,3 +527,5 @@ class Score:
     """Anything a reader recovered that the IR does not model yet. Kept so
     information is not silently discarded on the way in -- the decision above
     puts the loss at the exporter, not the reader."""
+    diagnostics: tuple[ScoreDiagnostic, ...] = ()
+    """Recoverable source conditions, independent of notation or playback."""

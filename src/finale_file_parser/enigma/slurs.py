@@ -7,7 +7,7 @@ confusing phrase slurs with per-pitch ties. See docs/ARCHITECTURE.md.
 
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Collection, Mapping, Sequence
 from fractions import Fraction
 
 from finale_file_parser.enigma.document import EnigmaDocument, Record, field_int
@@ -83,6 +83,8 @@ def _endpoint(
 def slurs_by_staff(
     document: EnigmaDocument,
     positions: Mapping[tuple[int, int, int], Sequence[SlurEndpoint]],
+    *,
+    ignored_shapes: Collection[int] = (),
 ) -> dict[int, tuple[Slur, ...]]:
     """Join score assignments once per visible preset entry-attached slur.
 
@@ -101,6 +103,7 @@ def slurs_by_staff(
         and shape > 0
     }
     result: dict[int, list[Slur]] = {}
+    assigned.difference_update(ignored_shapes)
     for record in document.others.of_tag("smartShape"):
         kind = str(record.fields.get("shapeType"))
         if (

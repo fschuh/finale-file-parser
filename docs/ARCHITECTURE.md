@@ -1510,6 +1510,25 @@ not honor these relative endpoint coordinates. The standard XML and canonical
 geometry are preserved, but this curve needs manual graphical correction in
 MuseScore. Do not claim the imported display matches the source PDF.
 
+### Stale assigned SmartShapes (2026-10-11)
+
+Spring Yard's active shape records still refer to bars42–43 and45–46 beyond
+its 29-bar score; Hurry Up has corresponding bars11–12 and14–15 beyond five
+bars. Spring also retains obsolete octave/custom-line records. These are
+stored source records, not evidence for extending the current musical score.
+Source eligibility requires a score assignment, a visible score definition,
+valid positive endpoint fields and both endpoints beyond the actual last bar.
+Library/linked-part-only definitions do not count as assigned score shapes.
+Partially missing endpoints, malformed fields, reversed spans and zero-length
+hairpins remain subject to ordinary validation rather than being quarantined.
+
+`stale_smart_shapes` returns the excluded IDs and structured ScoreDiagnostic
+records, which build_score retains on the canonical Score. Raw source records
+remain untouched; active musical endpoints are never clamped or rescheduled.
+The hairpin/slur resolvers accept these source-scope IDs, and future shape
+features must reuse the same eligibility decision. Authored scope tests and
+the 75-file production sweep cover this policy; Spring and Hurry now validate.
+
 ### Known format facts — crescendo and diminuendo hairpins
 
 Finale stores these dynamics as **SmartShapes**, separately from text

@@ -10,6 +10,18 @@ and resolved ones **DECIDED**.
 
 ---
 
+## 2026-10-11 — DECIDED: report wholly out-of-score shapes as stale source records
+
+**Context.** Assigned shapes refer entirely to bars beyond the current score
+in Spring Yard and Hurry Up, preventing export despite having no current notes
+at either endpoint. The user approved quarantining verified stale references.
+
+**Decision.** Keep raw records, attach typed diagnostics to canonical Score,
+and omit only source-eligible shapes whose valid endpoints both lie beyond the
+last real bar. Partially missing, malformed, reversed and zero-length supported
+spans remain errors. Do not extend measures or clamp timings to accommodate a
+stale drawing. Reuse this scope for subsequent octave/custom-line features.
+
 ## 2026-10-11 — DECIDED: keep same-event slur geometry separate from phrase timing
 
 **Context.** Memories of Green contains a real incoming curve at its second
