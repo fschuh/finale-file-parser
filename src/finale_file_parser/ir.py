@@ -284,6 +284,10 @@ class Voice:
 
     start_offset: Fraction = Fraction(0)
     """Initial silence in whole-note units, without inventing a written rest."""
+    instrument_id: str | None = None
+    """Explicit shared playback identity; None when the source does not establish one."""
+    playback: bool = True
+    solo: bool = False
 
 
 @dataclass(frozen=True)
@@ -601,6 +605,8 @@ class Part:
     """Written Event pitches remain unchanged; these determine sounding octaves."""
     tremolos: tuple[Tremolo, ...] = ()
     glissandi: tuple[Glissando, ...] = ()
+    instrument_id: str | None = None
+    """Shared playback identity when every used layer routes to the same source instrument."""
 
 
 @dataclass(frozen=True)

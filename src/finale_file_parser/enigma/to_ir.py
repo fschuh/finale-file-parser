@@ -47,6 +47,7 @@ from finale_file_parser.enigma.playback_preferences import playback_preferences
 from finale_file_parser.enigma.repeats import Repeats, repeats_for
 from finale_file_parser.enigma.slurs import slurs_by_staff
 from finale_file_parser.enigma.smart_shapes import stale_smart_shapes
+from finale_file_parser.enigma.staff_playback import with_playback_scopes
 from finale_file_parser.enigma.text import file_info, staff_names
 from finale_file_parser.enigma.timesig import TimeSignature as EnigmaTimeSignature
 from finale_file_parser.enigma.timesig import time_signatures
@@ -269,8 +270,9 @@ def build_score(document: EnigmaDocument) -> Score:
         for staff in staves
     ]
     groups = _groups(document, [part.id for part in parts])
+    scoped_parts = with_playback_scopes(document, tuple(parts))
     return Score(
-        parts=connect_arpeggios(document, tuple(parts), groups, assigned_entries),
+        parts=connect_arpeggios(document, scoped_parts, groups, assigned_entries),
         groups=groups,
         title=info.get("title", ""),
         composer=info.get("composer", ""),

@@ -148,7 +148,7 @@ def to_musicxml(score: Score) -> bytes:
     root = ET.Element("score-partwise", version=MUSICXML_VERSION)
     _append_identification(root, score)
     if any(
-        not event.playback and not event.is_rest
+        not (event.playback and voice.playback) and not event.is_rest
         for part in score.parts
         for measure in part.measures
         for voice in measure.voices
@@ -431,9 +431,12 @@ def _append_part(
 
 
 def _staff_bundles(score: Score) -> tuple[tuple[Part, ...], ...]:
-    """Only explicit arpeggio connections join staff-parts for MusicXML."""
+    """Explicit shared playback identities or arpeggios join staff-parts for MusicXML."""
     positions = {part.id: index for index, part in enumerate(score.parts)}
     joined = [False] * max(0, len(score.parts) - 1)
+    for index, (first, second) in enumerate(zip(score.parts, score.parts[1:], strict=False)):
+        if first.instrument_id is not None and first.instrument_id == second.instrument_id:
+            joined[index] = True
     for part in score.parts:
         for measure in part.measures:
             for voice in measure.voices:
@@ -1489,6 +1492,8 @@ def _append_event(
     tremolo: tuple[str, int] | None = None,
     glissandi: tuple[tuple[_GlissandoNotation, ...], ...] = (),
 ) -> None:
+    if not voice.playback:
+        event = replace(event, playback=False)
     if event.note_ties and len(event.note_ties) != len(event.pitches):
         raise ExportError("per-note tie flags must match the number of pitches")
     if any(not 0 <= mark.pitch_index < len(event.pitches) for mark in event.ornaments):

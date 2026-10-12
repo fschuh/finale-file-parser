@@ -2361,6 +2361,33 @@ anchors; page1/page3 rendering and MIDI checked. Its glide scale/timing and
 post-jump traversal differ from Finale Human Playback, so a glyph recovery is
 not an assertion of MIDI identity.
 
+#### Explicit staff playback scopes (2026-10-12, R04/F21 prerequisite)
+
+Numeric others230 is staffPlayData, keyed by source staff. The exact48-byte body
+matches the published `__EDTPlayData2006` in ff_other.h: six8-byte controls for
+chords, MIDI expressions and note layers1–4. Each contains u16 playbackRouteNum
+at+0, velControlLevel+2, velControlSaveFlags+4 and playFlags+6. Play mask1 and solo
+mask2 are published; route numbers are zero-based (`FCLayerPlaybackData` adds1
+to obtain the InstrumentDef ID). Keep velocity control fields separate from
+key velocity until their function is established. The expanded93-file source
+inventory has194 complete records, routes0–3 and1164 playFlags=1 controls.
+
+Carry explicit identities/play/solo on canonical voices and a shared identity
+on a part only when its used layers agree. Apply solo scope without deleting
+written notes; disabled voices export as full-size silent cues through F12.
+Join adjacent staves with the same explicit instrument identity into one
+MusicXML instrument, so a pedal-down on the bass staff and release on the treble
+staff control one instrument. Names/braces do not establish this identity.
+Program/channel/bank and Human Playback controls are separate R04 work; no patch
+number is inferred from these indices. Authored tests exercise different routes,
+disabled/solo voices, independent velocity controls and truncated48-byte bodies.
+
+The user added18 files during this session: current inventory93MUS/92MIDI with
+no MIDI-only names; Vampire Killer remains MUS-only. Preserve the original75-file
+baseline and149 hashes as that earlier snapshot. New expanded checks expose one
+cross-staff and two same-chord glissando cases, tracked separately; original75
+still export and validate.
+
 The same SmartShape definitions carry phrase slurs. Solid types **0** (`slurDown`),
 **1** (`slurUp`) and **15** (`slurAuto`) are documented by the published PDK
 [SmartShape enums and structs](https://pdk.finalelua.com/ff__smartshapes_8h_source.html)

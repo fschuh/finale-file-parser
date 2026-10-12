@@ -1076,3 +1076,13 @@ Source IDs are not array indices; unresolved or duplicate matches are errors.
 Part-local spans support cross-voice attachments; cross-staff glissandi currently
 raise a clear format limitation instead of being silently dropped.
 
+# 2026-10-12: use explicit source routing to share an exported instrument
+
+Append instrument identity/play/solo to Voice and shared identity to Part.
+Normalize source staffPlayData, keeping its routing IDs distinct from MIDI
+programs/channels and its velocity-control fields distinct from key velocity.
+Adjacent staves with one explicit identity export as one multi-staff MusicXML
+instrument. This permits cross-staff pedal controls to act on the same piano;
+staff names or a brace alone are insufficient evidence. Keep disabled/solo
+notation intact and suppress only its sounding attacks.
+

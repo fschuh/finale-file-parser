@@ -1187,6 +1187,28 @@ def _others_records(
                 if start_time is not None:
                     frame_fields[_FRAME_START_TIME] = str(start_time)
                 out.append(Record(tag="frameSpec", attrs=attrs, text="", fields=frame_fields))
+        elif record.tag == 230:
+            if len(record.payload) != 48:
+                raise CorruptScoreError("staffPlayData: expected six complete eight-byte controls")
+            controls = {}
+            for index, name in enumerate(
+                ("chords", "midiExpressions", "layer1", "layer2", "layer3", "layer4")
+            ):
+                at = index * 8
+                flags = _u16(record.payload, at + 6)
+                controls[name] = Record(
+                    tag=name,
+                    attrs={},
+                    text="",
+                    fields={
+                        "playbackRouteNum": str(_u16(record.payload, at)),
+                        "velControlLevel": str(_u16(record.payload, at + 2)),
+                        "velControlSaveFlags": str(_u16(record.payload, at + 4)),
+                        **({"play": ""} if flags & 1 else {}),
+                        **({"solo": ""} if flags & 2 else {}),
+                    },
+                )
+            out.append(Record(tag="staffPlayData", attrs=attrs, text="", fields=controls))
         elif record.tag == TAG_MEAS_SPEC and len(record.payload) >= 8:
             out.append(
                 Record(tag="measSpec", attrs=attrs, text="", fields=_meas_spec(record.payload))
