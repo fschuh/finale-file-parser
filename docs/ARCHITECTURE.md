@@ -2326,6 +2326,41 @@ Scratch `BoundaryMakefile` targets `hairpin-boundary` and
 
 ### Known format facts — entry-attached phrase slurs
 
+#### Individual-note glissando attachments (2026-10-12, F18)
+
+Preset SmartShape type25 is glissando in the published PDK enum. Its existing
+entry-based endpoints and start/endNoteID words (serialized+76/+78) identify
+individual chord pitches. Recover only assigned, visible, preset score shapes;
+keep the existing stale-shape quarantine and reject ambiguous/missing note IDs.
+Entry location validation is shared with slurs. Cross-voice endpoints are exact,
+and the canonical part-local representation reports an unsupported cross-staff
+span instead of silently moving it to a different note.
+
+`docs/eeppd.txt` documents TGFNID=0x001F0000 in each note's32-bit flag. Decode
+those bits into normalized `note id` and typed `Note.note_id`, retaining zero
+as absence. These IDs are independent of chord order and pitch; never treat
+ID7 as pitch index6 or guess the first pitch when an ID does not resolve.
+Notehead/tremolo override matching also uses these stable IDs. Authored tests
+use nonconsecutive/reordered IDs, tie-bit coexistence and silent hidden chord
+anchors; the same normalized note attrs are used by MUSX.
+
+SM64 Main Theme has exactly three visible assigned wavy glissandi:
+shape104 bar22, entry1839 ->1644 (voices1 ->2); shape106 bar24,1840 ->1670
+(voices1 ->2); shape80 bar60,1607 ->1608 (voice1). All endpoints specify noteID1.
+The final anchor is both hidden and playback-disabled; retain that written pitch
+and its line attachment while suppressing its direct attack through F12. Shape106's
+active drawing adjustments8/-17 and-37/-5EVPU survive independently of timing.
+
+Canonical `Part.glissandi` uses `NoteEndpoint(event,pitch_index)` and wavy/solid
+appearance plus active drawing adjustments. Export standard numbered start/stop
+glissando notation on those exact MusicXML notes, allocating at most16 concurrent
+numbers and rejecting dangling or reversed endpoints. No intermediate notes are
+added. The three source spans explain34 reference performance attacks. Actual
+MuseScore4.7.5 imports all three Glissando objects with exact cross-voice/hidden
+anchors; page1/page3 rendering and MIDI checked. Its glide scale/timing and
+post-jump traversal differ from Finale Human Playback, so a glyph recovery is
+not an assertion of MIDI identity.
+
 The same SmartShape definitions carry phrase slurs. Solid types **0** (`slurDown`),
 **1** (`slurUp`) and **15** (`slurAuto`) are documented by the published PDK
 [SmartShape enums and structs](https://pdk.finalelua.com/ff__smartshapes_8h_source.html)

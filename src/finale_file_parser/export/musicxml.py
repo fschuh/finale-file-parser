@@ -24,6 +24,7 @@ from finale_file_parser.ir import (
     Hairpin,
     Lyric,
     Measure,
+    NoteEndpoint,
     NoteTies,
     OctaveShift,
     Ornament,
@@ -119,6 +120,18 @@ class _SlurPosition:
 
 _SlurNotations = dict[tuple[str, int, int, int], tuple[_SlurNotation, ...]]
 _TremoloNotations = dict[SlurEndpoint, tuple[str, int]]
+
+
+@dataclass(frozen=True)
+class _GlissandoNotation:
+    type: str
+    number: str
+    line_type: str
+    x_offset: Fraction
+    y_offset: Fraction
+
+
+_GlissandoNotations = dict[NoteEndpoint, tuple[_GlissandoNotation, ...]]
 
 
 class ExportError(FinaleFileError):
@@ -398,6 +411,7 @@ def _append_part(
         octave_directions = _octave_directions((part,))
     first = True
     tremolos = _tremolo_notations(part)
+    glissandi = _glissando_notations(part)
     for measure in part.measures:
         _append_measure(
             element,
@@ -411,6 +425,7 @@ def _append_part(
             octaves=octave_directions.get((part.id, measure.number), ()),
             octave_spans=part.octave_shifts,
             tremolo_notations=tremolos,
+            glissando_notations=glissandi,
         )
         first = False
 
@@ -1175,6 +1190,54 @@ def _is_glyph(text: str) -> bool:
     return len(text) <= _MAX_GLYPH and not any(character.isalnum() for character in text)
 
 
+def _glissando_notations(part: Part) -> _GlissandoNotations:
+    positions = _slur_positions(part)
+    events = {
+        SlurEndpoint(m.number, v.number, i): e
+        for m in part.measures
+        for v in m.voices
+        for i, e in enumerate(v.events)
+    }
+    result: dict[NoteEndpoint, list[_GlissandoNotation]] = {}
+    active: dict[int, tuple[int, int, int]] = {}
+    for span in sorted(
+        part.glissandi,
+        key=lambda s: (
+            positions[s.start.event].order if s.start.event in positions else (-1, -1, -1)
+        ),
+    ):
+        start, end = positions.get(span.start.event), positions.get(span.end.event)
+        for point in (span.start, span.end):
+            event = events.get(point.event)
+            if event is None or not 0 <= point.pitch_index < len(event.pitches):
+                raise ExportError("glissando endpoint does not identify a pitched note")
+        if (
+            start is None
+            or end is None
+            or (end.order[0], end.onset) < (start.order[0], start.onset)
+            or end.order <= start.order
+        ):
+            raise ExportError("glissando end must follow its start in time and XML order")
+        if span.line_type not in {"wavy", "solid"}:
+            raise ExportError("unsupported glissando line type")
+        active = {number: order for number, order in active.items() if order > start.order}
+        number = next((i for i in range(1, 17) if i not in active), None)
+        if number is None:
+            raise ExportError("more than 16 overlapping glissandi")
+        active[number] = end.order
+        result.setdefault(span.start, []).append(
+            _GlissandoNotation(
+                "start", str(number), span.line_type, span.start_x_offset, span.start_y_offset
+            )
+        )
+        result.setdefault(span.end, []).append(
+            _GlissandoNotation(
+                "stop", str(number), span.line_type, span.end_x_offset, span.end_y_offset
+            )
+        )
+    return {point: tuple(items) for point, items in result.items()}
+
+
 def _tremolo_notations(part: Part) -> _TremoloNotations:
     events = {
         SlurEndpoint(measure.number, voice.number, index): event
@@ -1223,6 +1286,7 @@ def _append_measure(
     octaves: tuple[_OctaveDirection, ...] = (),
     octave_spans: tuple[OctaveShift, ...] = (),
     tremolo_notations: _TremoloNotations | None = None,
+    glissando_notations: _GlissandoNotations | None = None,
 ) -> None:
     element = ET.SubElement(parent, "measure", number=str(measure.number))
     _append_barline(element, measure, "left")
@@ -1285,6 +1349,12 @@ def _append_measure(
                 octave_displacement=displacement,
                 tremolo=(tremolo_notations or {}).get(
                     SlurEndpoint(measure.number, voice.number, event_index)
+                ),
+                glissandi=tuple(
+                    (glissando_notations or {}).get(
+                        NoteEndpoint(SlurEndpoint(measure.number, voice.number, event_index), i), ()
+                    )
+                    for i in range(len(event.pitches))
                 ),
             )
             if not event.is_grace:
@@ -1417,6 +1487,7 @@ def _append_event(
     slurs: tuple[_SlurNotation, ...] = (),
     octave_displacement: int = 0,
     tremolo: tuple[str, int] | None = None,
+    glissandi: tuple[tuple[_GlissandoNotation, ...], ...] = (),
 ) -> None:
     if event.note_ties and len(event.note_ties) != len(event.pitches):
         raise ExportError("per-note tie flags must match the number of pitches")
@@ -1443,6 +1514,7 @@ def _append_event(
             slurs=slurs if not index else (),
             ornaments=tuple(mark for mark in event.ornaments if mark.pitch_index == index),
             tremolo=tremolo if not index else None,
+            glissandi=glissandi[index] if glissandi else (),
         )
 
 
@@ -1459,6 +1531,7 @@ def _append_note(
     slurs: tuple[_SlurNotation, ...] = (),
     ornaments: tuple[Ornament, ...] = (),
     tremolo: tuple[str, int] | None = None,
+    glissandi: tuple[_GlissandoNotation, ...] = (),
 ) -> None:
     note = ET.SubElement(element, "note")
     if not event.visible:
@@ -1536,6 +1609,7 @@ def _append_note(
         or arpeggios
         or slurs
         or tremolo
+        or glissandi
     ):
         notations = ET.SubElement(note, "notations")
         if ties.stop:
@@ -1552,6 +1626,17 @@ def _append_note(
             if slur.y_offset:
                 attrs["relative-y"] = _decimal_number(slur.y_offset * 10)
             ET.SubElement(notations, "slur", attrs)
+        for glissando in glissandi:
+            attrs = {
+                "type": glissando.type,
+                "number": glissando.number,
+                "line-type": glissando.line_type,
+            }
+            if glissando.x_offset:
+                attrs["relative-x"] = _decimal_number(glissando.x_offset * 10)
+            if glissando.y_offset:
+                attrs["relative-y"] = _decimal_number(glissando.y_offset * 10)
+            ET.SubElement(notations, "glissando", attrs)
         for fermata in fermatas:
             ET.SubElement(notations, "fermata", type="inverted" if fermata.inverted else "upright")
         if marks:

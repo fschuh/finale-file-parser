@@ -1066,3 +1066,13 @@ Export standard start/stop ornaments and their required time modification.
 Source ornament/tremolo performance attacks are not inserted into the written
 score, and Human Playback's cadence is not encoded as a fabricated tempo curve.
 
+# 2026-10-12: resolve individual-note spans through source IDs
+
+Keep source note IDs in decoded `Note` data, then resolve them to canonical
+`NoteEndpoint(event,pitch_index)` values. Add `Part.glissandi` using those exact
+attachments and source appearance/geometry. Keep silent or hidden pitched
+anchors and do not synthesize a glissando's MIDI realization as written notes.
+Source IDs are not array indices; unresolved or duplicate matches are errors.
+Part-local spans support cross-voice attachments; cross-staff glissandi currently
+raise a clear format limitation instead of being silently dropped.
+

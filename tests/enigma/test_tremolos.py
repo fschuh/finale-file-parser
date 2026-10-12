@@ -35,9 +35,9 @@ def _score(
         else '<beamExtUp entnum="1"><leftAdjust>20</leftAdjust><rightAdjust>-20</rightAdjust>'
         f"<beamMask>{mask}</beamMask></beamExtUp>"
     )
-    notes = "<note><harmLev>0</harmLev><harmAlt>0</harmAlt></note>"
+    notes = '<note id="1"><harmLev>0</harmLev><harmAlt>0</harmAlt></note>'
     if chord:
-        notes += "<note><harmLev>2</harmLev><harmAlt>0</harmAlt></note>"
+        notes += '<note id="2"><harmLev>2</harmLev><harmAlt>0</harmAlt></note>'
     raw = f"""<finale><others>
       <fontName cmper="0"><name>Maestro</name></fontName><staffSpec cmper="1"/>
       <measSpec cmper="1"><beats>4</beats><divbeat>1024</divbeat></measSpec>

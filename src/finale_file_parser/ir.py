@@ -28,11 +28,13 @@ __all__ = [
     "Expression",
     "ExpressionPlayback",
     "Fermata",
+    "Glissando",
     "Hairpin",
     "Lyric",
     "Measure",
     "Navigation",
     "NoteTies",
+    "NoteEndpoint",
     "OctaveShift",
     "Ornament",
     "Part",
@@ -549,6 +551,27 @@ class Slur:
 
 
 @dataclass(frozen=True)
+class NoteEndpoint:
+    """One exact pitch of a part-local event, including an individual chord note."""
+
+    event: SlurEndpoint
+    pitch_index: int
+
+
+@dataclass(frozen=True)
+class Glissando:
+    """A slide between two written pitches, independent of intermediate MIDI attacks."""
+
+    start: NoteEndpoint
+    end: NoteEndpoint
+    line_type: str = "wavy"
+    start_x_offset: Fraction = Fraction(0)
+    start_y_offset: Fraction = Fraction(0)
+    end_x_offset: Fraction = Fraction(0)
+    end_y_offset: Fraction = Fraction(0)
+
+
+@dataclass(frozen=True)
 class Tremolo:
     """Two written notes/chords alternating over their shared rhythmic span."""
 
@@ -577,6 +600,7 @@ class Part:
     octave_shifts: tuple[OctaveShift, ...] = ()
     """Written Event pitches remain unchanged; these determine sounding octaves."""
     tremolos: tuple[Tremolo, ...] = ()
+    glissandi: tuple[Glissando, ...] = ()
 
 
 @dataclass(frozen=True)

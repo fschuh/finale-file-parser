@@ -75,6 +75,8 @@ class Note:
 
     tie_start: bool
     tie_end: bool
+    note_id: int = 0
+    """Stable source identity within an entry; zero means absent, not a pitch index."""
 
     @property
     def diatonic_step(self) -> int:
@@ -186,6 +188,7 @@ def _note(record: Record) -> Note:
         harm_alt=_int(_scalar(record, "harmAlt"), "harmAlt"),
         tie_start="tieStart" in record.fields,
         tie_end="tieEnd" in record.fields,
+        note_id=_int(record.attrs.get("id", "0"), "note id"),
     )
 
 

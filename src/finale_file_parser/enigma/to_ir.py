@@ -29,6 +29,7 @@ from finale_file_parser.enigma.document import EnigmaDocument, Record
 from finale_file_parser.enigma.expressions import SCORE_WIDE_STAFF, expressions_by_measure
 from finale_file_parser.enigma.fermatas import fermatas_by_entry
 from finale_file_parser.enigma.fingerings import fingerings_by_entry
+from finale_file_parser.enigma.glissandi import glissandi_by_staff
 from finale_file_parser.enigma.graces import grace_slash, slash_flagged_grace_notes
 from finale_file_parser.enigma.groups import staff_groups, staff_order
 from finale_file_parser.enigma.hairpins import hairpins_by_staff
@@ -228,6 +229,7 @@ def build_score(document: EnigmaDocument) -> Score:
     hairpins = hairpins_by_staff(document, ignored_shapes=ignored_shapes)
     slurs = slurs_by_staff(document, slur_positions, ignored_shapes=ignored_shapes)
     octaves = octaves_by_staff(document, ignored_shapes=ignored_shapes)
+    glissandi = glissandi_by_staff(document, slur_positions, ignored_shapes=ignored_shapes)
     clef_at = _carried_clefs(document, staves, numbers, clef_at, clef_changes)
     expressions = _place_score_wide(expressions, staves)
     parts = [
@@ -262,6 +264,7 @@ def build_score(document: EnigmaDocument) -> Score:
             abbreviation=names[staff].abbreviated if staff in names else "",
             octave_shifts=octaves.get(staff, ()),
             tremolos=tremolos.get(staff, ()),
+            glissandi=glissandi.get(staff, ()),
         )
         for staff in staves
     ]

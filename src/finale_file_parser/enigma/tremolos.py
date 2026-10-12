@@ -73,9 +73,12 @@ def recover_tremolos(
             continue
         if "beam" not in first.fields or "beam" in second.fields:
             continue
-        half_heads = heads.get(number, set()) == set(range(1, len(a.notes) + 1)) and heads.get(
-            partner, set()
-        ) == set(range(1, len(b.notes) + 1))
+        first_ids, last_ids = {note.note_id for note in a.notes}, {note.note_id for note in b.notes}
+        half_heads = (
+            0 not in first_ids | last_ids
+            and heads.get(number, set()) == first_ids
+            and heads.get(partner, set()) == last_ids
+        )
         if number not in extensions and not half_heads:
             continue
         value = tuplet.reference_number * tuplet.reference_duration

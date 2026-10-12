@@ -103,6 +103,8 @@ _IGNORE = 0x00008000
 """Documented main entry flag hiding notation independently from playback."""
 _TIE_START = 0x40000000
 _TIE_END = 0x20000000
+_NOTE_ID = 0x001F0000
+"""Documented TGFNID in eeppd.txt; identity is independent of pitch/chord order."""
 
 _TCD_ALT_BITS = 4
 """The TCD's low nibble is the alteration; the upper twelve bits are the pitch."""
@@ -374,7 +376,10 @@ def _note_record(stream: bytes, offset: int, order: ByteOrder) -> Record:
         fields["tieStart"] = ""
     if flag & _TIE_END:
         fields["tieEnd"] = ""
-    return Record(tag="note", attrs={}, text="", fields=fields)
+    identity = (flag & _NOTE_ID) >> 16
+    return Record(
+        tag="note", attrs={"id": str(identity)} if identity else {}, text="", fields=fields
+    )
 
 
 _ = Duration  # re-exported type used in the public signature

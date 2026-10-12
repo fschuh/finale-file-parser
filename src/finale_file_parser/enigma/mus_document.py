@@ -1013,7 +1013,14 @@ _SMART_SHAPE_ENTRY_BASED = 0x40000000
 _SMART_SHAPE_LYRIC_BASED = 0x10000000
 _SMART_SHAPE_PRESET = 0x00008000
 _SMART_SHAPE_ADJUSTMENT_ON = 0x4000
-_SMART_SHAPE_TYPES = {0: "slurDown", 1: "slurUp", 2: "decresc", 3: "cresc", 15: "slurAuto"}
+_SMART_SHAPE_TYPES = {
+    0: "slurDown",
+    1: "slurUp",
+    2: "decresc",
+    3: "cresc",
+    15: "slurAuto",
+    25: "glissando",
+}
 """Published PDK structs/flags, corroborated by getters; see ARCHITECTURE."""
 
 
