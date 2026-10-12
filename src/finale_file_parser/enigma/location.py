@@ -240,6 +240,27 @@ def locate_entries(
             )
 
     orphans = set(entries_by_num) - set(placements.by_entry) - set(placements.ignored)
+    if orphans and not include_reserved_staff:
+        for frame in doc.others.of_tag("frameSpec"):
+            if "unassignedFrame" not in frame.fields or "part" in frame.attrs:
+                continue
+            start = frame.fields.get("startEntry")
+            end = frame.fields.get("endEntry")
+            if not isinstance(start, str) or not isinstance(end, str):
+                continue
+            if _int(start, "startEntry") not in orphans and _int(end, "endEntry") not in orphans:
+                continue
+            _place_frame_entries(
+                doc,
+                _int(frame.attrs.get("cmper"), "frameSpec cmper"),
+                RESERVED_STAFF,
+                0,
+                0,
+                None,
+                entries_by_num,
+                placements,
+            )
+        orphans -= set(placements.ignored)
     if orphans:
         raise MalformedScoreError(
             f"{len(orphans)} orphan entry(ies) not placed by any frame: {sorted(orphans)}"

@@ -882,6 +882,20 @@ staff retain that staff's placement; genuine orphans and broken links still
 raise, and template claims have the same per-entry allocation cap. No key is
 fabricated for template measures outside the real score.
 
+The first scoped rerun additionally exposes dormant, still-active entry chains
+in Prelude (56 entries), Simone (56) and Dark World (24). Their frameSpec
+records exist, but no current gfhold references them in any layer or part.
+The legacy adapter derives `unassignedFrame` only for frames with complete
+start/end references into the active entry pool and no assignment from any of
+the four layers, including linked-part contexts. It preserves all raw entries
+and frames. Musical location resolution can validate those chains as dormant
+ownership without fabricating a staff/measure placement. An unassigned frame
+alone does not put notes in the score. Genuine frameless entries, broken chains,
+ordinary missing references and claim caps remain errors. Direct raw placement
+inspection keeps the original strict orphan behavior. No pitch/duration or
+filename heuristic selects dormant data. The 75-file rerun builds all three;
+Dark World then reveals the already predicted invalid-font-text export failure.
+
 ### Known format facts — staff groups
 
 A `staffGroup` detail record spans a run of staves and says how they are joined — the braces and

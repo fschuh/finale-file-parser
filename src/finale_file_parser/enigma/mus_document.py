@@ -362,24 +362,55 @@ def read_mus_document(path: str | os.PathLike[str]) -> EnigmaDocument:
             return _rows_document(path)
         raise
     year = _banner_year(path)
+    translated_details = _details_records(details)
+    entries = read_mus_entry_records(path)
+    translated_others = _others_records(
+        others, _FALLBACK_ENCODING.get(_banner_platform(path) or "", "cp1252"), year=year
+    )
     return EnigmaDocument(
         version=_VERSION,
         header=Pool(records=_EMPTY),
         mappings=Pool(records=_EMPTY),
         options=OptionsPool(records=tuple(_options_records(others, year))),
         others=OthersPool(
-            records=tuple(
-                _others_records(
-                    others,
-                    _FALLBACK_ENCODING.get(_banner_platform(path) or "", "cp1252"),
-                    year=year,
-                )
-            )
+            records=tuple(_frame_assignment_scope(translated_others, translated_details, entries))
         ),
-        details=DetailsPool(records=tuple(_details_records(details))),
-        entries=EntriesPool(records=read_mus_entry_records(path)),
+        details=DetailsPool(records=tuple(translated_details)),
+        entries=EntriesPool(records=entries),
         texts=TextsPool(records=tuple(_texts_records(path))),
     )
+
+
+def _frame_assignment_scope(
+    others: list[Record], details: list[Record], entries: tuple[Record, ...]
+) -> list[Record]:
+    """Mark stored entry frames not assigned in any staff/layer/part context.
+
+    Raw entries and frames remain present. Only complete entry-pair references
+    into the active pool establish dormant ownership; no musical inference.
+    """
+    assigned = {
+        record.fields[f"frame{layer}"]
+        for record in details
+        if record.tag == "gfhold"
+        for layer in range(1, 5)
+        if f"frame{layer}" in record.fields
+    }
+    entry_numbers = {record.attrs["entnum"] for record in entries}
+    out = []
+    for record in others:
+        if (
+            record.tag == "frameSpec"
+            and record.attrs.get("cmper") not in assigned
+            and "part" not in record.attrs
+            and record.fields.get("startEntry") in entry_numbers
+            and record.fields.get("endEntry") in entry_numbers
+        ):
+            record = Record(
+                record.tag, record.attrs, record.text, {**record.fields, "unassignedFrame": ""}
+            )
+        out.append(record)
+    return out
 
 
 _FRAME_BASE_2001 = 4

@@ -10,6 +10,23 @@ and resolved ones **DECIDED**.
 
 ---
 
+## 2026-10-11 — DECIDED: preserve dormant legacy frames outside musical placement
+
+**Context.** Reserved-template scope exposes active entry chains in stored
+frames with no current gfhold assignment in Prelude, Simone and Dark World.
+All four layer references must be decoded before making that determination.
+
+**Decision.** Retain the raw database. The legacy adapter derives an unassigned
+frame marker from complete entry references and absence of assignments in all
+staff/layer/linked-part contexts. Musical placement validates those dormant
+chains as ownership, while producing events only for assigned musical cells.
+Raw location inspection stays strict; genuine frameless entries and malformed
+chains still fail. This is consistent with the approved plan's scope/ownership
+requirements and avoids classifying entries by their pitches or rhythms.
+
+**Validation.** Authored unused/shared/higher-layer/linked-part/orphan cases;
+75-file production sweep, with input hashes unchanged.
+
 ## 2026-10-11 — DECIDED: expand combined accent/staccato glyphs into existing articulations
 
 **Context.** Scars' missing bass-clef accents are visible assignments of a
