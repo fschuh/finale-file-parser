@@ -1020,3 +1020,13 @@ sounding ties. Preserve hidden sounding notes as sounding, and silent visible
 notes as visible. A standard cue-size default of100 complements type size=full
 so MuseScore's importer retains the source's normal note size. This follows
 source flags and MusicXML semantics; MIDI does not decide which notes to silence.
+
+## 2026-10-12 — DECIDED: articulation characters and shapes are separate
+
+Normalize fontMain/sizeMain and explicit mainIsShape/mainShape for evidenced
+48/60-byte numeric definitions. Combine modern Unicode words rather than assuming
+the first word is padding. Resolve font identity through the score registry.
+Reject shape definitions in all character-based semantic resolvers, including
+normalized MUSX, rather than interpreting a shape ID or stale character as a
+fermata/accent. Unsupported layouts remain unguessed; new extended glyph mappings
+must establish their font context before introducing visible notation.

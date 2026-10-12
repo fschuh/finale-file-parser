@@ -95,7 +95,7 @@ def _definitions(document: EnigmaDocument) -> dict[int, int]:
     """articDef cmper -> its main character."""
     out: dict[int, int] = {}
     for record in document.others.of_tag(_DEFINITION):
-        if "part" in record.attrs:
+        if "part" in record.attrs or "mainIsShape" in record.fields:
             continue
         cmper = field_int(record.attrs.get("cmper"))
         character = field_int(record.fields.get("charMain"))

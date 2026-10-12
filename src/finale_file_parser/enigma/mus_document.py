@@ -191,10 +191,9 @@ UNTRANSLATED = (
     "text-repeat assignments, fonts, UTF-16 text and playback rules ARE read; "
     "both containers retain canonical navigation. General custom targets and "
     "renderer-specific repeat policies may require review.",
-    "Fingering fonts: articDef's fontMain cannot be read from a .mus -- its "
-    "offset moves within the 2011 era, and the best single offset matches only "
-    "363 of 373 paired records. Fingerings themselves ARE read, from the "
-    "character alone; see enigma.fingerings for why that is sufficient.",
+    "Articulation fonts in unsupported/DCL definition layouts remain unknown. "
+    "The complete numeric 48/60-byte layouts now retain main font and size, "
+    "separate character/shape fields and the main-is-shape flag.",
     "Chorus and section lyrics: the .mus tag for lyrDataVerse is identified, but "
     "no paired corpus document uses a chorus or section track, so their tags are "
     "unknown and those lyrics are absent from a .mus-derived score.",
@@ -236,10 +235,10 @@ _CLEF_FIELD_OFFSETS = {
 `clefChar` and two more before `shapeID`; everything else is shared."""
 
 _ARTIC_CHAR_OFFSET = {48: 0, 60: 2}
-"""Where `charMain` sits in an `articDef` payload, by payload length.
+"""Where the low character word sits in an `articDef`, by payload length.
 
 The same era split as the clef table: 2011 writes 48 bytes with the character
-first, 2012 writes 60 with two bytes ahead of it. Keyed by length rather than by
+first, 2012 writes a high-word-first 32-bit character in 60 bytes. Keyed by length rather than by
 banner year because the length is right there and the two agree on every corpus
 record -- 4,841 at 48 bytes, all 2011, and 311 at 60, all 2012.
 """
@@ -1193,7 +1192,7 @@ def _others_records(
                         tag="articDef",
                         attrs=attrs,
                         text="",
-                        fields={"charMain": str(_u16(record.payload, offset))},
+                        fields=_artic_def(record.payload),
                     )
                 )
         elif record.tag == TAG_STAFF_SPEC and len(record.payload) >= _STAFF_TRANSPOSITION + 2:
@@ -1272,6 +1271,24 @@ def _others_records(
                     )
                 )
     return out
+
+
+def _artic_def(payload: bytes) -> dict[str, str | tuple[str, ...] | Record | tuple[Record, ...]]:
+    """The two independently anchored 48/60-byte definition layouts."""
+    if len(payload) not in {48, 60}:
+        raise CorruptScoreError("articDef: unsupported definition layout")
+    is_unicode = len(payload) == 60
+    character = _u16(payload, 0) * 65536 + _u16(payload, 2) if is_unicode else payload[0]
+    flags = _u16(payload, 24 if is_unicode else 22)
+    fields: dict[str, str | tuple[str, ...] | Record | tuple[Record, ...]] = {
+        "charMain": str(character),
+        "fontMain": str(_u16(payload, 4) if is_unicode else payload[2]),
+        "sizeMain": str(_u16(payload, 6) if is_unicode else payload[3]),
+    }
+    if flags & 2:
+        fields["mainIsShape"] = ""
+        fields["mainShape"] = str(_u16(payload, 34 if is_unicode else 32))
+    return fields
 
 
 def _text_repeat_assign(

@@ -1419,8 +1419,47 @@ put a wrong articulation on a real note, which is worse than leaving the note ba
 and fermatas.
 
 Fingerings use numerals 1–5 rather than articulation names; their resolver and evidence are
-described above. A `.mus` does not reliably give the font (`fontMain`'s offset varies within
-a single era), so new glyph mappings still require independent evidence.
+described above. The original font-layout gap is resolved for complete numeric
+48/60-byte definitions below; new glyph mappings still require font/chart evidence.
+
+#### Articulation fonts and symbol kind (2026-10-12)
+
+Numeric tag121 has two complete layouts. RGP Allocate 0x4c1198 and DataSizeLoad
+0x4c117a independently establish loaded bases +0x38/+0x68 and sizes48/60.
+Subtract those actual bases, not the old low-character-word offsets: using +0x66
+as the modern base would incorrectly treat font size as font ID. Font getter
+0x4c1382 reads old byte+0x3A/new word+0x6C, size getter0x4c11b4 supplies the
+neighboring size field, and flag2 getter0x4c0fc6 reads +0x4E/+0x80. The symbol-kind
+getter tests flag2 mask2. Main-shape pointer0x4c0fe6 uses +0x58/+0x8A.
+
+| Field | 48-byte legacy | 60-byte Unicode |
+|---|---|---|
+| main character | +0 u8 | +0/+2 two u16 words, high word first |
+| main font ID | +2 u8 | +4 u16 |
+| main font size | +3 u8 | +6 u16 |
+| flag2 / main-is-shape mask2 | +22 u16 | +24 u16 |
+| separate main shape ID | +32 u16 | +34 u16 |
+
+The modern lower word at+2 was previously sufficient for BMP glyphs; it is not
+two bytes of padding before the character. Combining the words preserves the
+published 32-bit Unicode range. The high-word-first serialization also matches
+the independently mapped numeric four-byte playback controls. Every offset is
+read only after its exact complete-layout length is established.
+
+Normalize fontMain/sizeMain/mainIsShape/mainShape without treating a shape ID as
+a character. All articulation-derived resolvers reject mainIsShape before glyph
+lookup, including MUSX data. A shared score-only font registry resolves font IDs.
+In the supplied corpus all5167 visible assignments use character definitions:
+4889Maestro,270EngraverFontSet,8TimesNewRoman. The outstanding trill217 (three),
+portato248 (50), marcato171/172 (three) all explicitly use Maestro. Objection's
+161 character8 assignments and Athletic's two character0 assignments are also
+Maestro character definitions, not custom shapes; do not label them as invented
+visible accents. Their separate playback values remain a research item.
+
+Evidence: published [articulation API](https://pdk.finalelua.com/class_f_c_articulation_def.html),
+its ff_other.h structure/version selection, released RGP allocation/size/font/
+flag/shape-pointer getters and the complete source-font registry inventory.
+Authored tests distinguish neighboring fields, Unicode words and shape aliases.
 
 On the `.mus` side: `articAssign` is details tag 1009 with the definition's cmper at payload +0;
 `articDef` is others tag 121 with `charMain` at +0 (2011, 48-byte payload) or +2 (2012, 60-byte) —

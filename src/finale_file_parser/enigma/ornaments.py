@@ -21,7 +21,9 @@ def ornaments_by_entry(document: EnigmaDocument) -> dict[int, tuple[Ornament, ..
     definitions = {
         field_int(record.attrs.get("cmper"))
         for record in document.others.of_tag("articDef")
-        if "part" not in record.attrs and field_int(record.fields.get("charMain")) == _UPPER_MORDENT
+        if "part" not in record.attrs
+        and "mainIsShape" not in record.fields
+        and field_int(record.fields.get("charMain")) == _UPPER_MORDENT
     }
     out: dict[int, list[Ornament]] = {}
     for record in document.details.of_tag("articAssign"):

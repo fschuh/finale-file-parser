@@ -32,12 +32,18 @@ def _compiled_id(arguments: str) -> int:
     return number
 
 
+def font_names(document: EnigmaDocument) -> dict[int, str]:
+    """Only score font IDs name the registry used by score definitions."""
+    result = {}
+    for record in document.others.of_tag("fontName"):
+        number = field_int(record.attrs.get("cmper"))
+        if "part" not in record.attrs and number is not None:
+            result[number] = str(record.fields.get("name", ""))
+    return result
+
+
 def text_runs(document: EnigmaDocument, markup: str) -> tuple[FontRun, ...]:
-    fonts = {
-        field_int(record.attrs.get("cmper")): str(record.fields.get("name", ""))
-        for record in document.others.of_tag("fontName")
-        if "part" not in record.attrs
-    }
+    fonts = font_names(document)
     result: list[FontRun] = []
     name: str | None = None
     is_music = False
