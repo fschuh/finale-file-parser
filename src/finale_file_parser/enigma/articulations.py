@@ -28,6 +28,7 @@ names here.
 from __future__ import annotations
 
 from finale_file_parser.enigma.document import EnigmaDocument, field_int
+from finale_file_parser.enigma.fonts import font_names
 
 __all__ = ["ARTICULATION_CHARACTERS", "articulations_by_entry"]
 
@@ -61,7 +62,9 @@ _COMBINED_ARTICULATIONS = {
 """Cross-font combined glyphs; see the chart evidence in ARCHITECTURE."""
 
 
-def _articulation_names(character: int) -> tuple[str, ...]:
+def _articulation_names(character: int, font: str = "") -> tuple[str, ...]:
+    if font.casefold() == "maestro" and character in {248, 60}:
+        return ("tenuto", "staccato")
     name = ARTICULATION_CHARACTERS.get(character)
     return (name,) if name is not None else _COMBINED_ARTICULATIONS.get(character, ())
 
@@ -75,7 +78,7 @@ def articulations_by_entry(document: EnigmaDocument) -> dict[int, tuple[str, ...
     drops as a storage artifact. This layer does not collapse distinct source
     assignments.
     """
-    characters = _definitions(document)
+    definitions = _definitions(document)
     out: dict[int, list[str]] = {}
     for record in document.details.of_tag(_ASSIGN):
         if "part" in record.attrs or "hide" in record.fields:
@@ -84,21 +87,25 @@ def articulations_by_entry(document: EnigmaDocument) -> dict[int, tuple[str, ...
         definition = field_int(record.fields.get(_DEFINITION))
         if entnum is None or definition is None:
             continue
-        names = _articulation_names(characters.get(definition, -1))
+        names = definitions.get(definition, ())
         if not names:
             continue
         out.setdefault(entnum, []).extend(names)
     return {entnum: tuple(names) for entnum, names in out.items()}
 
 
-def _definitions(document: EnigmaDocument) -> dict[int, int]:
-    """articDef cmper -> its main character."""
-    out: dict[int, int] = {}
+def _definitions(document: EnigmaDocument) -> dict[int, tuple[str, ...]]:
+    """articDef cmper -> meanings established for its main character and font."""
+    fonts = font_names(document)
+    out: dict[int, tuple[str, ...]] = {}
     for record in document.others.of_tag(_DEFINITION):
         if "part" in record.attrs or "mainIsShape" in record.fields:
             continue
         cmper = field_int(record.attrs.get("cmper"))
         character = field_int(record.fields.get("charMain"))
         if cmper is not None and character is not None:
-            out[cmper] = character
+            font = field_int(record.fields.get("fontMain"))
+            out[cmper] = _articulation_names(
+                character, fonts.get(font, "") if font is not None else ""
+            )
     return out

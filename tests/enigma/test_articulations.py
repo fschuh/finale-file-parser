@@ -31,17 +31,22 @@ EMPTY: tuple[Record, ...] = ()
 
 
 def document(
-    *, definitions: dict[int, int], assignments: tuple[tuple[int, int], ...]
+    *,
+    definitions: dict[int, int],
+    assignments: tuple[tuple[int, int], ...],
+    font: str | None = None,
 ) -> EnigmaDocument:
     others = tuple(
         Record(
             tag="articDef",
             attrs={"cmper": str(cmper)},
             text="",
-            fields={"charMain": str(character)},
+            fields={"charMain": str(character), **({"fontMain": "7"} if font else {})},
         )
         for cmper, character in definitions.items()
     )
+    if font:
+        others += (Record(tag="fontName", attrs={"cmper": "7"}, text="", fields={"name": font}),)
     details = tuple(
         Record(
             tag="articAssign",
@@ -105,6 +110,18 @@ def test_a_combined_glyph_expands_in_assignment_order() -> None:
 
 def test_an_assignment_naming_a_missing_definition_is_dropped() -> None:
     doc = document(definitions={}, assignments=((7, 3),))
+    assert articulations_by_entry(doc) == {}
+
+
+@pytest.mark.parametrize("character", [248, 60])
+def test_font_gated_portato_retains_both_components(character: int) -> None:
+    doc = document(definitions={1: character}, assignments=((7, 1),), font="Maestro")
+    assert articulations_by_entry(doc) == {7: ("tenuto", "staccato")}
+
+
+@pytest.mark.parametrize("font", [None, "Times New Roman", "Unestablished Music Font"])
+def test_portato_is_not_guessed_from_a_letter_without_the_source_font(font: str | None) -> None:
+    doc = document(definitions={1: 248}, assignments=((7, 1),), font=font)
     assert articulations_by_entry(doc) == {}
 
 

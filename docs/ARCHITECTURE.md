@@ -1779,6 +1779,16 @@ chord pitches, even with the mark on C6. This importer limitation and its fixed
 trill cadence remain separate from source recovery; no extra written notes or
 voice split are manufactured to work around it.
 
+#### Combined tenuto and staccato (2026-10-12, F19)
+
+The official Maestro chart identifies characters248 (above) and60 (below) as
+tenuto with staccato. Recognize them only with established Maestro font context
+and emit both existing articulation components once per assigned entry, through
+the existing chord/hidden/linked-part/packed-assignment handling. All50 source
+placements use248: Peaceful Days8, Hikari2, Determination36, MEGALOVANIA4.
+There is no new binary layout or performance note-off rule; portato durations
+in Human Playback are not rewritten into notation.
+
 ### Known format facts — Unicode expression descriptions and dynamics
 
 Numeric-pool `.mus` **others tag 241** stores the expression description at
