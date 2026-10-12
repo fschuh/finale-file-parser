@@ -120,7 +120,7 @@ def build_score(document: EnigmaDocument) -> Score:
 
     One part per staff, measures in order, one IR voice per Finale layer.
     """
-    location = locate_entries(document)
+    location = locate_entries(document, include_reserved_staff=False)
     chain = entry_chain(document)
     sounded = sounded_durations(chain, tuplets_by_entry(document))
     records = {int(r.attrs["entnum"]): r for r in document.entries.of_tag("entry")}

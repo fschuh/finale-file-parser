@@ -121,6 +121,78 @@ def test_an_unmirrored_entry_holds_exactly_one_location() -> None:
     assert len(loc[3]) == 1
 
 
+def _reserved_template_document(*, shared: bool = False, orphan: bool = False) -> bytes:
+    """Authored template outside the score, optionally sharing a real entry."""
+    return _doc(
+        _entries("1:0", "2:0", *(("3:0",) if orphan else ()))
+        + f"""
+        <others>
+          <frameSpec cmper="10"><startEntry>1</startEntry><endEntry>1</endEntry></frameSpec>
+          <frameSpec cmper="20"><startEntry>{1 if shared else 2}</startEntry>
+            <endEntry>{1 if shared else 2}</endEntry></frameSpec>
+          <frameSpec cmper="21"><startEntry>2</startEntry><endEntry>2</endEntry></frameSpec>
+          <measSpec cmper="1"><keySig><key>2</key></keySig></measSpec>
+        </others>
+        <details>
+          <gfhold cmper1="1" cmper2="1"><frame1>10</frame1></gfhold>
+          <gfhold cmper1="32767" cmper2="9"><frame1>20</frame1></gfhold>
+          <gfhold cmper1="32767" cmper2="10"><frame1>21</frame1></gfhold>
+        </details>
+        """
+    )
+
+
+@pytest.mark.parametrize("shared", [False, True])
+def test_template_scope_preserves_shared_entries_and_raw_document(shared: bool) -> None:
+    document = parse_enigma(_reserved_template_document(shared=shared))
+    assert locate_entries(document, include_reserved_staff=False) == {
+        1: (EntryLocation(1, 1, 1, 2, 1),)
+    }
+    assert len(document.entries.records) == 2
+    assert len(tuple(document.details.of_tag("gfhold"))) == 3
+    with pytest.raises(MalformedScoreError, match="measure 9"):
+        locate_entries(document)
+
+
+def test_template_scope_does_not_exempt_real_orphans() -> None:
+    document = parse_enigma(_reserved_template_document(orphan=True))
+    with pytest.raises(MalformedScoreError, match=r"1 orphan.*\[3\]"):
+        locate_entries(document, include_reserved_staff=False)
+
+
+def test_template_scope_does_not_exempt_unknown_real_measures() -> None:
+    raw = _reserved_template_document().replace(b'cmper1="1" cmper2="1"', b'cmper1="1" cmper2="8"')
+    with pytest.raises(MalformedScoreError, match="measure 8"):
+        locate_entries(parse_enigma(raw), include_reserved_staff=False)
+
+
+def test_template_scope_still_checks_missing_entry_links() -> None:
+    raw = _reserved_template_document().replace(
+        b"<startEntry>2</startEntry>", b"<startEntry>99</startEntry>"
+    )
+    with pytest.raises(MalformedScoreError, match="missing entry 99"):
+        locate_entries(parse_enigma(raw), include_reserved_staff=False)
+
+
+def test_template_claims_remain_bounded() -> None:
+    body = (
+        _entries("1:0")
+        + """
+        <others><frameSpec cmper="20">
+          <startEntry>1</startEntry><endEntry>1</endEntry>
+        </frameSpec></others>
+        <details>
+    """
+    )
+    body += "".join(
+        f'<gfhold cmper1="32767" cmper2="{measure}"><frame1>20</frame1></gfhold>'
+        for measure in range(1, 66)
+    )
+    body += "</details>"
+    with pytest.raises(MalformedScoreError, match="more than 64 template frames"):
+        locate_entries(parse_enigma(_doc(body)), include_reserved_staff=False)
+
+
 def test_the_same_place_claimed_twice_still_raises() -> None:
     """Distinct locations are a mirror; the same location twice is malformed.
 

@@ -52,6 +52,8 @@ from finale_file_parser.errors import FinaleFileError
 
 _FRAME_FIELDS = ("frame1", "frame2", "frame3", "frame4")
 _CHAIN_GUARD = 1_000_000
+RESERVED_STAFF = 0x7FFF
+"""Finale's non-score template staff; see ARCHITECTURE, reserved staff 32767."""
 
 _MAX_MEASURE_SPAN = 100_000
 """Measures one document's key resolution may span, at most.
@@ -156,6 +158,15 @@ class _Placements:
     """
 
     by_entry: dict[int, list[EntryLocation]] = field(default_factory=dict)
+    ignored: dict[int, int] = field(default_factory=dict)
+
+    def ignore(self, entnum: int) -> None:
+        count = self.ignored.get(entnum, 0) + 1
+        if count > _MAX_PLACEMENTS_PER_ENTRY:
+            raise MalformedScoreError(
+                f"entry {entnum} claimed by more than {_MAX_PLACEMENTS_PER_ENTRY} template frames"
+            )
+        self.ignored[entnum] = count
 
     def add(self, place: EntryLocation) -> None:
         here = self.by_entry.setdefault(place.entnum, [])
@@ -172,12 +183,19 @@ class _Placements:
         here.append(place)
 
 
-def locate_entries(doc: EnigmaDocument) -> dict[int, tuple[EntryLocation, ...]]:
+def locate_entries(
+    doc: EnigmaDocument, *, include_reserved_staff: bool = True
+) -> dict[int, tuple[EntryLocation, ...]]:
     """Resolve every entry to the place(s) it sounds, and the effective raw key.
 
     Pure over the parsed document -- no I/O. Builds the whole index in one
     pass since the effective-key inheritance needs a full measure-order pass
     anyway, and callers iterate entries far more than once.
+
+    With `include_reserved_staff=False`, template entry chains are checked for
+    ownership but do not become musical placements. They may refer beyond the
+    actual measure range; no key is invented for those template cells. Shared
+    entries retain their ordinary staff placements. The raw document is intact.
 
     Raises:
         MalformedScoreError: an entry is not reachable from any frame, a
@@ -200,14 +218,15 @@ def locate_entries(doc: EnigmaDocument) -> dict[int, tuple[EntryLocation, ...]]:
             continue
         staff = _int(gfhold.attrs.get("cmper1"), "gfhold cmper1")
         measure = _int(gfhold.attrs.get("cmper2"), "gfhold cmper2")
-        if measure not in key_by_measure:
+        template = staff == RESERVED_STAFF and not include_reserved_staff
+        if not template and measure not in key_by_measure:
             # A measure that holds entries but defines no key is malformed: this
             # is the foundation every later slice reads its key from, so fabricate
             # nothing — raise rather than silently return C major.
             raise MalformedScoreError(
                 f"gfhold places entries in measure {measure}, which has no measSpec key"
             )
-        key_signature = key_by_measure[measure]
+        key_signature = None if template else key_by_measure[measure]
         for layer, field_name in enumerate(_FRAME_FIELDS, start=1):
             frame_value = gfhold.fields.get(field_name)
             if not isinstance(frame_value, str) or frame_value in ("", "0"):
@@ -220,7 +239,7 @@ def locate_entries(doc: EnigmaDocument) -> dict[int, tuple[EntryLocation, ...]]:
                 doc, frame_cmper, staff, measure, layer, key_signature, entries_by_num, placements
             )
 
-    orphans = set(entries_by_num) - set(placements.by_entry)
+    orphans = set(entries_by_num) - set(placements.by_entry) - set(placements.ignored)
     if orphans:
         raise MalformedScoreError(
             f"{len(orphans)} orphan entry(ies) not placed by any frame: {sorted(orphans)}"
@@ -291,7 +310,7 @@ def _place_frame_entries(
     staff: int,
     measure: int,
     layer: int,
-    key_signature: int,
+    key_signature: int | None,
     entries_by_num: dict[int, Record],
     placements: _Placements,
 ) -> None:
@@ -337,7 +356,7 @@ def _walk_entry_chain(
     staff: int,
     measure: int,
     layer: int,
-    key_signature: int,
+    key_signature: int | None,
     entries_by_num: dict[int, Record],
     placements: _Placements,
 ) -> None:
@@ -356,15 +375,18 @@ def _walk_entry_chain(
             raise MalformedScoreError(
                 f"frameSpec {frame_cmper} chain references missing entry {entnum}"
             )
-        placements.add(
-            EntryLocation(
-                entnum=entnum,
-                staff=staff,
-                measure=measure,
-                layer=layer,
-                key_signature=key_signature,
+        if key_signature is None:
+            placements.ignore(entnum)
+        else:
+            placements.add(
+                EntryLocation(
+                    entnum=entnum,
+                    staff=staff,
+                    measure=measure,
+                    layer=layer,
+                    key_signature=key_signature,
+                )
             )
-        )
         if entnum == end_entnum:
             break
         entnum = _int(entry.attrs.get("next"), "next")

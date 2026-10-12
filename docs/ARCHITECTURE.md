@@ -864,7 +864,15 @@ absence from the list (a `.mus` has no such list, and the containers must agree)
 for is **not** established — a hidden one-line staff of repeated quarter notes would fit a click
 track, rhythmic notation or a chord-symbol carrier equally well.
 
-Its entries are still placed by `locate_entries`, so nothing below the IR is lost.
+The raw document retains all its entries. By default `locate_entries` still
+includes it for callers inspecting raw placements. `build_score` now requests
+musical scope explicitly: reserved-staff chains are validated and recorded as
+template ownership, without requiring a real measure/key or producing a part.
+This handles stale template measures observed in Wind Scene, Prelude, Simone,
+Dungeon and Dark World in the 2026-10-11 audit. Entries shared with an ordinary
+staff retain that staff's placement; genuine orphans and broken links still
+raise, and template claims have the same per-entry allocation cap. No key is
+fabricated for template measures outside the real score.
 
 ### Known format facts — staff groups
 
