@@ -169,6 +169,59 @@ def test_an_empty_layer_slot_is_omitted(pools: Callable[..., None]) -> None:
     assert "frame2" not in record.fields
 
 
+@pytest.mark.parametrize("layer", [3, 4])
+def test_numeric_gfhold_preserves_higher_layers(pools: Callable[..., None], layer: int) -> None:
+    payload = bytearray(gfhold_payload(3, 0))
+    at = 6 + (layer - 1) * 2
+    payload[at : at + 2] = (71).to_bytes(2, "little")
+    pools(details=(MusDetailRecord(GFHOLD, 2, 7, 0, bytes(payload)),))
+    record = read_mus_document(PATH).details.get("gfhold", 2, 7)
+    assert record is not None
+    assert record.fields == {"clefID": "3", f"frame{layer}": "71"}
+
+
+@pytest.mark.parametrize("size", [0, 4, 6, 9, 10, 12, 13])
+def test_numeric_gfhold_rejects_truncated_frame_arrays(
+    pools: Callable[..., None], size: int
+) -> None:
+    pools(details=(MusDetailRecord(GFHOLD, 1, 1, 0, bytes(size)),))
+    with pytest.raises(CorruptScoreError, match="truncated four-layer frame array"):
+        read_mus_document(PATH)
+
+
+@pytest.mark.parametrize("layer", [3, 4])
+def test_higher_layer_music_reaches_ir_and_musicxml(pools: Callable[..., None], layer: int) -> None:
+    payload = bytearray(gfhold_payload(0, 0))
+    at = 6 + (layer - 1) * 2
+    payload[at : at + 2] = (71).to_bytes(2, "little")
+    pools(
+        others=(
+            MusOther(FRAME_SPEC, 71, 0, entry_pair(501, 501)),
+            MusOther(MEAS_SPEC, 1, 0, meas_spec_payload(305, 0, 1, 1024)),
+        ),
+        details=(MusDetailRecord(GFHOLD, 1, 1, 0, bytes(payload)),),
+        entries=(
+            Record(
+                "entry",
+                {"entnum": "501", "prev": "0", "next": "0"},
+                "",
+                {
+                    "dura": "1024",
+                    "numNotes": "1",
+                    "note": Record("note", {}, "", {"harmLev": "0", "harmAlt": "0"}),
+                },
+            ),
+        ),
+    )
+    score = build_score(read_mus_document(PATH))
+    voice = score.parts[0].measures[0].voices[0]
+    assert voice.number == layer
+    assert len(voice.events) == 1
+    root = DET.fromstring(to_musicxml(score))
+    assert root.findtext("part/measure/note/voice") == str(layer)
+    assert root.findtext("part/measure/note/pitch/step") == "C"
+
+
 def test_passes_entry_records_through(pools: Callable[..., None]) -> None:
     entry = Record(tag="entry", attrs={"entnum": "9"}, text="", fields={"dura": "1024"})
     pools(entries=(entry,))
@@ -218,7 +271,6 @@ def test_skips_record_types_it_cannot_translate(pools: Callable[..., None]) -> N
 def test_skips_a_payload_too_short_for_its_fields(pools: Callable[..., None]) -> None:
     pools(
         others=(MusOther(FRAME_SPEC, 3, 0, b"\x09\x00"),),
-        details=(MusDetailRecord(GFHOLD, 1, 1, 0, b"\x00\x00"),),
     )
     document = read_mus_document(PATH)
     assert document.others.records == ()

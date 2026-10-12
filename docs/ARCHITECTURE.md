@@ -303,6 +303,14 @@ claiming 4/4 over a bar that is really 3/4. Only 76 measures genuinely set the f
 A `gfhold` holds up to four frames, which are Finale's **layers**. `EntryLocation.layer` records which
 slot placed an entry (1–4).
 
+The legacy numeric `gfhold` (tag1044) stores four u16 frame references at
+payload +6,+8,+10,+12. Require all 14 bytes before reading the array and omit
+zero references. The 2026-10-11 Objection audit independently resolves +10 to
+frames110/148 in staff3 measures16/22; these locate six otherwise orphaned
+entries. The normalized resolver already supports four layers, as does the
+older DCL adapter. Authored tests exercise nonempty layers3/4 and truncated
+arrays without reproducing source music.
+
 **Each layer independently fills its measure**, so anything summing durations must group by
 `(staff, measure, layer)`. Grouping by `(staff, measure)` alone makes a two-layer measure appear to
 hold exactly twice its time signature — measured on the corpus, 78 measures at exactly 2× and 4 at

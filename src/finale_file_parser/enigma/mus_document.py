@@ -22,7 +22,7 @@ Translated:
 | entries | `entry` | via `read_mus_entry_records` |
 | others | `frameSpec` (146) | `startEntry`, `endEntry` |
 | others | `measSpec` (176) | `keySig.key`, `beats`, `divbeat`, the +10 flags byte |
-| details | `gfhold` (1044) | `clefID`, `frame1`, `frame2` |
+| details | `gfhold` (1044) | `clefID`, `frame1`..`frame4` |
 | options | `clefOptions` (109) | the clef table: `adjust`, `clefChar`, `clefYDisp`, `shapeID` |
 | options | `graceNoteOptions` (58 / ETF `^44`) | `slashFlaggedGraceNotes` |
 | details | `tupletDef` (1072) | `symbolicNum`, `symbolicDur`, `refNum`, `refDur` |
@@ -392,7 +392,7 @@ apart -- three in a 2001 file, six in a 2005 one. See
 _FRAME_LAYERS = 4
 """Frame slots per `GF` record, one per Finale layer.
 
-Four, not the two the 2011 reader takes: a fifth slot never resolves to a frame
+Four in both legacy adapters: a fifth slot never resolves to a frame
 in any corpus document, and reading the third and fourth reaches 1,058 entries
 that two leave orphaned. Finale has four layers, so this is the format's own
 number rather than a fitted one."""
@@ -1328,8 +1328,10 @@ def _gfhold(payload: bytes) -> dict[str, str | tuple[str, ...] | Record | tuple[
     A frame of 0 means the layer is empty and is omitted, matching a `.musx`,
     where `locate_entries` reads an absent slot as "this layer holds nothing".
     """
+    if len(payload) < 14:
+        raise CorruptScoreError("gfhold: truncated four-layer frame array")
     fields = _gfhold_clef(payload)
-    for layer, offset in ((1, 6), (2, 8)):
+    for layer, offset in enumerate(range(6, 14, 2), start=1):
         frame = _u16(payload, offset)
         if frame:
             fields[f"frame{layer}"] = str(frame)
@@ -1496,7 +1498,7 @@ def _details_records(records: tuple[MusDetailRecord, ...]) -> list[Record]:
     artic_seen: dict[int, set[tuple[int, int, bool]]] = {}
     shape_incidence: dict[int, dict[int, int]] = {}
     for record in records:
-        if record.tag == TAG_GFHOLD and len(record.payload) >= 10:
+        if record.tag == TAG_GFHOLD:
             out.append(
                 Record(
                     tag="gfhold",
