@@ -1069,10 +1069,44 @@ which is too thin to commit to. The records are tags **203** (`repeatBack`), **2
 (`repeatEndingStart`) and **206** (`repeatPassList`); 204 and 206 share a key set, and the payload
 separates them — 206 is 12 bytes opening with the pass number, 204 is 24 bytes of bracket geometry.
 
-Not read, deliberately: `repeatBack.target`, `trigger`, `action`, and the `textRepeatAssign` family
+The original implementation did not read `repeatBack.target`, `trigger`, `action`, or the `textRepeatAssign` family
 (D.C., D.S., Fine, To Coda). Those describe *jumps* rather than repeat barlines and MusicXML spells
 them differently. `repeatEndingText` — a bracket's custom label, used by three corpus documents — is
 also unread; the text is derived from the pass numbers instead.
+
+### Explicit backward-repeat state (2026-10-12)
+
+The 24-byte numeric tag-203 record stores actuate +2, signed target +4 and
+flags +10. Published PDK `FCBackwardRepeat` exposes the same EDT structure:
+the loaded object starts at +0x36, so its independently confirmed actuate
+getter +0x38 anchors the serialized translation rather than treating a live
+object offset as a file offset. Target +0x3a and flag +0x40 corroborate the
+relative field spacing. Paired legacy pass evidence, source barlines/ending
+lists and all supplied repeat routes provide independent checks.
+
+Flags &0x70: 0 automatic/nearest preceding forward repeat, 0x10 absolute
+measure, 0x20 relative measure. Flags &0xc00: 0 always, 0x400 on pass, 0x800
+until pass. Flag 0x4 resets the counter when another repeat action occurs;
+0x1 is not that reset flag. Unsupported combinations fail, and records without
+an actual backward barline do not install playback rules. Older short records
+retain only their previously evidenced pass count. The canonical
+`Measure.repeat_playback` retains these independent values.
+
+`playback.measure_route` performs bounded traversal with separate per-repeat
+encounter counts and consumed ending state. An outer repeat does not erase an
+inner repeat unless its source reset bit requests that action. This recovers
+Memories of Green's final return to bar 5 while skipping its first ending,
+without filename-specific route logic. The 56-measure visit route has the
+expected 224 quarters. Spring Yard's notation alone gives a longer route than
+its MIDI's 156-quarter replay; playback-control stop preferences still need
+their own serialized mapping before that discrepancy can be classified.
+
+MusicXML preserves ordinary repeat/ending notation and its standard after-jump
+attribute for reset behavior. This does not claim every Finale action/trigger
+can be expressed by a repeat barline or verified in the user's MuseScore.
+Nonstandard targets remain in IR for the navigation/export work. Evidence:
+[published PDK](https://pdk.finalelua.com/class_f_c_backward_repeat.html), its
+`ff_other.h` source, read-only RGP Lua getters and source/MIDI route checks.
 
 ### Known format facts — beams
 

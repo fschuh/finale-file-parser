@@ -951,3 +951,14 @@ Ranges export their two printed bounds; absent separately typed source playback
 data, they do not select a single sound tempo. Resolve legacy beat and dot glyphs
 from active font runs before parsing. Keep expression text intact and require
 actual assignment evidence before promoting page/header text to timed notation.
+
+## 2026-10-12 — DECIDED: retain repeat rules independently from written barlines
+
+Append `Measure.repeat_playback` for explicit destination, trigger, pass count
+and reset policy. Keep existing written repeat/ending fields. A bounded pure
+traversal over canonical Score retains encounter counts per backward repeat;
+an outer jump resets only counters with an explicit source reset flag. It never
+uses a MIDI-derived route or expands the written score into performed notes.
+Ordinary MusicXML barlines retain their standard after-jump flag outside endings;
+arbitrary Finale actions and playback-control stops require separate source and
+importer evidence before additional playback instructions are emitted.

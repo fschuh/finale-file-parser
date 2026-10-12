@@ -1161,6 +1161,8 @@ def _append_barline(element: ET.Element, measure: Measure, location: str) -> Non
         # otherwise -- a section played three times, say.
         if not left and measure.repeat_passes != 2:
             attrs["times"] = str(measure.repeat_passes)
+        if not left and not endings and measure.repeat_playback is not None:
+            attrs["after-jump"] = "yes" if measure.repeat_playback.reset_on_action else "no"
         ET.SubElement(barline, "repeat", attrs)
 
 

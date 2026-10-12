@@ -37,7 +37,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from finale_file_parser.enigma.document import EnigmaDocument, Record, field_int
-from finale_file_parser.ir import Ending
+from finale_file_parser.enigma.models import CorruptScoreError
+from finale_file_parser.ir import Ending, RepeatPlayback
 
 __all__ = ["MeasureRepeats", "Repeats", "repeats_for"]
 
@@ -72,6 +73,7 @@ class MeasureRepeats:
     endings: tuple[Ending, ...] = ()
     """Ending brackets opening or closing here. A single-measure ending both
     opens and closes on its own measure, so this can hold two."""
+    playback: RepeatPlayback | None = None
 
 
 @dataclass(frozen=True)
@@ -91,6 +93,7 @@ def repeats_for(document: EnigmaDocument) -> Repeats:
     """Resolve every repeat barline and ending bracket in `document`."""
     flags = _measure_flags(document)
     passes = _backward_passes(document)
+    playback = _backward_playback(document)
     out: dict[int, list[Ending]] = {}
     for start, stop, numbers in _endings(document, flags):
         out.setdefault(start, []).append(Ending(numbers=numbers, type="start"))
@@ -108,6 +111,7 @@ def repeats_for(document: EnigmaDocument) -> Repeats:
                 backward=flags.get(measure, _NO_FLAGS).backward,
                 passes=passes.get(measure, DEFAULT_PASSES),
                 endings=tuple(out.get(measure, ())),
+                playback=playback.get(measure) if flags.get(measure, _NO_FLAGS).backward else None,
             )
             for measure in sorted(measures)
         }
@@ -157,6 +161,31 @@ def _backward_passes(document: EnigmaDocument) -> dict[int, int]:
             continue
         out[measure] = actuate if actuate and actuate > 0 else DEFAULT_PASSES
     return out
+
+
+def _backward_playback(document: EnigmaDocument) -> dict[int, RepeatPlayback]:
+    result = {}
+    for record in document.others.of_tag(_BACK):
+        if "part" in record.attrs or not {"action", "trigger"}.intersection(record.fields):
+            continue
+        measure = field_int(record.attrs.get("cmper"))
+        target = field_int(record.fields.get("target", "0"))
+        passes = field_int(record.fields.get("actuate", "2"))
+        action = str(record.fields.get("action", "jumpAuto"))
+        trigger = str(record.fields.get("trigger", "always"))
+        if (
+            measure is None
+            or target is None
+            or passes is None
+            or not 1 <= passes <= 32767
+            or action not in {"jumpAuto", "jumpAbsolute", "jumpRelative", "noJump", "stop"}
+            or trigger not in {"always", "onPass", "untilPass"}
+        ):
+            raise CorruptScoreError("repeatBack: invalid playback rule")
+        result[measure] = RepeatPlayback(
+            action, trigger, target, passes, "clrOnChange" in record.fields
+        )
+    return result
 
 
 def _endings(

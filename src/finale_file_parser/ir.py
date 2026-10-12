@@ -36,6 +36,7 @@ __all__ = [
     "Part",
     "PartGroup",
     "Pitch",
+    "RepeatPlayback",
     "Score",
     "Slur",
     "SlurEndpoint",
@@ -371,6 +372,17 @@ class ClefChange:
 
 
 @dataclass(frozen=True)
+class RepeatPlayback:
+    """Explicit source repeat destination and trigger, independent of its barline."""
+
+    action: str = "jumpAuto"
+    trigger: str = "untilPass"
+    target: int = 0
+    passes: int = 2
+    reset_on_action: bool = False
+
+
+@dataclass(frozen=True)
 class Measure:
     """One measure of one part."""
 
@@ -420,6 +432,7 @@ class Measure:
 
     clef_changes: tuple[ClefChange, ...] = ()
     """Timed clefs, including a source list's initial clef at offset zero."""
+    repeat_playback: RepeatPlayback | None = None
 
 
 @dataclass(frozen=True)

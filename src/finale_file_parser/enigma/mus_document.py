@@ -1207,7 +1207,23 @@ def _repeat_back(payload: bytes) -> dict[str, str | tuple[str, ...] | Record | t
     holds 0 exactly where the `.musx` omits it.
     """
     actuate = _u16(payload, 2)
-    return {"actuate": str(actuate)} if actuate else {}
+    fields: dict[str, str | tuple[str, ...] | Record | tuple[Record, ...]] = (
+        {"actuate": str(actuate)} if actuate else {}
+    )
+    if len(payload) < 24:
+        # Older short records establish the already-evidenced pass field only.
+        return fields
+    flags = _u16(payload, 10)
+    actions = {0: "jumpAuto", 0x10: "jumpAbsolute", 0x20: "jumpRelative"}
+    triggers = {0: "always", 0x400: "onPass", 0x800: "untilPass"}
+    action = actions.get(flags & 0x70)
+    trigger = triggers.get(flags & 0xC00)
+    if action is None or trigger is None:
+        raise CorruptScoreError("repeatBack: unsupported target or trigger flag combination")
+    fields.update(target=str(_s16(payload, 4)), action=action, trigger=trigger)
+    if flags & 4:
+        fields["clrOnChange"] = ""
+    return fields
 
 
 def _staff_spec(

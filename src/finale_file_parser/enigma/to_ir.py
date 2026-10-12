@@ -629,6 +629,7 @@ def _measure(
         repeat_backward=here.backward,
         repeat_passes=here.passes,
         endings=here.endings,
+        repeat_playback=here.playback,
     )
 
 
