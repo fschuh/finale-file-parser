@@ -4,6 +4,7 @@ from fractions import Fraction
 
 from finale_file_parser.enigma.document import EnigmaDocument, field_int
 from finale_file_parser.enigma.models import CorruptScoreError
+from finale_file_parser.enigma.timesig import time_signatures
 from finale_file_parser.ir import PlaybackPreferences
 
 
@@ -49,6 +50,13 @@ def playback_preferences(document: EnigmaDocument) -> PlaybackPreferences | None
         stop_measure = stop - (values["stopEdu"] == 0)
         if stop_measure < 1:
             raise CorruptScoreError("playbackOptions: stop precedes the score")
+    signatures = time_signatures(document) if document.others.of_tag("measSpec") else {}
+    initial = signatures.get(min(signatures)) if signatures else None
+    unit = (
+        Fraction(initial.division_edu, 8192)
+        if initial is not None and not initial.is_compound
+        else None
+    )
     return PlaybackPreferences(
         Fraction(values["metronomeBeat"], 4096),
         Fraction(values["metronomeSpeed"]),
@@ -61,4 +69,5 @@ def playback_preferences(document: EnigmaDocument) -> PlaybackPreferences | None
         Fraction(values["stopEdu"], 4096),
         values["startPass"],
         values["endPass"],
+        unit,
     )

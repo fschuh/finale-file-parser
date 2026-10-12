@@ -1152,6 +1152,42 @@ mapping/getters (binary hash recorded with the grace evidence), source records
 and the verified MuseScore importer source. No released binary is executed or
 committed.
 
+### Source swing and straight instructions (2026-10-12)
+
+Typed swing expressions use the independently mapped signed value/1024;
+zero explicitly restores straight time and 1024 requests standard triplet swing.
+Finale's actual metric division determines the swung subdivision, at half of
+that division. A displayed 4/4 over actual 8/8 therefore swings sixteenths, not
+eighths. `ExpressionPlayback.beat_unit` and `PlaybackPreferences.swing_unit`
+preserve that subdivision separately from the displayed meter and tempo glyph.
+Compound or unknown units and unestablished intermediate amounts are not guessed.
+The supplied seven swing scores use established eighth-note, zero/1024 controls;
+Duck Tales' stored default 512 is overridden by its explicit initial 1024.
+
+Export writes recognizable Swing/Straight words with MusicXML sound/swing:
+first=2, second=1 and the eighth/16th unit, or straight. Written durations, grace
+notes and tuplets are unchanged. Score-wide controls use direction system=only-top;
+coincident equivalent controls print once while retaining both source assignments
+in IR. An active document default attaches to an existing initial Swing heading
+where available, avoiding a second visible heading (Player Select).
+
+**Verified MuseScore 4.7.5 limitation:** the user's build 3654226 imports standard
+first=2/second=1 as native ratio=50 instead of approximately 67. An authored
+two-part Swing/Straight/Swing score imported and exported to MIDI plays all three
+bars straight. Changing only the temporary native test's swing ratio to 66
+produces offbeats at approximately .658 quarter notes in both parts, with .5
+offbeats in the straight bar. Thus scope/reset import works, but the ratio
+conversion is incorrect. Preserve standards-compliant MusicXML; do not invert
+its ratio or change written rhythms to compensate for this importer bug.
+The extracted AppImage ran offscreen with an isolated XDG profile; only the
+temporary copy's GTK platform-theme plugin was disabled to permit headless use.
+
+Evidence: [Finale swing value](https://usermanuals.finalemusic.com/Finale2012Win/Content/Finale/SwingPlayback.htm),
+[actual metric unit](https://www.finalemusic.com/blog/swing-16th-notes-playback-in-finale/),
+[MusicXML ratio semantics](https://www.w3.org/2021/06/musicxml40/musicxml-reference/elements/swing/),
+MuseScore importer `MusicXmlParserDirection::swing` at revision 3654226 and the
+local authored runtime check. Exact Human Playback timing remains separate.
+
 ### Explicit backward-repeat state (2026-10-12)
 
 The 24-byte numeric tag-203 record stores actuate +2, signed target +4 and

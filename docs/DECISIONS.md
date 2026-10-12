@@ -982,3 +982,13 @@ absolute meaning are established; keep print tempo unchanged. Explicit "none"
 does not imply a printed rate is active. Nonabsolute/zero source controls stay
 in canonical data and structured diagnostics rather than failing the whole
 score or changing their type to match a performance MIDI.
+
+## 2026-10-12 — DECIDED: preserve standard source swing despite importer limits
+
+Represent typed swing amounts and their actual metric subdivisions without
+rewriting written rhythms. Export established zero/standard-triplet values with
+MusicXML straight or first=2/second=1, retaining scope and pass conditions.
+Intermediate source amounts stay an evidence gate rather than using a fitted
+MIDI ratio. Keep standards-compliant export despite the verified MuseScore 4.7.5
+ratio conversion bug; record the renderer limitation and native control result
+in review evidence instead of encoding a false ratio for every other importer.

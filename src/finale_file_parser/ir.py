@@ -583,6 +583,8 @@ class PlaybackPreferences:
     stop_offset: Fraction = Fraction(0)
     start_pass: int = 1
     stop_pass: int = 1
+    swing_unit: Fraction | None = None
+    """Half the initial actual metric division, independent of display meter."""
 
     @property
     def quarter_bpm(self) -> Fraction:

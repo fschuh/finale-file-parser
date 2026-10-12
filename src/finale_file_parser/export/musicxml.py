@@ -147,6 +147,7 @@ def to_musicxml(score: Score) -> bytes:
             _append_multistaff_part(root, bundle, score.groups)
 
     _append_default_tempo(root, score)
+    _append_default_swing(root, score)
 
     ET.indent(root, space="  ")
     body = ET.tostring(root, encoding="unicode")
@@ -179,6 +180,47 @@ def _append_default_tempo(root: ET.Element, score: Score) -> None:
         )
         sound = ET.Element("sound", tempo=_decimal_number(score.playback.quarter_bpm))
         measure.insert(position, sound)
+
+
+def _append_default_swing(root: ET.Element, score: Score) -> None:
+    prefs = score.playback
+    if prefs is None or not prefs.swing_amount or not score.parts or not score.parts[0].measures:
+        return
+    first = score.parts[0].measures[0]
+    if any(
+        e.playback is not None and e.playback.kind == "swing" and e.offset == 0
+        for part in score.parts
+        for measure in part.measures
+        if measure.number == first.number
+        for e in measure.expressions
+    ):
+        return
+    if prefs.swing_amount not in {Fraction(0), Fraction(1)} or prefs.swing_unit is None:
+        raise ExportError("default swing interpolation/unit is not established")
+    measure = root.find("part/measure")
+    if measure is None:
+        return
+    direction = next(
+        (
+            d
+            for d in measure.findall("direction")
+            if (d.findtext("direction-type/words") or "").lower().startswith("swing")
+        ),
+        None,
+    )
+    if direction is None:
+        direction = ET.Element("direction", placement="above")
+        ET.SubElement(ET.SubElement(direction, "direction-type"), "words").text = "Swing"
+        at = next(
+            (i for i, e in enumerate(measure) if e.tag not in {"barline", "attributes"}),
+            len(measure),
+        )
+        measure.insert(at, direction)
+    direction.set("system", "only-top")
+    sound = direction.find("sound")
+    if sound is None:
+        sound = ET.SubElement(direction, "sound")
+    _append_swing(sound, prefs.swing_amount, prefs.swing_unit)
 
 
 def _append_part_list(
@@ -957,9 +999,25 @@ def _append_expressions(element: ET.Element, measure: Measure, divisions: int) -
     tempo can differ from its printed metronome. Nonabsolute source values are
     retained with diagnostics rather than converted into impossible controls.
     """
+    seen_swing = set()
     for expression in measure.expressions:
+        if expression.playback is not None and expression.playback.kind == "swing":
+            identity = (
+                expression.offset,
+                expression.playback,
+                expression.score_wide,
+                expression.layer,
+            )
+            if identity in seen_swing:
+                continue
+            seen_swing.add(identity)
         if expression.tempo is not None:
             direction = _append_tempo(element, expression.tempo)
+        elif expression.playback is not None and expression.playback.kind == "swing":
+            direction = ET.SubElement(element, "direction", placement="above")
+            ET.SubElement(ET.SubElement(direction, "direction-type"), "words").text = (
+                "Straight" if not expression.playback.value else "Swing"
+            )
         elif expression.is_rehearsal:
             # `<rehearsal>`, not `<words>`: the two are different elements and a
             # consumer treats them differently -- a rehearsal mark is a
@@ -981,6 +1039,8 @@ def _append_expressions(element: ET.Element, measure: Measure, divisions: int) -
         else:
             continue
         _append_expression_playback(direction, expression)
+        if expression.score_wide and expression.playback and expression.playback.kind == "swing":
+            direction.set("system", "only-top")
         if expression.offset:
             offset = ET.Element("offset", sound="yes")
             offset.text = str(_duration_in_divisions(expression.offset, divisions))
@@ -1003,6 +1063,14 @@ def _append_expression_playback(direction: ET.Element, expression: Expression) -
                 direction.remove(existing_sound)
     if playback.kind == "none":
         return
+    if playback.kind == "swing":
+        sound = direction.find("sound")
+        if sound is None:
+            sound = ET.SubElement(direction, "sound")
+        _append_swing(sound, Fraction(playback.value, 1024), playback.beat_unit)
+        if playback.pass_number:
+            sound.set("time-only", str(playback.pass_number))
+        return
     attrs = {}
     if playback.kind == "tempo" and playback.beat_unit is not None:
         rate = playback.value * playback.beat_unit * 4
@@ -1021,6 +1089,18 @@ def _append_expression_playback(direction: ET.Element, expression: Expression) -
     sound.attrib.update(attrs)
     if playback.pass_number:
         sound.set("time-only", str(playback.pass_number))
+
+
+def _append_swing(sound: ET.Element, amount: Fraction, unit: Fraction | None) -> None:
+    swing = ET.SubElement(sound, "swing")
+    if amount == 0:
+        ET.SubElement(swing, "straight")
+        return
+    if amount != 1 or unit not in {Fraction(1, 8), Fraction(1, 16)}:
+        raise ExportError("swing needs an established triplet amount and eighth/16th unit")
+    ET.SubElement(swing, "first").text = "2"
+    ET.SubElement(swing, "second").text = "1"
+    ET.SubElement(swing, "swing-type").text = "eighth" if unit == Fraction(1, 8) else "16th"
 
 
 def _decimal_number(value: Fraction) -> str:

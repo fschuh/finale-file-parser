@@ -129,6 +129,7 @@ from finale_file_parser.enigma.document import EnigmaDocument, Record, field_int
 from finale_file_parser.enigma.fonts import FontRun, text_runs
 from finale_file_parser.enigma.models import CorruptScoreError
 from finale_file_parser.enigma.text import plain_text, text_block
+from finale_file_parser.enigma.timesig import time_signatures
 from finale_file_parser.formats.dynamics import (
     DYNAMICS_CATEGORY,
     described_dynamic,
@@ -250,6 +251,7 @@ def expressions_by_measure(
 
     on_a_staff = _staffed(document)
     labels = _rehearsal_labels(document, definitions, texts)
+    swing_units = _swing_units(document)
 
     out: dict[tuple[int, int], list[Expression]] = {}
     for record in document.others.of_tag(_ASSIGN):
@@ -290,6 +292,9 @@ def expressions_by_measure(
         # and a rehearsal mark whose style is unreadable has no label to print.
         if not text and marking is None:
             continue
+        playback = _playback(definition)
+        if playback is not None and playback.kind == "swing":
+            playback = replace(playback, beat_unit=swing_units.get(measure))
         out.setdefault((staff, measure), []).append(
             Expression(
                 text=text,
@@ -303,10 +308,22 @@ def expressions_by_measure(
                 if marking is None and label is None
                 else None,
                 offset=offset,
-                playback=_playback(definition),
+                playback=playback,
             )
         )
     return {where: tuple(items) for where, items in out.items()}
+
+
+def _swing_units(document: EnigmaDocument) -> dict[int, Fraction]:
+    # Finale swings half of the actual metric division, not a metronome glyph
+    # or the displayed numerator. Compound divisions already subdivide by 3.
+    if not document.others.of_tag("measSpec"):
+        return {}
+    return {
+        number: Fraction(signature.division_edu, 8192)
+        for number, signature in time_signatures(document).items()
+        if not signature.is_compound
+    }
 
 
 def _playback(definition: Record) -> ExpressionPlayback | None:
