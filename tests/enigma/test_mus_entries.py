@@ -355,6 +355,83 @@ def test_an_empty_labelled_entry_pool_reads_as_no_entries(tmp_path: Path) -> Non
     assert read_mus_entries(path) == ()
 
 
+@pytest.mark.parametrize(("era", "order"), [(2005, "little"), (2005, "big"), (2012, "little")])
+def test_inactive_slots_do_not_become_entries_or_interrupt_chords(
+    tmp_path: Path, era: int, order: ByteOrder
+) -> None:
+    """Independently authored database slots, including a multi-slot chord."""
+    slot = _entry_slot if order == "little" else _be_entry_slot
+    inactive = (500).to_bytes(4, order) + bytes(34)
+    first = slot(501, dura=512, flag=SETBIT | NOTEBIT, notes=[(0x0010, SETBIT)] * 3)
+    continuation = (
+        (501).to_bytes(4, order)
+        + (1).to_bytes(2, order)
+        + (0x0020).to_bytes(2, order)
+        + SETBIT.to_bytes(4, order)
+        + bytes(26)
+    )
+    last = slot(502, dura=1024, flag=SETBIT | NOTEBIT, notes=[(0x0040, SETBIT)])
+    pool = inactive + first + continuation + inactive + last + inactive
+    path = tmp_path / "inactive-slots.mus"
+    path.write_bytes(_dcl_file(pool, order) if era == 2005 else _mus_file(pool + _pool(150)))
+    entries = read_mus_entries(path)
+    assert [entry.entnum for entry in entries[:2]] == [501, 502]
+    assert len(entries) == (2 if era == 2005 else 152)
+    assert [note.harm_lev for note in entries[0].notes] == [1, 1, 2]
+    assert entries[1].notes[0].harm_lev == 4
+
+
+@pytest.mark.parametrize("order", ["little", "big"])
+def test_a_labelled_inactive_only_pool_is_empty(tmp_path: Path, order: ByteOrder) -> None:
+    path = tmp_path / "inactive-only.mus"
+    path.write_bytes(_dcl_file((501).to_bytes(4, order) + bytes(34), order))
+    assert read_mus_entries(path) == ()
+
+
+def test_an_unlabelled_inactive_only_stream_is_not_recognized(tmp_path: Path) -> None:
+    path = tmp_path / "inactive-only-stream.mus"
+    path.write_bytes(_mus_file(((501).to_bytes(4, "little") + bytes(34)) * 150))
+    with pytest.raises(CorruptScoreError, match="no recognisable entry pool"):
+        read_mus_entries(path)
+
+
+@pytest.mark.parametrize("order", ["little", "big"])
+@pytest.mark.parametrize("changed_offset", [4, 6, 14, 18, 22, 24, 26, 37])
+def test_partially_cleared_slots_are_not_inactive(
+    tmp_path: Path, order: ByteOrder, changed_offset: int
+) -> None:
+    raw = bytearray((501).to_bytes(4, order) + bytes(34))
+    raw[changed_offset] = 1
+    path = tmp_path / "partially-cleared.mus"
+    path.write_bytes(_dcl_file(bytes(raw), order))
+    with pytest.raises(CorruptScoreError, match="does not tile as entry slots"):
+        read_mus_entries(path)
+
+
+@pytest.mark.parametrize("order", ["little", "big"])
+@pytest.mark.parametrize("corruption", ["truncated", "wrong_entry", "wrong_index", "inactive"])
+def test_a_chord_requires_its_actual_continuation_slot(
+    tmp_path: Path, order: ByteOrder, corruption: str
+) -> None:
+    slot = _entry_slot if order == "little" else _be_entry_slot
+    first = slot(501, dura=512, flag=SETBIT | NOTEBIT, notes=[(0x0010, SETBIT)] * 3)
+    continuation = (
+        (502 if corruption == "wrong_entry" else 501).to_bytes(4, order)
+        + (2 if corruption == "wrong_index" else 1).to_bytes(2, order)
+        + (0x0020).to_bytes(2, order)
+        + SETBIT.to_bytes(4, order)
+        + bytes(26)
+    )
+    if corruption == "truncated":
+        continuation = continuation[:-1]
+    elif corruption == "inactive":
+        continuation = (501).to_bytes(4, order) + bytes(34)
+    path = tmp_path / "broken-continuation.mus"
+    path.write_bytes(_dcl_file(first + continuation, order))
+    with pytest.raises(CorruptScoreError, match="does not tile as entry slots"):
+        read_mus_entries(path)
+
+
 def test_a_labelled_pool_that_is_not_entry_slots_raises(tmp_path: Path) -> None:
     """Trusting the label is not the same as trusting the bytes."""
     path = tmp_path / "mislabelled.mus"

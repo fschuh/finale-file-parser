@@ -78,6 +78,8 @@ _MAX_NOTES = 12
 
 _SETBIT = 0x80000000
 """Set on every legal entry and every legal note record."""
+_INACTIVE_BODY = bytes(_SLOT - 4)
+"""A cleared database slot retains only its entry number; see ARCHITECTURE."""
 _NOTEBIT = 0x40000000
 """Set for a musical note, clear for a rest, independently of stored records."""
 _FLOATREST = 0x01000000
@@ -187,7 +189,7 @@ def _read_labelled(pool: MusPool, path: str | os.PathLike[str]) -> tuple[Record,
     """Read the pool the container itself calls the entry pool."""
     if not pool.data:
         return ()
-    if not _looks_like_entry_pool(pool.data, pool.byte_order):
+    if not _looks_like_entry_pool(pool.data, pool.byte_order, allow_inactive_only=True):
         raise CorruptScoreError(
             f"{path}: the pool the container labels as entries does not tile as entry slots"
         )
@@ -227,7 +229,9 @@ def _slot_span(note_count: int) -> int:
     return 1 + -(-overflow // _CONT_SLOT_NOTES)  # ceiling division
 
 
-def _looks_like_entry_pool(stream: bytes, order: ByteOrder = "little") -> bool:
+def _looks_like_entry_pool(
+    stream: bytes, order: ByteOrder = "little", *, allow_inactive_only: bool = False
+) -> bool:
     """Is this stream the entry pool, read `order`-endian?
 
     Identified by structure rather than by position, so a file whose streams are
@@ -243,7 +247,11 @@ def _looks_like_entry_pool(stream: bytes, order: ByteOrder = "little") -> bool:
     if not stream or len(stream) % _SLOT:
         return False
     position = 0
+    active = False
     while position + _SLOT <= len(stream):
+        if _is_inactive_slot(stream, position, order):
+            position += _SLOT
+            continue
         if _u16(stream, position + 4, order) != 0:
             return False  # a first slot must carry slot index 0
         if not _u32(stream, position + 18, order) & _SETBIT:
@@ -251,14 +259,35 @@ def _looks_like_entry_pool(stream: bytes, order: ByteOrder = "little") -> bool:
         count = _u16(stream, position + 24, order)
         if count > _MAX_NOTES:
             return False
-        position += _SLOT * _slot_span(count)
-    return position == len(stream)
+        end = position + _SLOT * _slot_span(count)
+        if end > len(stream):
+            return False
+        number = _u32(stream, position, order)
+        for index, at in enumerate(range(position + _SLOT, end, _SLOT), start=1):
+            if _u32(stream, at, order) != number or _u16(stream, at + 4, order) != index:
+                return False
+        position = end
+        active = True
+    return position == len(stream) and (active or allow_inactive_only)
+
+
+def _is_inactive_slot(stream: bytes, position: int, order: ByteOrder) -> bool:
+    return (
+        position + _SLOT <= len(stream)
+        and _u32(stream, position, order) != 0
+        and stream[position + 4 : position + _SLOT] == _INACTIVE_BODY
+    )
 
 
 def _read_pool(stream: bytes, order: ByteOrder) -> list[Record]:
+    if stream and not _looks_like_entry_pool(stream, order, allow_inactive_only=True):
+        raise CorruptScoreError("entry pool does not tile as valid active or inactive slots")
     records: list[Record] = []
     position = 0
     while position + _SLOT <= len(stream):
+        if _is_inactive_slot(stream, position, order):
+            position += _SLOT
+            continue
         stored_count = _u16(stream, position + 24, order)
         if stored_count > _MAX_NOTES:
             raise CorruptScoreError(f"entry note count {stored_count} exceeds {_MAX_NOTES}")

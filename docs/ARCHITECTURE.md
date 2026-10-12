@@ -463,6 +463,18 @@ The pool is a flat array of fixed **38-byte slots**, each tagged with the entry 
 First slot: `prev(4) next(4) dura(2) pos(2) flag(4) extflag(2) count(2)` then two note records.
 Continuation slots carry five more notes each, from offset 6. A note is `TCD(2) + flag(4)`.
 
+**Cleared database slots are not musical entries.** The 2026-10-11 Dark World
+audit finds 615 active entries and 440 inactive slots. An inactive slot keeps
+its nonzero entry number at +0 and has exactly 34 zero bytes at +4..37,
+including slot index, links, duration, flags, count and stored-note area. Skip
+only this exact representation. Partially cleared records remain invalid.
+Unlabelled pool recognition requires at least one active entry; otherwise an
+arbitrary zero-filled stream could be mistaken for an entry database. An
+explicitly labelled pool may legitimately contain only inactive slots.
+Active chords still require complete continuation slots bearing the same entry
+number and consecutive slot indices. Authored tests cover both byte orders,
+interleaved cleared slots, chords and truncated/incorrect continuation headers.
+
 Three details that are easy to get wrong, each caught by comparing against ground truth:
 
 - **The TCD's alteration nibble is sign-and-magnitude**, bit 3 being the sign — not two's complement.
