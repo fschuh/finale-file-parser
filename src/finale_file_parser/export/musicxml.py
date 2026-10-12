@@ -1564,6 +1564,15 @@ def _append_event(
         raise ExportError("arpeggio coverage contains an invalid chord pitch")
     if any(not 0 <= mark.pitch_index < len(event.pitches) for mark in event.ornaments):
         raise ExportError("ornament principal note is outside the event's pitches")
+    if any(
+        m.side not in {"left", "right"}
+        or (m.pitch_index is not None and not 0 <= m.pitch_index < len(event.pitches))
+        for m in event.parentheses
+    ):
+        raise ExportError("invalid parenthesis side or note attachment")
+    for index in {m.pitch_index for m in event.parentheses if m.pitch_index is not None}:
+        if {m.side for m in event.parentheses if m.pitch_index == index} != {"left", "right"}:
+            raise ExportError("a notehead enclosure requires both parentheses")
     legacy_ties = NoteTies(event.tie_start, event.tie_end)
     if event.is_rest:
         _append_note(element, event, voice, divisions, pitch=None, chord=False, ties=legacy_ties)
@@ -1659,6 +1668,8 @@ def _append_note(
         # triplet sounds 2/3, and is 3 notes in the time of 2.
         ET.SubElement(modification, "actual-notes").text = str(event.tuplet_ratio.denominator)
         ET.SubElement(modification, "normal-notes").text = str(event.tuplet_ratio.numerator)
+    if pitch is not None and any(m.pitch_index == pitch_index for m in event.parentheses):
+        ET.SubElement(note, "notehead", parentheses="yes").text = "normal"
     # Schema order puts <beam> after <time-modification> and before
     # <notations>. Only on a chord's principal note: the beam belongs to the
     # stem, and the schema allows at most eight per note.
@@ -1671,6 +1682,9 @@ def _append_note(
     marks = () if chord else event.articulations
     digits = () if chord else event.fingerings
     fermatas = () if chord else event.fermatas
+    drawn_parentheses = (
+        () if chord else tuple(m for m in event.parentheses if m.pitch_index is None)
+    )
     arpeggios = (
         tuple(
             (i, mark)
@@ -1691,6 +1705,7 @@ def _append_note(
         or slurs
         or tremolo
         or glissandi
+        or drawn_parentheses
     ):
         notations = ET.SubElement(note, "notations")
         if ties.stop:
@@ -1773,6 +1788,20 @@ def _append_note(
                     raise ExportError(f"unsupported arpeggio direction {arpeggio.direction!r}")
                 attrs["direction"] = arpeggio.direction
             ET.SubElement(notations, "arpeggiate", attrs)
+        for mark in drawn_parentheses:
+            if mark.side not in {"left", "right"}:
+                raise ExportError(f"unsupported parenthesis side {mark.side!r}")
+            attrs = {
+                "type": "single",
+                "smufl": "noteheadParenthesisLeft"
+                if mark.side == "left"
+                else "noteheadParenthesisRight",
+                "relative-x": _decimal_number(mark.x_offset * 10),
+                "relative-y": _decimal_number(mark.y_offset * 10),
+            }
+            ET.SubElement(notations, "other-notation", attrs).text = (
+                "(" if mark.side == "left" else ")"
+            )
     # Schema order puts <lyric> last, after <notations>. Only on a chord's
     # principal note: the syllable is sung once, not once per pitch.
     if not chord:

@@ -1313,7 +1313,12 @@ def _artic_def(payload: bytes) -> dict[str, str | tuple[str, ...] | Record | tup
         "charMain": str(character),
         "fontMain": str(_u16(payload, 4) if is_unicode else payload[2]),
         "sizeMain": str(_u16(payload, 6) if is_unicode else payload[3]),
+        "xOffsetMain": str(_s16(payload, 18 if is_unicode else 16)),
+        "yOffsetMain": str(_s16(payload, 20 if is_unicode else 18)),
+        "defVertPos": str(_s16(payload, 22 if is_unicode else 20)),
     }
+    if _u16(payload, 10) & 0x80:
+        fields["useTopNote"] = ""
     if flags & 2:
         fields["mainIsShape"] = ""
         fields["mainShape"] = str(_u16(payload, 34 if is_unicode else 32))

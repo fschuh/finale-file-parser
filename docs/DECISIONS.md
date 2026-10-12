@@ -1115,3 +1115,14 @@ export the standard arpeggiate direction attribute. Different native/reference
 roll speeds remain performance realizations, without inserted notes or tempo
 changes derived from MIDI.
 
+# 2026-10-12: distinguish parenthetical noteheads from unresolved glyph drawings
+
+Retain positioned parentheses on canonical Event, with an optional established
+pitch index. Compact pairs on single notes use standard notehead parentheses.
+Chord-note and wide-span placements retain their glyphs/adjustments and a source
+diagnostic until Finale automatic drawing layout can resolve their attachment.
+Do not parenthesize every pitch, suppress optional notes, or fabricate playback
+from MIDI. Standard other-notation preserves the remaining symbols; MuseScore's
+importer treats them as articulations and ignores coordinates, so those seven
+placements require manual review. This is an explicit F24 format/import limit.
+

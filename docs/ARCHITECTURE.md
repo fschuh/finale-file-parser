@@ -2507,6 +2507,52 @@ Authored direction/context/visibility/connection tests and all105 schema checks
 pass. The MusicXML [arpeggiate reference](https://www.w3.org/2021/06/musicxml40/musicxml-reference/elements/arpeggiate/)
 distinguishes an explicit arrow from the plain sign's default upward roll.
 
+#### Parenthetical noteheads and retained drawings (2026-10-12, F24)
+
+Maestro characters40/41 are parentheses, not musical attacks. The expanded105
+files have18 pairs across11 scores. Each definition uses xOffsetMain=-26/+26,
+yOffsetMain=-21 and defVertPos=0. The published FCArticulationDef handle getters
+and read-only released RGP Lua code anchor these additional fields:
+
+| Field | 48-byte layout | 60-byte layout | Getter VM |
+|---|---|---|---|
+| signed xOffsetMain | +16 i16 | +18 i16 | 0x4c111e |
+| signed yOffsetMain | +18 i16 | +20 i16 | 0x4c1102 |
+| signed defVertPos | +20 i16 | +22 i16 | 0x4c10e6 |
+| useTopNote | +10 u16 mask0x80 | same | 0x216ae8 |
+
+These are glyph-handle adjustments; they do not by themselves establish the
+automatically positioned chord note. The getters use object bases+0x38/+0x68
+established above. The [primary model](https://github.com/openmusx/musxdom/blob/main/src/musx/dom/Others.h)
+and its field map corroborate the names. Source assignment offsets remain the
+independent signed fields already decoded from articAssign.
+
+Event.parentheses retains both symbols and combined positioning adjustments in
+staff spaces. A compact, vertically matched pair on a single pitched entry
+establishes its notehead enclosure. Export notehead parentheses=yes with normal
+heads, retaining pitch, rhythm, ties and playback. Actual MuseScore4.7.5 imports
+all11 such enclosures. The Moon/Underwater/Hammer/Star Light, two Bubble Man,
+Hyrule Castle entry1060, MEGALOVANIA entry2650, Spear and two Monster's Lair
+placements use this path.
+
+Seven placements require further drawing layout to establish exact attachment:
+Dire Dire Docks entry8175 (wide multi-note span), Death Mountain438, Hyrule
+Castle865 and MEGALOVANIA130/131/132/2129 (selected notes within chords). Their
+glyphs and adjustments remain in IR and standard other-notation elements;
+ScoreDiagnostic parenthesis-attachment identifies each, rather than guessing
+whole-chord parentheses or deleting optional notes. Original MEGALOVANIA and
+Death Mountain PDF pages confirm that the signs select individual chord notes.
+These source drawings are retained, not claimed to be reconstructed page geometry.
+
+MuseScore4.7.5 imports the fourteen retained SMuFL glyphs as articulations but
+ignores their coordinates, producing misplaced signs. Its exact-revision
+addArticulationToChord consumes placement/type/color, not position attributes;
+this requires manual layout review. The eleven semantic notehead enclosures
+render correctly. All105 XML files pass the official4.0 schema; authored tests
+cover fonts, visibility, duplicates, signed era-specific offsets, unmatched
+marks, chords, spans and invalid attachments. No MIDI notes or velocities are
+changed to imply that parenthesized notes were omitted in playback.
+
 The same SmartShape definitions carry phrase slurs. Solid types **0** (`slurDown`),
 **1** (`slurUp`) and **15** (`slurAuto`) are documented by the published PDK
 [SmartShape enums and structs](https://pdk.finalelua.com/ff__smartshapes_8h_source.html)

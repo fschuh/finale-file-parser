@@ -44,6 +44,7 @@ from finale_file_parser.enigma.music import Note, read_entry
 from finale_file_parser.enigma.note_dynamics import dynamics_by_entry
 from finale_file_parser.enigma.octaves import octaves_by_staff
 from finale_file_parser.enigma.ornaments import ornaments_by_entry
+from finale_file_parser.enigma.parentheses import parentheses_by_entry
 from finale_file_parser.enigma.pedals import pedals_by_entry
 from finale_file_parser.enigma.pitch import StaffTransposition, read_transposition, spell_note
 from finale_file_parser.enigma.playback_preferences import playback_preferences
@@ -67,6 +68,7 @@ from finale_file_parser.ir import (
     Navigation,
     NoteTies,
     Ornament,
+    Parenthesis,
     Part,
     PartGroup,
     Pedal,
@@ -145,6 +147,7 @@ def build_score(document: EnigmaDocument) -> Score:
     ornaments = ornaments_by_entry(document)
     fermatas = fermatas_by_entry(document)
     arpeggios = arpeggios_by_entry(document)
+    parentheses = parentheses_by_entry(document)
     assigned_entries: dict[EventPosition, int] = {}
     slur_positions: dict[tuple[int, int, int], list[SlurEndpoint]] = defaultdict(list)
     always_slash = slash_flagged_grace_notes(document)
@@ -192,6 +195,7 @@ def build_score(document: EnigmaDocument) -> Score:
                     ornaments=ornaments.get(entnum, ()),
                     fermatas=fermatas.get(entnum, ()),
                     arpeggios=arpeggios.get(entnum, ()),
+                    parentheses=parentheses.get(entnum, ()),
                 )
             )
 
@@ -237,6 +241,18 @@ def build_score(document: EnigmaDocument) -> Score:
     keys = effective_keys(document)
     numbers = _measure_numbers(keys, cells)
     ignored_shapes, diagnostics = stale_smart_shapes(document, numbers)
+    placed_entries = {entry for _, _, entry in slur_positions}
+    diagnostics += tuple(
+        ScoreDiagnostic(
+            "parenthesis-attachment",
+            f"Parentheses on entry {entry} retain their glyph positions; their exact "
+            "chord-note or span attachment requires Finale drawing layout. "
+            "MusicXML other-notation preserves them, but MuseScore may not render them.",
+            f"articAssign:{entry}",
+        )
+        for entry, marks in parentheses.items()
+        if entry in placed_entries and any(mark.pitch_index is None for mark in marks)
+    )
     hairpins = hairpins_by_staff(document, ignored_shapes=ignored_shapes)
     slurs = slurs_by_staff(document, slur_positions, ignored_shapes=ignored_shapes)
     octaves = octaves_by_staff(document, ignored_shapes=ignored_shapes)
@@ -588,6 +604,7 @@ def _event(
     ornaments: tuple[Ornament, ...] = (),
     fermatas: tuple[Fermata, ...] = (),
     arpeggios: tuple[Arpeggio, ...] = (),
+    parentheses: tuple[Parenthesis, ...] = (),
 ) -> Event:
     entry = read_entry(record)
     key = decode_key(key_raw)
@@ -638,6 +655,7 @@ def _event(
         ornaments=ornaments,
         fermatas=fermatas,
         arpeggios=arpeggios if pitches else (),
+        parentheses=parentheses,
     )
 
 

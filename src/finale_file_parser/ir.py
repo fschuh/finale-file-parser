@@ -178,6 +178,21 @@ class Arpeggio:
 
 
 @dataclass(frozen=True)
+class Parenthesis:
+    """One drawn parenthesis attached to an event.
+
+    Offsets retain glyph positioning in staff spaces. A paired pitch_index
+    identifies a notehead enclosure only when its note attachment is established;
+    None preserves drawing information without guessing a chord note or span.
+    """
+
+    side: str
+    x_offset: Fraction = Fraction(0)
+    y_offset: Fraction = Fraction(0)
+    pitch_index: int | None = None
+
+
+@dataclass(frozen=True)
 class Event:
     """One note, chord, or rest.
 
@@ -267,6 +282,9 @@ class Event:
     """False for an explicitly silent source event; written pitches survive."""
     visible: bool = True
     """Source notation visibility, independent of whether the event sounds."""
+
+    parentheses: tuple[Parenthesis, ...] = ()
+    """Notehead enclosures or retained positioned glyphs needing attachment review."""
 
     @property
     def is_rest(self) -> bool:

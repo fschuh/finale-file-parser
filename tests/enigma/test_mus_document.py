@@ -490,6 +490,24 @@ def test_an_articulation_definition_reads_in_either_era_layout(
     assert articulations_by_entry(read_mus_document(PATH)) == {9: ("staccato",)}
 
 
+@pytest.mark.parametrize("length", [48, 60])
+def test_articulation_symbol_handle_positions_and_note_anchor_are_signed_and_era_specific(
+    pools: Callable[..., None], length: int
+) -> None:
+    payload = bytearray(artic_def_payload(40, length=length))
+    base = 2 if length == 60 else 0
+    for at, value in ((16, -26), (18, -21), (20, 7)):
+        payload[base + at : base + at + 2] = value.to_bytes(2, "little", signed=True)
+    payload[10:12] = (0x80).to_bytes(2, "little")
+    pools(others=(MusOther(TAG_ARTIC_DEF, 1, 0, bytes(payload)),))
+    record = read_mus_document(PATH).others.get("articDef", 1)
+    assert record is not None
+    assert record.fields["xOffsetMain"] == "-26"
+    assert record.fields["yOffsetMain"] == "-21"
+    assert record.fields["defVertPos"] == "7"
+    assert "useTopNote" in record.fields
+
+
 def test_a_repeated_articulation_assignment_is_emitted_once(
     pools: Callable[..., None],
 ) -> None:
