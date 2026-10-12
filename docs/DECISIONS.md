@@ -942,3 +942,12 @@ to a stop after that attack for standard XML interval semantics. Reject ambiguou
 overlapping source octave spans until their combined meaning is evidenced; the
 current 50 active corpus records do not overlap. Preserve stale records in the
 raw document and its existing diagnostic rather than extending the score.
+
+## 2026-10-11 — DECIDED: tempo equivalents and ranges retain their printed meaning
+
+Append optional `Tempo.upper_per_minute` and `Tempo.equivalents`. Consistent
+explicit equivalents export both metronome units and one quarter-note rate.
+Ranges export their two printed bounds; absent separately typed source playback
+data, they do not select a single sound tempo. Resolve legacy beat and dot glyphs
+from active font runs before parsing. Keep expression text intact and require
+actual assignment evidence before promoting page/header text to timed notation.

@@ -976,12 +976,24 @@ def _append_tempo(element: ET.Element, tempo: Tempo) -> ET.Element:
     direction = ET.SubElement(element, "direction", placement="above")
     if tempo.words:
         ET.SubElement(ET.SubElement(direction, "direction-type"), "words").text = tempo.words
-    metronome = ET.SubElement(ET.SubElement(direction, "direction-type"), "metronome")
-    ET.SubElement(metronome, "beat-unit").text = unit
-    for _ in range(tempo.dots):
-        ET.SubElement(metronome, "beat-unit-dot")
-    ET.SubElement(metronome, "per-minute").text = _decimal_number(tempo.per_minute)
-    ET.SubElement(direction, "sound", tempo=_decimal_number(tempo.quarter_bpm))
+    for value in (tempo, *tempo.equivalents):
+        unit = _NOTE_TYPES.get(value.beat_unit.denominator)
+        if value.beat_unit.numerator != 1 or unit is None:
+            raise ExportError("unsupported equivalent tempo unit")
+        if value.quarter_bpm != tempo.quarter_bpm or (value is not tempo and value.equivalents):
+            raise ExportError("equivalent tempos must have the same rate and not be nested")
+        metronome = ET.SubElement(ET.SubElement(direction, "direction-type"), "metronome")
+        ET.SubElement(metronome, "beat-unit").text = unit
+        for _ in range(value.dots):
+            ET.SubElement(metronome, "beat-unit-dot")
+        per_minute = _decimal_number(value.per_minute)
+        if value.upper_per_minute is not None:
+            if value.upper_per_minute < value.per_minute:
+                raise ExportError("tempo range must have an ordered upper limit")
+            per_minute += "–" + _decimal_number(value.upper_per_minute)
+        ET.SubElement(metronome, "per-minute").text = per_minute
+    if tempo.upper_per_minute is None:
+        ET.SubElement(direction, "sound", tempo=_decimal_number(tempo.quarter_bpm))
     return direction
 
 

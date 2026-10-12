@@ -1616,6 +1616,30 @@ All75 production exports now validate against the official MusicXML4 schema.
 This resolves text validity, not the outstanding text-block join or font-backed
 dynamic semantics. The input scores/MIDIs remain byte-identical.
 
+### Explicit metronome variants (2026-10-11)
+
+After text-block/font resolution, The Moon's assigned `q=180 (e=360)` establishes
+two consistent quarter-note rates. Preserve both explicit beat/rate pairs;
+contradictory equivalents remain ordinary text. The Engraver Text manual names
+`d` as the augmentation dot for quarter/half notes, so Spear of Justice's
+registry-backed `qd=88` means dotted-quarter 88 (quarter 132), not quarter 88.
+MaestroTimes' documented extended quarter/half/eighth glyphs resolve only in
+that font. Fillmore's imported private U+F0CE variant in that same font is
+corroborated as quarter=120 by its PDF's first-system marking; it is never
+interpreted in an ordinary text font or by source filename.
+
+Dire Dire Docks explicitly prints half=64–68. Preserve both range bounds and
+export the standard metronome per-minute text without selecting a single sound
+tempo. A typed independent source playback value can later specify its actual
+rate; a displayed range by itself cannot. Equivalent marks print as multiple
+metronomes with one identical sound rate. Source expression text remains intact.
+Page/header block text is a separate placement/evidence issue: the presence of
+an unused tempo-like block alone does not create a measure-attached tempo.
+
+Evidence: [Engraver Text chart](https://usermanuals.finalemusic.com/FinaleWin/Content/Finale/font-engraver.htm),
+[Maestro Times chart](https://usermanuals.finalemusic.com/FinaleWin/Content/Finale/font-maestro.htm),
+assigned source records and read-only local PDF renders.
+
 ### Legacy font registry and expression runs (2026-10-11)
 
 Numeric others tag 144 is the existing paired-corpus `fontName` match. In the

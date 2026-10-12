@@ -97,6 +97,10 @@ class Tempo:
     dots: int = 0
     words: str = ""
     """Surrounding words, e.g. ``Faster``, without duplicating the metronome marking."""
+    upper_per_minute: Fraction | None = None
+    """Optional upper limit of a printed range, without choosing a playback rate."""
+    equivalents: tuple[Tempo, ...] = ()
+    """Additional explicit beat/rate pairs with the same quarter-note rate."""
 
     @property
     def quarter_bpm(self) -> Fraction:

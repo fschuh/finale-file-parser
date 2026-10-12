@@ -245,8 +245,6 @@ def test_explicit_metronome_marks_do_not_require_an_expression_category(
         "Allegro",
         "x = 80",
         "q = h",
-        "q = 80–100",
-        "q = 80 - 100",
         "q = 80/3",
         "q = 0",
         "q = -80",
@@ -255,7 +253,7 @@ def test_explicit_metronome_marks_do_not_require_an_expression_category(
         "q = 80.1234",
         "q = 1e3",
         "q = 80bpm",
-        "q = 80; h = 40",
+        "q = 80; h = 41",
         "q.... = 80",
     ],
 )

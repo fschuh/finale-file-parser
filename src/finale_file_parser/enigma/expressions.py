@@ -122,11 +122,11 @@ for the otherwise ambiguous attack variants.
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from fractions import Fraction
 
 from finale_file_parser.enigma.document import EnigmaDocument, Record, field_int
-from finale_file_parser.enigma.fonts import text_runs
+from finale_file_parser.enigma.fonts import FontRun, text_runs
 from finale_file_parser.enigma.models import CorruptScoreError
 from finale_file_parser.enigma.text import plain_text, text_block
 from finale_file_parser.formats.dynamics import (
@@ -170,6 +170,7 @@ _NUMBER_STYLE = "numbers"
 _TEMPO = re.compile(
     r"(?<!\w)(?P<unit>quarter|half|eighth|whole|[qhew♩♪𝅘𝅥𝅗𝅥𝅝])"
     r"(?P<dots>\.{0,3})\s*=\s*(?P<bpm>\d{1,4}(?:\.\d{1,3})?)"
+    r"(?:\s*[-–]\s*(?P<upper>\d{1,4}(?:\.\d{1,3})?))?"
     r"(?![\w./]|\s*[-–]\s*\d)",
     re.IGNORECASE,
 )
@@ -197,24 +198,43 @@ _TEMPO_UNITS = {
 }
 
 
-def _tempo(text: str) -> Tempo | None:
-    matches = _TEMPO.finditer(text)
-    match = next(matches, None)
-    if match is None or next(matches, None) is not None:
+def _tempo(text: str, *, runs: tuple[FontRun, ...] = ()) -> Tempo | None:
+    if runs:
+        translated = []
+        for run in runs:
+            literal = run.text
+            if run.name == "MaestroTimes":
+                literal = literal.translate(str.maketrans("ŒÓ‰\uf0ce", "qheq"))
+            if run.name in {"EngraverTextT", "EngraverTextH", "EngraverTextNCS"}:
+                literal = re.sub(r"(?i)([qhe])d", r"\1.", literal)
+            translated.append(literal)
+        # Run boundaries may separate a beat symbol from its literal equality.
+        text = " ".join(translated)
+    matches = list(_TEMPO.finditer(text))
+    if not matches:
         return None
-    per_minute = Fraction(match["bpm"])
-    if not 0 < per_minute <= 1000:
+    tempos = []
+    for match in matches:
+        rate = Fraction(match["bpm"])
+        upper = Fraction(match["upper"]) if match["upper"] else None
+        if not 0 < rate <= 1000 or (upper is not None and not rate <= upper <= 1000):
+            return None
+        tempos.append(
+            Tempo(
+                _TEMPO_UNITS[match["unit"].lower()],
+                rate,
+                len(match["dots"]),
+                upper_per_minute=upper,
+            )
+        )
+    if len(tempos) > 1 and (
+        any(t.upper_per_minute is not None for t in tempos)
+        or any(t.quarter_bpm != tempos[0].quarter_bpm for t in tempos[1:])
+    ):
         return None
-    start, end = match.span()
-    before, after = text[:start].rstrip(), text[end:].lstrip()
-    if before.endswith("(") and after.startswith(")"):
-        before, after = before[:-1].rstrip(), after[1:].lstrip()
-    return Tempo(
-        beat_unit=_TEMPO_UNITS[match["unit"].lower()],
-        per_minute=per_minute,
-        dots=len(match["dots"]),
-        words=" ".join(piece for piece in (before, after) if piece),
-    )
+    remainder = _TEMPO.sub("", text)
+    words = " ".join(remainder.strip(" ()=;,").split())
+    return replace(tempos[0], words=words, equivalents=tuple(tempos[1:]))
 
 
 def expressions_by_measure(
@@ -279,7 +299,9 @@ def expressions_by_measure(
                 score_wide=staff == SCORE_WIDE_STAFF,
                 is_rehearsal=label is not None,
                 layer=field_int(record.fields.get("layer")),
-                tempo=_tempo(printed) if marking is None and label is None else None,
+                tempo=_tempo(printed, runs=found.runs if found else ())
+                if marking is None and label is None
+                else None,
                 offset=offset,
             )
         )
@@ -436,6 +458,7 @@ class _Text:
 
     is_rehearsal: bool
     """The text is the `^rehearsal()` insert, so the label has to be worked out."""
+    runs: tuple[FontRun, ...] = ()
 
 
 def _texts(document: EnigmaDocument) -> dict[int, _Text]:
@@ -467,9 +490,11 @@ def _texts(document: EnigmaDocument) -> dict[int, _Text]:
 
 
 def _as_text(document: EnigmaDocument, markup: str) -> _Text:
-    runs = tuple(run for run in text_runs(document, markup) if run.text.strip())
+    all_runs = text_runs(document, markup)
+    runs = tuple(run for run in all_runs if run.text.strip())
     return _Text(
         printed=plain_text(markup),
         in_music_font=bool(runs) and all(run.is_music for run in runs),
         is_rehearsal=bool(_REHEARSAL.search(markup)),
+        runs=all_runs,
     )
