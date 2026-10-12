@@ -231,6 +231,9 @@ def _divisions_for(part: Part) -> int:
         for change in measure.clef_changes:
             denominator = math.lcm(denominator, (change.offset * 4).denominator)
         for voice in measure.voices:
+            if voice.start_offset < 0:
+                raise ExportError("voice start offset must not be negative")
+            denominator = math.lcm(denominator, (voice.start_offset * 4).denominator)
             for event in voice.events:
                 if event.is_grace:
                     continue
@@ -367,7 +370,7 @@ def _arpeggio_numbers(parts: tuple[Part, ...]) -> _ArpeggioNumbers:
     for part in parts:
         for measure in part.measures:
             for voice in measure.voices:
-                onset = Fraction(0)
+                onset = voice.start_offset
                 for index, event in enumerate(voice.events):
                     assigned = []
                     for mark_index, mark in enumerate(event.arpeggios):
@@ -424,7 +427,7 @@ def _append_multistaff_part(
 def _assign_staff(part: ET.Element, staff: int, voices: dict[str, str]) -> None:
     for measure in part:
         for element in measure:
-            if element.tag == "note":
+            if element.tag in {"note", "forward"}:
                 voice = element.find("voice")
                 if voice is not None and voice.text is not None:
                     voice.text = voices[voice.text]
@@ -555,7 +558,8 @@ def _hairpin_measure_positions(part: Part) -> dict[int, tuple[int, Fraction]]:
             signature_length = Fraction(measure.time.beats, measure.time.beat_type)
         written_length = max(
             (
-                sum((event.duration for event in voice.events if not event.is_grace), Fraction(0))
+                voice.start_offset
+                + sum((event.duration for event in voice.events if not event.is_grace), Fraction(0))
                 for voice in measure.voices
             ),
             default=Fraction(0),
@@ -667,7 +671,7 @@ def _slur_positions(part: Part) -> dict[SlurEndpoint, _SlurPosition]:
             if voice.number in voices:
                 raise ExportError("slurs require unique voice numbers within a measure")
             voices.add(voice.number)
-            onset = Fraction(0)
+            onset = voice.start_offset
             for event_index, event in enumerate(voice.events):
                 result[SlurEndpoint(measure.number, voice.number, event_index)] = _SlurPosition(
                     (measure_index, voice_index, event_index), onset, not event.is_rest
@@ -898,7 +902,8 @@ def _append_measure(
         if index:
             # Voices are written in sequence, so the cursor must be rewound to the
             # start of the measure before each one after the first.
-            spent = sum(
+            previous_voice = measure.voices[index - 1]
+            spent = _duration_in_divisions(previous_voice.start_offset, divisions) + sum(
                 (
                     _duration_in_divisions(e.duration, divisions)
                     for e in measure.voices[index - 1].events
@@ -908,6 +913,12 @@ def _append_measure(
             if spent:
                 backup = ET.SubElement(element, "backup")
                 ET.SubElement(backup, "duration").text = str(spent)
+        if voice.start_offset:
+            forward = ET.SubElement(element, "forward")
+            ET.SubElement(forward, "duration").text = str(
+                _duration_in_divisions(voice.start_offset, divisions)
+            )
+            ET.SubElement(forward, "voice").text = str(voice.number)
         for event_index, event in enumerate(voice.events):
             numbers = (
                 ()
@@ -928,7 +939,7 @@ def _append_clef_changes(element: ET.Element, measure: Measure, divisions: int) 
     cursor = Fraction(0)
     extent = max(
         (
-            sum((e.duration for e in v.events if not e.is_grace), Fraction(0))
+            v.start_offset + sum((e.duration for e in v.events if not e.is_grace), Fraction(0))
             for v in measure.voices
         ),
         default=Fraction(0),

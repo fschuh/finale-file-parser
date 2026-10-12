@@ -121,6 +121,30 @@ def test_an_unmirrored_entry_holds_exactly_one_location() -> None:
     assert len(loc[3]) == 1
 
 
+@pytest.mark.parametrize("start_time", [512, 768, 3584])
+def test_a_leading_frame_incidence_preserves_time_for_its_entry_chain(start_time: int) -> None:
+    raw = BASIC.replace(
+        b'<frameSpec cmper="10" inci="0">',
+        f'<frameSpec cmper="10" inci="0"><startTime>{start_time}</startTime></frameSpec>'
+        '<frameSpec cmper="10" inci="1">'.encode(),
+    )
+    # Keep the concatenation above byte-valued, without borrowing score content.
+    locations = locate_entries(parse_enigma(raw))
+    assert locations[1][0].start_time == start_time
+    assert locations[2][0].start_time == start_time
+    assert locations[3][0].start_time == 0
+
+
+@pytest.mark.parametrize("start_time", ["-1", "2147483648", "not-a-number"])
+def test_frame_start_times_are_bounded_scalar_values(start_time: str) -> None:
+    raw = BASIC.replace(
+        b'<frameSpec cmper="10" inci="0">',
+        ('<frameSpec cmper="10" inci="0"><startTime>' + start_time + "</startTime>").encode(),
+    )
+    with pytest.raises(MalformedScoreError, match="startTime"):
+        locate_entries(parse_enigma(raw))
+
+
 def _reserved_template_document(*, shared: bool = False, orphan: bool = False) -> bytes:
     """Authored template outside the score, optionally sharing a real entry."""
     return _doc(

@@ -324,6 +324,25 @@ Layers are distinct from Finale's **voice 1 / voice 2** within a layer (`eeppd.t
 "V2 launch" and `CNTLBIT`). No voice-2 marker has been located in EnigmaXML entry records yet, and the
 measure sums above do not require one, so it remains unmodelled.
 
+### Frame start times and initial voice silence (2026-10-11)
+
+A leading frameSpec incidence can carry `startTime` while the trailing incidence
+holds its entry pair. Resolve that time once per frame, across score incidences,
+and retain it on each EntryLocation in EDU. Missing means zero; negative,
+non-scalar, conflicting or values above signed32 range are malformed. The
+musical cell carries the common start per layer into canonical Voice.start_offset
+as an exact fraction of a whole note. Different starts in one layer are not
+silently combined. No additional written notes/rests are created.
+
+The nine 2026-10-11 source offsets in Chrono Trigger, Wind Scene, Maya Fey,
+Star Light, Ending and Hurry Up all agree with the resulting voices. MusicXML
+uses a voice-specific forward before its events and includes the initial
+silence when rewinding the next voice. Divisions include the offset denominator;
+staff projection remaps both forward and note voice IDs. Slur/arpeggio timing
+and measure/clef bounds include the same offset. Authored tests cover split
+incidences, fractional positions, independent voices, graces, combined staves
+and invalid times. All75 exports still validate, with written durations intact.
+
 ### Legacy detail scope and linked-part groups (2026-10-11)
 
 The variable-length details header word at **+6** is the **part ID**, with 0

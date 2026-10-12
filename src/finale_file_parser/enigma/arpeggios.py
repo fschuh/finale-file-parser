@@ -97,7 +97,7 @@ def _events_at(parts: tuple[Part, ...]) -> dict[EventPosition, tuple[Event, Meas
                 clef_sign, clef_line = measure.clef_sign, measure.clef_line
             initial_sign, initial_line = clef_sign, clef_line
             for voice in measure.voices:
-                onset = Fraction(0)
+                onset = voice.start_offset
                 for index, event in enumerate(voice.events):
                     sign, line = initial_sign, initial_line
                     for change in measure.clef_changes:

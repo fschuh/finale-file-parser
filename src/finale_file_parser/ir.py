@@ -258,6 +258,9 @@ class Voice:
 
     events: tuple[Event, ...] = ()
 
+    start_offset: Fraction = Fraction(0)
+    """Initial silence in whole-note units, without inventing a written rest."""
+
 
 @dataclass(frozen=True)
 class Ending:

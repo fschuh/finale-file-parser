@@ -145,6 +145,9 @@ class EntryLocation:
     times, matching their layer count.
     """
 
+    start_time: int = 0
+    """The frame's leading startTime in EDU, before its first entry."""
+
 
 @dataclass
 class _Placements:
@@ -346,6 +349,17 @@ def _place_frame_entries(
         raise MalformedScoreError(
             f"gfhold staff={staff} measure={measure} frame {frame_cmper} has no matching frameSpec"
         )
+    times = set()
+    for frame in frame_specs:
+        value = frame.fields.get("startTime")
+        if value is None:
+            continue
+        if not isinstance(value, str):
+            raise MalformedScoreError(f"frameSpec {frame_cmper} startTime is not scalar")
+        times.add(_int(value, "frameSpec startTime"))
+    if any(not 0 <= value <= 0x7FFFFFFF for value in times) or len(times) > 1:
+        raise MalformedScoreError(f"frameSpec {frame_cmper} has invalid or conflicting startTime")
+    start_time = next(iter(times), 0)
     for frame_spec in frame_specs:
         start = frame_spec.fields.get("startEntry")
         end = frame_spec.fields.get("endEntry")
@@ -367,6 +381,7 @@ def _place_frame_entries(
             key_signature,
             entries_by_num,
             placements,
+            start_time,
         )
 
 
@@ -380,6 +395,7 @@ def _walk_entry_chain(
     key_signature: int | None,
     entries_by_num: dict[int, Record],
     placements: _Placements,
+    start_time: int = 0,
 ) -> None:
     entnum = _int(start, "startEntry")
     end_entnum = _int(end, "endEntry")
@@ -406,6 +422,7 @@ def _walk_entry_chain(
                     measure=measure,
                     layer=layer,
                     key_signature=key_signature,
+                    start_time=start_time,
                 )
             )
         if entnum == end_entnum:

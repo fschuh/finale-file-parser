@@ -114,6 +114,7 @@ class _Cell:
     """Enigma's beam bit per event, parallel to `events_by_layer`. Kept beside
     the events rather than on them: it is an Enigma detail the IR has no need
     of once the beams themselves are worked out."""
+    start_times: dict[int, int] = field(default_factory=dict)
 
 
 def build_score(document: EnigmaDocument) -> Score:
@@ -153,6 +154,9 @@ def build_score(document: EnigmaDocument) -> Score:
                 _Cell(events_by_layer=defaultdict(list), key_raw=here.key_signature),
             )
             cell.starts_beam[here.layer].append("beam" in record.fields)
+            if here.layer in cell.start_times and cell.start_times[here.layer] != here.start_time:
+                raise CorruptScoreError("one layer has conflicting frame start times")
+            cell.start_times[here.layer] = here.start_time
             slur_positions[here.staff, here.measure, entnum].append(
                 SlurEndpoint(here.measure, here.layer, len(cell.events_by_layer[here.layer]))
             )
@@ -583,7 +587,11 @@ def _measure(
         number=number,
         voices=(
             tuple(
-                Voice(number=layer, events=tuple(events))
+                Voice(
+                    number=layer,
+                    events=tuple(events),
+                    start_offset=Fraction(cell.start_times.get(layer, 0), _WHOLE_EDU),
+                )
                 for layer, events in sorted(cell.events_by_layer.items())
             )
             if cell is not None
