@@ -1764,11 +1764,14 @@ def _append_note(
             for digit in digits:
                 ET.SubElement(technical, "fingering").text = digit
         # Unlike an accent, an arpeggio names every participating chord pitch.
-        # There is no arrow on the supported glyph, so omit `direction`.
         for index, arpeggio in arpeggios:
             attrs = {"number": arpeggio_numbers[index] if arpeggio_numbers else str(index + 1)}
             if arpeggio.part_ids:
                 attrs["unbroken"] = "yes"
+            if arpeggio.direction is not None:
+                if arpeggio.direction not in {"up", "down"}:
+                    raise ExportError(f"unsupported arpeggio direction {arpeggio.direction!r}")
+                attrs["direction"] = arpeggio.direction
             ET.SubElement(notations, "arpeggiate", attrs)
     # Schema order puts <lyric> last, after <notations>. Only on a chord's
     # principal note: the syllable is sung once, not once per pitch.

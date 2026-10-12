@@ -100,6 +100,24 @@ def test_every_pitch_of_a_rolled_chord_has_an_arpeggiate_without_an_arrow() -> N
     assert [note.findtext("duration") for note in notes] == ["1"] * 3
 
 
+@pytest.mark.parametrize("direction", ["up", "down"])
+def test_explicit_arpeggio_arrow_is_exported_on_every_covered_pitch(direction: str) -> None:
+    event = replace(
+        _event(Pitch("C", 4, 0), Pitch("E", 4, 0), Pitch("G", 4, 0)),
+        arpeggios=(Arpeggio(pitch_indices=(0, 2), direction=direction),),
+    )
+    score = Score(parts=(Part("P1", "Test", (Measure(1, (Voice(1, (event,)),)),)),))
+    root = _tree(score)
+    assert [m.get("direction") for m in root.findall(".//arpeggiate")] == [direction] * 2
+
+
+def test_unsupported_arpeggio_direction_raises_a_clear_error() -> None:
+    event = replace(_event(Pitch("C", 4, 0)), arpeggios=(Arpeggio(direction="sideways"),))
+    score = Score(parts=(Part("P1", "Test", (Measure(1, (Voice(1, (event,)),)),)),))
+    with pytest.raises(ExportError, match="unsupported arpeggio direction"):
+        to_musicxml(score)
+
+
 def test_a_rest_never_exports_an_arpeggiate_even_when_authored_with_one() -> None:
     score = Score(parts=(Part("P1", "Test", (Measure(1, (Voice(1, (_event(),)),)),)),))
     assert _tree(score).find(".//arpeggiate") is None

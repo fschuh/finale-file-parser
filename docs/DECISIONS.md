@@ -1105,3 +1105,13 @@ Shared source routing supplies instrument scope across staves. Automatic
 Human Playback sustain does not authorize manufacturing printed pedal signs;
 MuseScore's missing repeated MIDI pedal controls do not authorize score unrolling.
 
+# 2026-10-12: retain explicit arpeggio arrows through staff projection
+
+Append optional up/down direction to Arpeggio, with None preserving the plain
+sign and its default upward roll. Recognize Corridors' separately drawn
+Maestro down triangle only with an unambiguous positioned roll assignment;
+the glyph alone is not a roll. Preserve direction when connecting staves and
+export the standard arpeggiate direction attribute. Different native/reference
+roll speeds remain performance realizations, without inserted notes or tempo
+changes derived from MIDI.
+

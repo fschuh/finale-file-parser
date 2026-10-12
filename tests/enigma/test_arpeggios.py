@@ -9,7 +9,7 @@ import pytest
 from defusedxml import ElementTree as DET
 
 from finale_file_parser.enigma.arpeggios import arpeggios_by_entry, connect_arpeggios
-from finale_file_parser.enigma.document import EnigmaDocument, parse_enigma
+from finale_file_parser.enigma.document import EnigmaDocument, Record, parse_enigma
 from finale_file_parser.enigma.to_ir import build_score
 from finale_file_parser.export.musicxml import to_musicxml
 from finale_file_parser.ir import Arpeggio, Event, Measure, Part, PartGroup, Pitch, Voice
@@ -249,3 +249,109 @@ def test_enigmaxml_to_ir_to_musicxml_preserves_the_connected_sign() -> None:
     assert len(marks) == 4 and all(
         mark.attrib == {"number": "1", "unbroken": "yes"} for mark in marks
     )
+
+
+def _with_arrow(
+    *,
+    font: str = "Maestro",
+    x: str = "-67",
+    y: str = "-46",
+    arrow_flags: dict[str, str] | None = None,
+    definition_flags: dict[str, str] | None = None,
+    arrow_attrs: dict[str, str] | None = None,
+    duplicate: bool = False,
+) -> EnigmaDocument:
+    doc = _document()
+    doc.others = replace(
+        doc.others,
+        records=(
+            *doc.others.records,
+            Record("fontName", {"cmper": "7"}, "", {"name": font}),
+            Record(
+                "articDef",
+                {"cmper": "7"},
+                "",
+                {"charMain": "224", "fontMain": "7", **(definition_flags or {})},
+            ),
+        ),
+    )
+    arrow = Record(
+        "articAssign",
+        {"entnum": "1", "inci": "1", **(arrow_attrs or {})},
+        "",
+        {"articDef": "7", "horzOff": x, "vertOff": y, **(arrow_flags or {})},
+    )
+    doc.details = replace(
+        doc.details,
+        records=(
+            *(
+                replace(r, fields={**r.fields, "horzOff": "-42", "vertOff": "-24"})
+                if r.tag == "articAssign"
+                else r
+                for r in doc.details.records
+            ),
+            arrow,
+            *((replace(arrow, attrs={**arrow.attrs, "inci": "2"}),) if duplicate else ()),
+        ),
+    )
+    return doc
+
+
+def test_a_maestro_triangle_at_the_bottom_of_one_roll_sets_downward_direction() -> None:
+    assert arpeggios_by_entry(_with_arrow()) == {1: (Arpeggio(direction="down"),)}
+
+
+@pytest.mark.parametrize(
+    "kwargs",
+    [
+        {"font": "Times New Roman"},
+        {"font": "Unestablished Music Font"},
+        {"x": "12"},
+        {"x": "invalid"},
+        {"y": "12"},
+        {"y": "invalid"},
+        {"arrow_flags": {"hide": ""}},
+        {"definition_flags": {"mainIsShape": ""}},
+        {"arrow_attrs": {"part": "1"}},
+        {"arrow_attrs": {"entnum": "2"}},
+        {"duplicate": True},
+    ],
+)
+def test_a_triangle_without_unambiguous_source_context_does_not_add_an_arrow(
+    kwargs: dict[str, object],
+) -> None:
+    doc = _with_arrow(**kwargs)  # type: ignore[arg-type]
+    assert arpeggios_by_entry(doc) == {1: (Arpeggio(),)}
+
+
+def test_a_standalone_triangle_does_not_create_a_roll() -> None:
+    doc = _with_arrow()
+    doc.details = replace(
+        doc.details,
+        records=tuple(
+            r
+            for r in doc.details.records
+            if r.tag != "articAssign" or r.fields.get("articDef") == "7"
+        ),
+    )
+    assert arpeggios_by_entry(doc) == {}
+
+
+def test_downward_direction_survives_a_connected_staff_span_and_musicxml() -> None:
+    score = build_score(_with_arrow())
+    marks = [p.measures[0].voices[0].events[0].arpeggios[0] for p in score.parts]
+    assert marks[0] == marks[1]
+    assert marks[0].direction == "down" and marks[0].part_ids == ("P1", "P2")
+    xml = DET.fromstring(to_musicxml(score))
+    assert [m.get("direction") for m in xml.findall(".//arpeggiate")] == ["down"] * 4
+
+
+def test_partial_chord_coverage_does_not_expand_to_another_staff() -> None:
+    upper, lower = _parts()
+    event = upper.measures[0].voices[0].events[0]
+    event = replace(event, arpeggios=(Arpeggio(pitch_indices=(1,), direction="down"),))
+    upper = replace(
+        upper,
+        measures=(replace(upper.measures[0], voices=(Voice(1, (event,)),)),),
+    )
+    assert connect_arpeggios(_document(), (upper, lower), _BRACE, _ORIGIN) == (upper, lower)

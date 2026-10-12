@@ -2482,6 +2482,31 @@ sf dynamics respectively. The corpus now contains104 exact MUS/MIDI pairs,
 no MIDI-only case and MUS-only Castlevania - Vampire Killer. These are notation
 and import checks; the full playback audit remains separate.
 
+#### Separate downward arpeggio arrows (2026-10-12, F23)
+
+Corridors of Time entries1331/1340, upper bars5/25, each carry one glyph103
+roll and a separate Maestro character224. The official Maestro chart calls224
+a filled upside-down triangle; it has no inherent arpeggio meaning. The
+original PDF shows it at the bottom of the wavy sign. The roll assignment has
+horzOff=-42, vertOff=-24, vertAdd=-38; the triangle has horzOff=-67,
+vertOff=-46. All105 files contain exactly these two eligible triangle placements.
+
+Require one visible score roll and one actual Maestro triangle on the same
+entry, both before the heads (negative horzOff), with the triangle below the
+roll anchor. Shape/text-font/hidden/part variants, standalone triangles,
+ambiguous multiple signs and missing positioning do not establish direction.
+Append optional Arpeggio.direction, preserve it through cross-staff connections,
+and emit standard arpeggiate direction=down on all seven covered notes. Partial
+note coverage is never expanded into a cross-staff roll.
+
+Actual MuseScore4.7.5 imports two native downward arpeggios; the rendered first
+page was inspected. Both native MIDI rolls descend81,80,78,73,69,68,66, matching
+the reference order. Native spread0.744quarter versus reference0.639quarter is
+a renderer realization difference, not additional source notes or a tempo fix.
+Authored direction/context/visibility/connection tests and all105 schema checks
+pass. The MusicXML [arpeggiate reference](https://www.w3.org/2021/06/musicxml40/musicxml-reference/elements/arpeggiate/)
+distinguishes an explicit arrow from the plain sign's default upward roll.
+
 The same SmartShape definitions carry phrase slurs. Solid types **0** (`slurDown`),
 **1** (`slurUp`) and **15** (`slurAuto`) are documented by the published PDK
 [SmartShape enums and structs](https://pdk.finalelua.com/ff__smartshapes_8h_source.html)

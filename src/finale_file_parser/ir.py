@@ -161,7 +161,7 @@ class Lyric:
 
 @dataclass(frozen=True)
 class Arpeggio:
-    """A plain rolled-chord sign, shared across every pitch of the event.
+    """A rolled-chord sign, shared across its participating pitches.
 
     A connected sign has the same ``group`` on all participating events and
     lists their staff-part ids in score order. Empty ids mean one staff. The
@@ -173,6 +173,8 @@ class Arpeggio:
     part_ids: tuple[str, ...] = ()
     pitch_indices: tuple[int, ...] = ()
     """Explicit covered chord notes; empty means the entire event."""
+    direction: str | None = None
+    """A printed up/down arrow; None retains the plain sign and default upward roll."""
 
 
 @dataclass(frozen=True)

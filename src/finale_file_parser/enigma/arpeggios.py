@@ -13,7 +13,8 @@ from collections import defaultdict
 from dataclasses import replace
 from fractions import Fraction
 
-from finale_file_parser.enigma.document import EnigmaDocument, field_int
+from finale_file_parser.enigma.document import EnigmaDocument, Record, field_int
+from finale_file_parser.enigma.fonts import font_names
 from finale_file_parser.ir import Arpeggio, Event, Measure, Part, PartGroup, Pitch
 
 __all__ = ["arpeggios_by_entry", "connect_arpeggios"]
@@ -27,7 +28,7 @@ EventPosition = tuple[str, int, int, int]
 """Staff-part id, measure number, voice number, event index."""
 
 
-def _assignments(document: EnigmaDocument) -> dict[int, tuple[int | None, ...]]:
+def _assignments(document: EnigmaDocument) -> dict[int, tuple[Record, ...]]:
     definitions = {
         field_int(record.attrs.get("cmper"))
         for record in document.others.of_tag("articDef")
@@ -36,22 +37,63 @@ def _assignments(document: EnigmaDocument) -> dict[int, tuple[int | None, ...]]:
         and field_int(record.fields.get("charMain")) == _ARPEGGIO_CHARACTER
     }
     definitions.discard(None)
-    out: dict[int, list[int | None]] = {}
+    out: dict[int, list[Record]] = {}
     for record in document.details.of_tag("articAssign"):
         if "part" in record.attrs or "hide" in record.fields:
             continue
         entry = field_int(record.attrs.get("entnum"))
         definition = field_int(record.fields.get("articDef"))
         if entry is not None and definition is not None and definition in definitions:
-            out.setdefault(entry, []).append(field_int(record.fields.get("vertAdd")))
-    return {entry: tuple(offsets) for entry, offsets in out.items()}
+            out.setdefault(entry, []).append(record)
+    return {entry: tuple(records) for entry, records in out.items()}
+
+
+def _downward_arrows(document: EnigmaDocument, rolls: dict[int, tuple[Record, ...]]) -> set[int]:
+    """A separate Maestro triangle at the lower end of one assigned roll.
+
+    Character224 is a notehead triangle, not intrinsically an arpeggio arrow.
+    Both signs must be before the same entry's heads, with the triangle below
+    the roll's anchor. Ambiguous rolls/arrows and standalone triangles do not
+    establish a direction. The source construction is documented in ARCHITECTURE.
+    """
+    fonts = font_names(document)
+    definitions = {
+        field_int(record.attrs.get("cmper"))
+        for record in document.others.of_tag("articDef")
+        if "part" not in record.attrs
+        and "mainIsShape" not in record.fields
+        and field_int(record.fields.get("charMain")) == 224
+        and fonts.get(field_int(record.fields.get("fontMain")) or 0, "").casefold() == "maestro"
+    }
+    definitions.discard(None)
+    arrows: dict[int, list[Record]] = {}
+    for record in document.details.of_tag("articAssign"):
+        if "part" in record.attrs or "hide" in record.fields:
+            continue
+        entry = field_int(record.attrs.get("entnum"))
+        if entry in rolls and field_int(record.fields.get("articDef")) in definitions:
+            assert entry is not None
+            arrows.setdefault(entry, []).append(record)
+    result = set()
+    for entry, records in arrows.items():
+        if len(records) != 1 or len(rolls[entry]) != 1:
+            continue
+        roll, arrow = rolls[entry][0], records[0]
+        rx, ry = field_int(roll.fields.get("horzOff")), field_int(roll.fields.get("vertOff"))
+        ax, ay = field_int(arrow.fields.get("horzOff")), field_int(arrow.fields.get("vertOff"))
+        if rx is not None and ax is not None and ry is not None and ay is not None:
+            if rx < 0 and ax < 0 and ay < ry:
+                result.add(entry)
+    return result
 
 
 def arpeggios_by_entry(document: EnigmaDocument) -> dict[int, tuple[Arpeggio, ...]]:
     """Only visible, assigned score glyphs place a sign; library entries do not."""
+    assignments = _assignments(document)
+    downward = _downward_arrows(document, assignments)
     return {
-        entry: tuple(Arpeggio() for _ in offsets)
-        for entry, offsets in _assignments(document).items()
+        entry: tuple(Arpeggio(direction="down" if entry in downward else None) for _ in records)
+        for entry, records in assignments.items()
     }
 
 
@@ -144,9 +186,14 @@ def connect_arpeggios(
             continue
         event, measure, onset = placed
         distance = distances.get(position[0])
-        if distance is None or len(event.arpeggios) != 1:
+        if (
+            distance is None
+            or len(event.arpeggios) != 1
+            or event.arpeggios[0].pitch_indices
+            or entry not in offsets
+        ):
             continue
-        extension = offsets[entry][0]
+        extension = field_int(offsets[entry][0].fields.get("vertAdd"))
         bounds = _bounds(event, measure, distance)
         if extension is None or extension >= 0 or bounds is None:
             continue
@@ -170,7 +217,9 @@ def connect_arpeggios(
             other = candidates[0]
             if other in replacements:
                 continue
-            mark = Arpeggio(group=f"{position[0]}:{measure.number}:{entry}", part_ids=ids)
+            mark = replace(
+                event.arpeggios[0], group=f"{position[0]}:{measure.number}:{entry}", part_ids=ids
+            )
             replacements[position] = replace(event, arpeggios=(mark,))
             replacements[other] = replace(events[other][0], arpeggios=(mark,))
     return (
