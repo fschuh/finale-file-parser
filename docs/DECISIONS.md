@@ -1086,3 +1086,13 @@ instrument. This permits cross-staff pedal controls to act on the same piano;
 staff names or a brace alone are insufficient evidence. Keep disabled/solo
 notation intact and suppress only its sounding attacks.
 
+# 2026-10-12: extend pitch spans across staves and recognize drawn arpeggios
+
+Allow NoteEndpoint to name another staff-part. Export explicit glissando
+connections in one staff bundle with globally paired numbers, retaining source
+voice instrument identities independently. Same-chord type25 wavy drawings
+before the noteheads are arpeggios when distinct pitch endpoints establish their
+extent, corroborated by Game Over/Swimming source PDFs. Keep exact pitch coverage
+on Arpeggio; the drawing's endpoint order does not establish roll direction.
+This resolves the cross-staff limitation recorded in the initial F18 decision.
+

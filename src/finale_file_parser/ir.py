@@ -170,6 +170,8 @@ class Arpeggio:
 
     group: str | None = None
     part_ids: tuple[str, ...] = ()
+    pitch_indices: tuple[int, ...] = ()
+    """Explicit covered chord notes; empty means the entire event."""
 
 
 @dataclass(frozen=True)
@@ -560,6 +562,8 @@ class NoteEndpoint:
 
     event: SlurEndpoint
     pitch_index: int
+    part_id: str | None = None
+    """None uses the owning part; an explicit ID preserves a cross-staff endpoint."""
 
 
 @dataclass(frozen=True)

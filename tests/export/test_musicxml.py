@@ -10,6 +10,7 @@ from defusedxml import ElementTree as DET
 from finale_file_parser.export.musicxml import ExportError, prints_as_words, to_musicxml
 from finale_file_parser.formats.dynamics import DYNAMICS
 from finale_file_parser.ir import (
+    Arpeggio,
     Beam,
     Ending,
     Event,
@@ -235,6 +236,20 @@ def test_inverted_marcato_uses_a_standard_strong_accent_with_down_orientation() 
     mark = root.find(".//articulations/strong-accent")
     assert mark is not None and mark.get("type") == "down"
     assert root.find(".//articulations/staccato") is not None
+
+
+def test_source_arpeggio_can_cover_only_its_identified_chord_notes() -> None:
+    root = _tree(
+        _score(
+            _note(
+                pitches=(Pitch("C", 4, 0), Pitch("E", 4, 0), Pitch("G", 4, 0)),
+                arpeggios=(Arpeggio(pitch_indices=(1, 2)),),
+            )
+        )
+    )
+    notes = root.findall(".//note")
+    assert notes[0].find(".//arpeggiate") is None
+    assert len(root.findall(".//arpeggiate")) == 2
 
 
 @pytest.mark.parametrize("ornament", [Ornament("unknown"), Ornament("upper-mordent", 3)])

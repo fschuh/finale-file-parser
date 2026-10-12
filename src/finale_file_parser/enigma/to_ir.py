@@ -230,7 +230,13 @@ def build_score(document: EnigmaDocument) -> Score:
     hairpins = hairpins_by_staff(document, ignored_shapes=ignored_shapes)
     slurs = slurs_by_staff(document, slur_positions, ignored_shapes=ignored_shapes)
     octaves = octaves_by_staff(document, ignored_shapes=ignored_shapes)
-    glissandi = glissandi_by_staff(document, slur_positions, ignored_shapes=ignored_shapes)
+    glissandi, shaped_arpeggios = glissandi_by_staff(
+        document, slur_positions, ignored_shapes=ignored_shapes
+    )
+    for (staff, endpoint), marks in shaped_arpeggios.items():
+        events = cells[staff, endpoint.measure].events_by_layer[endpoint.voice]
+        event = events[endpoint.event_index]
+        events[endpoint.event_index] = replace(event, arpeggios=event.arpeggios + marks)
     clef_at = _carried_clefs(document, staves, numbers, clef_at, clef_changes)
     expressions = _place_score_wide(expressions, staves)
     parts = [

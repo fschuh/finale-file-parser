@@ -2388,6 +2388,31 @@ baseline and149 hashes as that earlier snapshot. New expanded checks expose one
 cross-staff and two same-chord glissando cases, tracked separately; original75
 still export and validate.
 
+#### Additional SmartShape pitch attachments in the expanded corpus (2026-10-12)
+
+The18 added files expose one cross-staff glissando (Mega Man2 Opening, shape39,
+upper bar18 entry573 to lower bar19 entry1371) and eight same-chord wavy shapes
+(SMW Game Over/Swimming, four each). The latter have distinct stable note IDs
+on the same event and active drawing coordinates entirely before the noteheads.
+Both original PDFs clearly show arpeggio signs. Normalize that evidenced drawing
+construction to an arpeggio covering the notes between its pitch endpoints;
+do not manufacture a temporal glide between simultaneous chord notes or infer
+roll direction from which end of the wavy line was drawn first.
+
+Append optional part_id to NoteEndpoint for cross-staff references and covered
+pitch_indices to Arpeggio (empty keeps whole-chord semantics). Glissando numbers
+are allocated across the entire exported staff bundle in XML order, including
+voice order, instead of requiring musical time to equal serialization order.
+Explicit cross-staff glissando connections join the relevant staves for export,
+as explicit cross-staff arpeggios already do; source voice routing identities
+remain independent in IR. This supersedes the earlier F18 cross-staff limitation.
+
+The full93-file production path now parses, builds, exports and validates against
+official MusicXML4.0 with185 input hashes unchanged; no MIDI-only filenames.
+MuseScore4.7.5 imports the cross-staff line and four arpeggios per added SMW score.
+Rendered Game Over page verified against the source. Authored regressions cover
+the drawing construction, partial coverage and cross-staff endpoints.
+
 The same SmartShape definitions carry phrase slurs. Solid types **0** (`slurDown`),
 **1** (`slurUp`) and **15** (`slurAuto`) are documented by the published PDK
 [SmartShape enums and structs](https://pdk.finalelua.com/ff__smartshapes_8h_source.html)

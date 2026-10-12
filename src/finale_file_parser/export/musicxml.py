@@ -400,6 +400,7 @@ def _append_part(
     hairpin_directions: _HairpinDirections | None = None,
     slur_notations: _SlurNotations | None = None,
     octave_directions: _OctaveDirections | None = None,
+    glissando_notations: _GlissandoNotations | None = None,
 ) -> None:
     element = ET.SubElement(root, "part", id=part.id)
     divisions = _divisions_for(part) if divisions is None else divisions
@@ -411,7 +412,9 @@ def _append_part(
         octave_directions = _octave_directions((part,))
     first = True
     tremolos = _tremolo_notations(part)
-    glissandi = _glissando_notations(part)
+    glissandi = (
+        _glissando_notations((part,)) if glissando_notations is None else glissando_notations
+    )
     for measure in part.measures:
         _append_measure(
             element,
@@ -438,6 +441,15 @@ def _staff_bundles(score: Score) -> tuple[tuple[Part, ...], ...]:
         if first.instrument_id is not None and first.instrument_id == second.instrument_id:
             joined[index] = True
     for part in score.parts:
+        for span in part.glissandi:
+            target = span.end.part_id or part.id
+            if target == part.id:
+                continue
+            if target not in positions:
+                raise ExportError("glissando endpoint names a missing score part")
+            first_index, last_index = sorted((positions[part.id], positions[target]))
+            for index in range(first_index, last_index):
+                joined[index] = True
         for measure in part.measures:
             for voice in measure.voices:
                 for event in voice.events:
@@ -532,6 +544,7 @@ def _append_multistaff_part(
     hairpin_directions = _hairpin_directions(parts)
     slur_notations = _slur_notations(parts)
     octave_directions = _octave_directions(parts)
+    glissando_notations = _glissando_notations(parts)
     next_voice = 1
     for staff, part in enumerate(parts, start=1):
         _append_part(
@@ -542,6 +555,7 @@ def _append_multistaff_part(
             hairpin_directions=hairpin_directions,
             slur_notations=slur_notations,
             octave_directions=octave_directions,
+            glissando_notations=glissando_notations,
         )
         voices = sorted({voice.number for measure in part.measures for voice in measure.voices})
         voice_ids = {str(voice): str(next_voice + index) for index, voice in enumerate(voices)}
@@ -1193,51 +1207,65 @@ def _is_glyph(text: str) -> bool:
     return len(text) <= _MAX_GLYPH and not any(character.isalnum() for character in text)
 
 
-def _glissando_notations(part: Part) -> _GlissandoNotations:
-    positions = _slur_positions(part)
+def _glissando_notations(parts: tuple[Part, ...]) -> _GlissandoNotations:
+    positions = {part.id: _slur_positions(part) for part in parts}
     events = {
-        SlurEndpoint(m.number, v.number, i): e
-        for m in part.measures
+        NoteEndpoint(SlurEndpoint(m.number, v.number, i), j, p.id): event
+        for p in parts
+        for m in p.measures
         for v in m.voices
-        for i, e in enumerate(v.events)
+        for i, event in enumerate(v.events)
+        for j in range(len(event.pitches))
     }
+    staff_order = {p.id: i for i, p in enumerate(parts)}
+    endpoints = []
+    for owner in parts:
+        for index, span in enumerate(owner.glissandi):
+            if span.start.part_id not in {None, owner.id}:
+                raise ExportError("a glissando must be owned by its starting part")
+            points = tuple(
+                replace(point, part_id=point.part_id or owner.id)
+                for point in (span.start, span.end)
+            )
+            resolved = [positions.get(point.part_id or "", {}).get(point.event) for point in points]
+            if any(point not in events for point in points) or any(p is None for p in resolved):
+                raise ExportError(
+                    "glissando endpoint does not identify a pitched note in this instrument"
+                )
+            start, end = resolved
+            assert start is not None and end is not None
+            if points[0] == points[1] or (end.order[0], end.onset) < (start.order[0], start.onset):
+                raise ExportError("glissando end must follow its start")
+            if span.line_type not in {"wavy", "solid"}:
+                raise ExportError("unsupported glissando line type")
+            for point, position, starting in zip(points, (start, end), (True, False), strict=True):
+                rank = (
+                    position.order[0],
+                    staff_order[point.part_id or ""],
+                    *position.order[1:],
+                    point.pitch_index,
+                )
+                mark = _GlissandoNotation(
+                    "start" if starting else "stop",
+                    "",
+                    span.line_type,
+                    span.start_x_offset if starting else span.end_x_offset,
+                    span.start_y_offset if starting else span.end_y_offset,
+                )
+                endpoints.append((rank, owner.id, index, point, mark))
     result: dict[NoteEndpoint, list[_GlissandoNotation]] = {}
-    active: dict[int, tuple[int, int, int]] = {}
-    for span in sorted(
-        part.glissandi,
-        key=lambda s: (
-            positions[s.start.event].order if s.start.event in positions else (-1, -1, -1)
-        ),
+    active: dict[tuple[str, int], str] = {}
+    for _, owner_id, index, point, mark in sorted(
+        endpoints, key=lambda row: (row[0], row[1], row[2])
     ):
-        start, end = positions.get(span.start.event), positions.get(span.end.event)
-        for point in (span.start, span.end):
-            event = events.get(point.event)
-            if event is None or not 0 <= point.pitch_index < len(event.pitches):
-                raise ExportError("glissando endpoint does not identify a pitched note")
-        if (
-            start is None
-            or end is None
-            or (end.order[0], end.onset) < (start.order[0], start.onset)
-            or end.order <= start.order
-        ):
-            raise ExportError("glissando end must follow its start in time and XML order")
-        if span.line_type not in {"wavy", "solid"}:
-            raise ExportError("unsupported glissando line type")
-        active = {number: order for number, order in active.items() if order > start.order}
-        number = next((i for i in range(1, 17) if i not in active), None)
+        identity = owner_id, index
+        number = active.pop(identity, None)
         if number is None:
-            raise ExportError("more than 16 overlapping glissandi")
-        active[number] = end.order
-        result.setdefault(span.start, []).append(
-            _GlissandoNotation(
-                "start", str(number), span.line_type, span.start_x_offset, span.start_y_offset
-            )
-        )
-        result.setdefault(span.end, []).append(
-            _GlissandoNotation(
-                "stop", str(number), span.line_type, span.end_x_offset, span.end_y_offset
-            )
-        )
+            number = next((str(i) for i in range(1, 17) if str(i) not in active.values()), None)
+            if number is None:
+                raise ExportError("more than 16 overlapping glissandi")
+            active[identity] = number
+        result.setdefault(point, []).append(replace(mark, number=number))
     return {point: tuple(items) for point, items in result.items()}
 
 
@@ -1355,7 +1383,10 @@ def _append_measure(
                 ),
                 glissandi=tuple(
                     (glissando_notations or {}).get(
-                        NoteEndpoint(SlurEndpoint(measure.number, voice.number, event_index), i), ()
+                        NoteEndpoint(
+                            SlurEndpoint(measure.number, voice.number, event_index), i, part_id
+                        ),
+                        (),
                     )
                     for i in range(len(event.pitches))
                 ),
@@ -1496,6 +1527,10 @@ def _append_event(
         event = replace(event, playback=False)
     if event.note_ties and len(event.note_ties) != len(event.pitches):
         raise ExportError("per-note tie flags must match the number of pitches")
+    if any(
+        i < 0 or i >= len(event.pitches) for mark in event.arpeggios for i in mark.pitch_indices
+    ):
+        raise ExportError("arpeggio coverage contains an invalid chord pitch")
     if any(not 0 <= mark.pitch_index < len(event.pitches) for mark in event.ornaments):
         raise ExportError("ornament principal note is outside the event's pitches")
     legacy_ties = NoteTies(event.tie_start, event.tie_end)
@@ -1513,6 +1548,7 @@ def _append_event(
             voice,
             divisions,
             pitch=pitch,
+            pitch_index=index,
             chord=bool(index),
             ties=ties,
             arpeggio_numbers=arpeggio_numbers,
@@ -1530,6 +1566,7 @@ def _append_note(
     divisions: int,
     *,
     pitch: Pitch | None,
+    pitch_index: int = 0,
     chord: bool,
     ties: NoteTies,
     arpeggio_numbers: tuple[str, ...] = (),
@@ -1603,7 +1640,15 @@ def _append_note(
     marks = () if chord else event.articulations
     digits = () if chord else event.fingerings
     fermatas = () if chord else event.fermatas
-    arpeggios = event.arpeggios if pitch is not None else ()
+    arpeggios = (
+        tuple(
+            (i, mark)
+            for i, mark in enumerate(event.arpeggios)
+            if not mark.pitch_indices or pitch_index in mark.pitch_indices
+        )
+        if pitch is not None
+        else ()
+    )
     if (
         ties.start
         or ties.stop
@@ -1689,7 +1734,7 @@ def _append_note(
                 ET.SubElement(technical, "fingering").text = digit
         # Unlike an accent, an arpeggio names every participating chord pitch.
         # There is no arrow on the supported glyph, so omit `direction`.
-        for index, arpeggio in enumerate(arpeggios):
+        for index, arpeggio in arpeggios:
             attrs = {"number": arpeggio_numbers[index] if arpeggio_numbers else str(index + 1)}
             if arpeggio.part_ids:
                 attrs["unbroken"] = "yes"

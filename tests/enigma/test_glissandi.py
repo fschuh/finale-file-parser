@@ -13,12 +13,17 @@ from finale_file_parser.export.musicxml import ExportError, to_musicxml
 from finale_file_parser.ir import NoteEndpoint, Score, SlurEndpoint
 
 
-def _score(*, note_id: int = 4, hidden: bool = False, assigned: bool = True) -> Score:
+def _score(
+    *, note_id: int = 4, hidden: bool = False, assigned: bool = True, shaped_roll: bool = False
+) -> Score:
     assignment = (
         '<smartShapeEntryMark entnum="1"><shapeNum>1</shapeNum></smartShapeEntryMark>'
         if assigned
         else ""
     )
+    if shaped_roll:
+        note_id = 3
+    adjustment = "<endPtAdj><on/><x>-24</x><y>12</y></endPtAdj>" if shaped_roll else ""
     raw = f"""<finale><others><staffSpec cmper="1"/>
       <measSpec cmper="1"><beats>4</beats><divbeat>1024</divbeat></measSpec>
       <frameSpec cmper="1"><startEntry>1</startEntry><endEntry>1</endEntry></frameSpec>
@@ -26,8 +31,10 @@ def _score(*, note_id: int = 4, hidden: bool = False, assigned: bool = True) -> 
         <startTime>1024</startTime></frameSpec>
       <smartShape cmper="1"><shapeType>glissando</shapeType><entryBased/>
         {"<hidden/>" if hidden else ""}<startNoteID>7</startNoteID><endNoteID>{note_id}</endNoteID>
-        <startTermSeg><endPt><inst>1</inst><meas>1</meas><entryNum>1</entryNum></endPt></startTermSeg>
-        <endTermSeg><endPt><inst>1</inst><meas>1</meas><entryNum>2</entryNum></endPt></endTermSeg>
+        <startTermSeg><endPt><inst>1</inst><meas>1</meas><entryNum>1</entryNum></endPt>
+          {adjustment}</startTermSeg>
+        <endTermSeg><endPt><inst>1</inst><meas>1</meas>
+          <entryNum>{1 if shaped_roll else 2}</entryNum></endPt>{adjustment}</endTermSeg>
       </smartShape>
     </others><details><gfhold cmper1="1" cmper2="1"><frame1>1</frame1><frame2>2</frame2></gfhold>
       {assignment}
@@ -97,3 +104,37 @@ def test_cross_bar_glissando_does_not_compare_reset_measure_offsets_as_absolute_
     span = replace(part.glissandi[0], end=NoteEndpoint(SlurEndpoint(2, 2, 0), 0))
     result = replace(score, parts=(replace(part, measures=(first, last), glissandi=(span,)),))
     assert len(DET.fromstring(to_musicxml(result)).findall(".//glissando")) == 2
+
+
+def test_same_chord_wavy_shape_before_the_heads_is_a_source_arpeggio() -> None:
+    score = _score(shaped_roll=True)
+    assert not score.parts[0].glissandi
+    event = score.parts[0].measures[0].voices[0].events[0]
+    assert event.arpeggios[0].pitch_indices == (0, 1)
+    root = DET.fromstring(to_musicxml(score))
+    assert len(root.findall(".//arpeggiate")) == 2 and root.find(".//glissando") is None
+
+
+def test_cross_staff_glissando_resolves_within_the_explicit_shared_instrument() -> None:
+    score = _score()
+    part = score.parts[0]
+    measure = part.measures[0]
+    span = replace(part.glissandi[0], end=replace(part.glissandi[0].end, part_id="P2"))
+    first = replace(
+        part,
+        measures=(replace(measure, voices=(measure.voices[0],)),),
+        glissandi=(span,),
+        instrument_id="shared",
+    )
+    last = replace(
+        part,
+        id="P2",
+        measures=(replace(measure, voices=(measure.voices[1],)),),
+        glissandi=(),
+        instrument_id="shared",
+    )
+    root = DET.fromstring(to_musicxml(replace(score, parts=(first, last))))
+    assert len(root.findall("part")) == 1
+    notes = [n for n in root.findall(".//note") if n.find(".//glissando") is not None]
+    assert [n.findtext("staff") for n in notes] == ["1", "2"]
+    assert len(notes) == 2
