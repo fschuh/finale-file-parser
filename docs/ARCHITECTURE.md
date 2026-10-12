@@ -1135,7 +1135,51 @@ The original implementation did not read `repeatBack.target`, `trigger`, `action
 them differently. `repeatEndingText` — a bracket's custom label, used by three corpus documents — is
 also unread; the text is derived from the pass numbers instead.
 
-### Typed expression playback (2026-10-12)
+### Silent entries and independent visibility (2026-10-12)
+
+Extended entry word **slot+22 bit 0x0400** disables entry playback. The
+published FCNoteEntry.GetPlayback and released RGP getter 0x468e46 test the
+loaded entry byte +0x0D mask 4. The independently established grace-slash
+getter 0x467efa reads that same byte with mask 1, anchoring it to serialized
+extended bit 0x0100 at slot+22. Thus mask 4 in that byte is exactly extended
+0x0400; it is not a live-object-offset guess fitted to unmatched MIDI notes.
+Main entry flag **0x00008000** independently hides notation, documented as
+IGNOREBIT in eeppd.txt. Normalized noPlayback/ignore fields feed typed Entry
+and canonical Event.playback/visible for both containers and byte orders.
+Neither field removes pitches, metric time, source ties or span endpoints.
+
+The supplied corpus has 167 active disabled entries in 25 files, mostly rests
+used for layout. Seventeen pitched entries in five files contain 18 written
+pitches: Corridors1, Slider4, SM64Main3, SMWAthletic2 and ZeldaTitle8. The newly
+covered Athletic chord is coincident with sounding material, explaining why an
+earlier attack-only candidate probe did not name it separately. Scope follows
+the production musical frames, not a MIDI note-selection heuristic.
+
+MusicXML uses the standard silent cue representation at full size for disabled
+pitches, preserving duration and graphical tied/slur endpoints. Cue notes cannot
+carry sounding tie elements, so only their visual tied elements are emitted;
+the complete source ties remain in IR. Hidden notation uses note print-object=no
+independently of cue/silence. Rests do not become synthetic pitched cue notes.
+Every exported silent cue has type size=full and a standard defaults/appearance
+note-size type=cue value100. MuseScore 4.7.5 ignores the individual full-size cue
+attribute but honors this default, setting smallNoteMag=1. An authored four-note
+runtime check verifies visible C/D at the same full size, hidden E/F, only C/E
+MIDI attacks, and native play=0 for both silent notes. Zero dynamics is unsuitable
+for this build: the importer discards it; instrument mute is a playing technique.
+
+Source-derived attack comparison after suppression: Corridors1188/0/0,
+ZeldaTitle1308/0/0, SMWAthletic1308/0/0 (matched/source-only/MIDI-only).
+Slider2250/0/13 and SM64Main1093/0/34 retain the separately planned grace-chord
+and glissando realization gaps. Source visibility is preserved, not inferred
+from silence or whether a note happens to match the MIDI.
+
+Evidence: [PDK entry API](https://pdk.finalelua.com/class_f_c_note_entry.html),
+eeppd.txt and the released getter pair, [MusicXML silent/full-size cues](https://www.w3.org/2021/06/musicxml40/musicxml-reference/elements/cue/),
+[cue-size default](https://www.w3.org/2021/06/musicxml40/musicxml-reference/elements/note-size/),
+and the user's isolated MuseScore 4.7.5 runtime. Its exact pass-1/2 importer
+source independently confirms the cue playback and size behavior.
+
+### Typed expression playback controls (2026-10-12)
 
 Numeric textExprDef tag 241's flags are the word at +10: low byte 0 none, 1
 tempo, 2 key velocity, 14 swing. Published EDT/PDK methods and the read-only RGP

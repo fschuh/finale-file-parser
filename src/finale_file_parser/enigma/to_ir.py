@@ -554,6 +554,8 @@ def _event(
         note_ties=tuple(NoteTies(note.tie_start, note.tie_end) for note in entry.notes),
         tuplet_ratio=ratio,
         is_grace="graceNote" in record.fields,
+        playback=entry.playback,
+        visible=entry.visible,
         grace_slash=True
         if "graceNote" in record.fields and "slashGrace" in record.fields
         else None,

@@ -1009,3 +1009,14 @@ measure-level for al Fine/Coda instructions so MuseScore can import the complete
 printed instruction; its embedded-sound classifier discards that qualifier.
 Document other importer policy limits rather than changing source ending labels
 or synthesizing duplicated notation to reproduce a performance route.
+
+## 2026-10-12 — DECIDED: silent source events retain independent notation
+
+Append Event.playback/visible with backward-compatible true defaults and expose
+the same state on typed Entry. Decode source noPlayback/ignore independently;
+keep metric time, pitches, ties and span anchors. Export disabled pitched events
+as standard full-size silent cues, retaining visual ties while omitting prohibited
+sounding ties. Preserve hidden sounding notes as sounding, and silent visible
+notes as visible. A standard cue-size default of100 complements type size=full
+so MuseScore's importer retains the source's normal note size. This follows
+source flags and MusicXML semantics; MIDI does not decide which notes to silence.

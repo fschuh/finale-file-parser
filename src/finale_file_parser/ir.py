@@ -248,6 +248,11 @@ class Event:
     arpeggios: tuple[Arpeggio, ...] = ()
     """Rolled-chord signs in source order; rests do not participate."""
 
+    playback: bool = True
+    """False for an explicitly silent source event; written pitches survive."""
+    visible: bool = True
+    """Source notation visibility, independent of whether the event sounds."""
+
     @property
     def is_rest(self) -> bool:
         return not self.pitches

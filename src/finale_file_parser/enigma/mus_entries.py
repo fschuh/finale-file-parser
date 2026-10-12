@@ -97,6 +97,10 @@ _SLASHGRACE = 0x0100
 Confirmed by the published FCNoteEntry getter and read-only inspection of RGP
 Lua 0.79's corresponding getter. See docs/ARCHITECTURE.md, grace-note slashes.
 """
+_NO_PLAYBACK = 0x0400
+"""Extended high-byte bit 4 shares the independently anchored grace-slash word."""
+_IGNORE = 0x00008000
+"""Documented main entry flag hiding notation independently from playback."""
 _TIE_START = 0x40000000
 _TIE_END = 0x20000000
 
@@ -337,6 +341,10 @@ def _entry_record(stream: bytes, offset: int, stored_count: int, order: ByteOrde
         fields["graceNote"] = ""
     if _u16(stream, offset + 22, order) & _SLASHGRACE:
         fields["slashGrace"] = ""
+    if _u16(stream, offset + 22, order) & _NO_PLAYBACK:
+        fields["noPlayback"] = ""
+    if flag & _IGNORE:
+        fields["ignore"] = ""
     notes = tuple(_note_record(stream, o, order) for o in _note_offsets(offset, stored_count))
     if notes:
         fields["note"] = notes if len(notes) > 1 else notes[0]

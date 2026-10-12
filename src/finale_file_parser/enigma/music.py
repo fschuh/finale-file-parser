@@ -95,6 +95,8 @@ class Entry:
     duration: Duration
     is_rest: bool
     notes: tuple[Note, ...]
+    playback: bool = True
+    visible: bool = True
 
 
 def read_entry(record: Record) -> Entry:
@@ -117,7 +119,14 @@ def read_entry(record: Record) -> Entry:
     # positioned rest may still store note-shaped data for its drawing position.
     # Minimal authored records without source flags retain count semantics.
     is_rest = num_notes == 0 or ("isValid" in record.fields and "isNote" not in record.fields)
-    return Entry(entnum=entnum, duration=duration, is_rest=is_rest, notes=() if is_rest else notes)
+    return Entry(
+        entnum=entnum,
+        duration=duration,
+        is_rest=is_rest,
+        notes=() if is_rest else notes,
+        playback="noPlayback" not in record.fields,
+        visible="ignore" not in record.fields,
+    )
 
 
 def duration_from_edu(edu: int) -> Duration:

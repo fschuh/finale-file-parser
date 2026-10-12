@@ -132,6 +132,18 @@ def to_musicxml(score: Score) -> bytes:
     """
     root = ET.Element("score-partwise", version=MUSICXML_VERSION)
     _append_identification(root, score)
+    if any(
+        not event.playback and not event.is_rest
+        for part in score.parts
+        for measure in part.measures
+        for voice in measure.voices
+        for event in voice.events
+    ):
+        # Every silent cue emitted here retains ordinary source note size.
+        # MuseScore ignores type size=full on cues, but honors this standard
+        # default and therefore preserves full-size notation as well as silence.
+        appearance = ET.SubElement(ET.SubElement(root, "defaults"), "appearance")
+        ET.SubElement(appearance, "note-size", type="cue").text = "100"
 
     bundles = _staff_bundles(score)
     labels = {
@@ -1399,6 +1411,9 @@ def _append_note(
     slurs: tuple[_SlurNotation, ...] = (),
 ) -> None:
     note = ET.SubElement(element, "note")
+    if not event.visible:
+        note.set("print-object", "no")
+    silent = not event.playback and pitch is not None
     # Schema order: grace, chord, pitch or rest, duration, tie, voice, type...
     # A grace note takes no metric time, and the schema requires duration > 0, so
     # it is expressed by omitting duration rather than by writing zero.
@@ -1406,6 +1421,8 @@ def _append_note(
         grace = ET.SubElement(note, "grace")
         if event.grace_slash is not None:
             grace.set("slash", "yes" if event.grace_slash else "no")
+    if silent:
+        ET.SubElement(note, "cue")
     if chord:
         ET.SubElement(note, "chord")
     if pitch is None:
@@ -1428,13 +1445,16 @@ def _append_note(
     # <tie> is the sounding instruction; <tied> inside <notations> is the visual
     # tie. Both are required for a tie to survive a round trip through most
     # applications.
-    if ties.stop:
+    if ties.stop and not silent:
         ET.SubElement(note, "tie", type="stop")
-    if ties.start:
+    if ties.start and not silent:
         ET.SubElement(note, "tie", type="start")
     ET.SubElement(note, "voice").text = str(voice.number)
     if not event.is_measure_rest:
-        ET.SubElement(note, "type").text = _note_type(event)
+        type_element = ET.SubElement(note, "type")
+        type_element.text = _note_type(event)
+        if silent:
+            type_element.set("size", "full")
     for _ in range(event.dots):
         ET.SubElement(note, "dot")
     if event.tuplet_ratio is not None:
