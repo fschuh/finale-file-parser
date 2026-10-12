@@ -2462,6 +2462,26 @@ Authored font/shape/scope/chord/offset tests pass and actual MuseScore4.7.5 impo
 the first-note mp as a native Dynamic. No new byte range or playback value is
 decoded by identifying this notation.
 
+#### Font-specific sforzando variant (2026-10-12, R05)
+
+The official [Maestro chart](https://usermanuals.finalemusic.com/FinaleWin/Content/Finale/font-maestro.htm)
+identifies character83, `S`/Shift+s, as sforzando. Its linked
+[glyph image](https://usermanuals.finalemusic.com/FinaleWin/Content/Resources/Images/characterSets/Maestro/Sforzando%20or%20Sforzato.png)
+prints **sf**; character167, `§`, has a separate image printing **sfz**.
+The inspected sf PNG has SHA256
+`23998340ba65394379d0065e1e88b392d2376635d9429defabf554fc37a15c15`.
+Resolve `S` to sf only when the actual decoded glyph run names Maestro. A
+dynamic category, a description saying sforzando, an unknown font or another
+music font cannot establish this character's appearance. Ordinary text S stays
+text. No accent or MIDI-derived velocity is fabricated.
+
+All105 current user-supplied files convert and pass the official MusicXML4.0
+schema. Exactly three expression placements change: SM64 Main Theme bars22/24
+and SMB3 Athletic Theme bar12. Actual MuseScore4.7.5 imports two and one native
+sf dynamics respectively. The corpus now contains104 exact MUS/MIDI pairs,
+no MIDI-only case and MUS-only Castlevania - Vampire Killer. These are notation
+and import checks; the full playback audit remains separate.
+
 The same SmartShape definitions carry phrase slurs. Solid types **0** (`slurDown`),
 **1** (`slurUp`) and **15** (`slurAuto`) are documented by the published PDK
 [SmartShape enums and structs](https://pdk.finalelua.com/ff__smartshapes_8h_source.html)

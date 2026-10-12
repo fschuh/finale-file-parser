@@ -285,6 +285,14 @@ def expressions_by_measure(
             category=category,
             in_music_font=found.in_music_font if found is not None else False,
             description=str(definition.fields.get("descStr") or ""),
+            in_maestro_font=any(
+                run.name is not None
+                and run.name.casefold() == "maestro"
+                and run.text.strip() == printed
+                for run in found.runs
+            )
+            if found
+            else False,
         )
         # Keep it if there is something to print *or* something to call it. An
         # expression with neither is not a marking -- 461 corpus assignments
@@ -456,7 +464,14 @@ def _definitions(document: EnigmaDocument) -> dict[int, Record]:
     return out
 
 
-def _marking(text: str, *, category: str, in_music_font: bool, description: str) -> str | None:
+def _marking(
+    text: str,
+    *,
+    category: str,
+    in_music_font: bool,
+    description: str,
+    in_maestro_font: bool = False,
+) -> str | None:
     """The readable dynamic this expression is, or None if it is not one.
 
     Three signals, strongest first:
@@ -473,6 +488,8 @@ def _marking(text: str, *, category: str, in_music_font: bool, description: str)
     Anything else is left unnamed -- see "When a glyph counts as a dynamic" in
     the module docstring for the counts behind the rule.
     """
+    if text == "S":
+        return "sf" if in_maestro_font else None
     described = described_dynamic(description, glyph=text)
     if described is not None:
         return described.marking

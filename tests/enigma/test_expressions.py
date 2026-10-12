@@ -308,6 +308,29 @@ def test_an_unidentified_glyph_is_still_carried() -> None:
     assert found.category == "dynamics"
 
 
+@pytest.mark.parametrize(
+    "font,expected",
+    [
+        ("Maestro", "sf"),
+        ("Times New Roman", None),
+        ("Unestablished Music Font", None),
+        ("EngraverFontSet", None),
+    ],
+)
+def test_sforzando_s_requires_its_established_maestro_glyph_context(
+    font: str, expected: str | None
+) -> None:
+    registry = Record(tag="fontName", attrs={"cmper": "7"}, text="", fields={"name": font})
+    doc = document(
+        *library(),
+        registry,
+        definition(60, category_id=DYNAMICS_CATEGORY, desc="sforzando"),
+        text(60, "^fontMus(7,0)S"),
+        assignment(6, 60),
+    )
+    assert expressions_by_measure(doc)[(1, 6)][0].marking == expected
+
+
 def test_a_sforzato_glyph_and_description_identify_sfz_without_font_or_category() -> None:
     """The compiled legacy font command cannot establish a font on its own."""
     doc = document(

@@ -98,7 +98,7 @@ seventh rungs, which is where forte and piano belong in a ten-step ladder.
 ACCENT_DYNAMICS: tuple[Dynamic, ...] = (
     Dynamic("ê", "forte piano", "fp", None),
     Dynamic("Z", "forzando", "fz", None),
-    Dynamic("S", "sforzando", None, None),
+    Dynamic("S", "sforzando", "sf", None),
     Dynamic("§", "sforzato", "sfz", None),
     Dynamic("\x8d", "sforzato", None, None),
 )
@@ -107,9 +107,10 @@ library gives them no `value`. A user can still set one -- one corpus document
 gives its *sforzando* 88 with `playType='amplitude'` -- so `None` here means
 "no default", not "never has one".
 
-Two are left unabbreviated. The legacy Maestro chart and local score confirm
-`§` as `sfz`; the other two need their own glyph evidence. A description alone
-still cannot distinguish the two glyphs called `sforzato`. See ARCHITECTURE.md.
+The control-character variant remains unabbreviated. The Maestro chart identifies
+`S` as `sf` and `§` as `sfz`; their distinct glyph images provide the evidence.
+A description alone still cannot distinguish the two glyphs called `sforzato`.
+See ARCHITECTURE.md.
 """
 
 OTHER_DYNAMICS: tuple[Dynamic, ...] = (Dynamic("subito p", "subito piano", "subito p", 49),)
