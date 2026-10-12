@@ -65,6 +65,11 @@ _COMBINED_ARTICULATIONS = {
 def _articulation_names(character: int, font: str = "") -> tuple[str, ...]:
     if font.casefold() == "maestro" and character in {248, 60}:
         return ("tenuto", "staccato")
+    if font.casefold() == "maestro":
+        if character in {171, 216}:
+            return ("strong-accent" if character == 171 else "strong-accent-down",)
+        if character in {172, 232}:
+            return ("strong-accent" if character == 172 else "strong-accent-down", "staccato")
     name = ARTICULATION_CHARACTERS.get(character)
     return (name,) if name is not None else _COMBINED_ARTICULATIONS.get(character, ())
 

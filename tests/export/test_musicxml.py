@@ -230,6 +230,13 @@ def test_chord_ornaments_appear_once_alongside_other_notations() -> None:
     assert root.findtext(".//fingering") == "1"
 
 
+def test_inverted_marcato_uses_a_standard_strong_accent_with_down_orientation() -> None:
+    root = _tree(_score(_note(articulations=("strong-accent-down", "staccato"))))
+    mark = root.find(".//articulations/strong-accent")
+    assert mark is not None and mark.get("type") == "down"
+    assert root.find(".//articulations/staccato") is not None
+
+
 @pytest.mark.parametrize("ornament", [Ornament("unknown"), Ornament("upper-mordent", 3)])
 def test_unsupported_ornaments_raise(ornament: Ornament) -> None:
     with pytest.raises(ExportError, match="ornament|auxiliary"):

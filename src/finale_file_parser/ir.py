@@ -225,7 +225,8 @@ class Event:
 
     articulations: tuple[str, ...] = ()
     """MusicXML articulation names -- "staccato", "accent", "tenuto",
-    "strong-accent", "breath-mark" -- in document order."""
+    "strong-accent", "breath-mark" -- in document order. "strong-accent-down"
+    preserves an inverted marcato; the exporter maps it to strong-accent type=down."""
 
     note_ties: tuple[NoteTies, ...] = ()
     """One set of flags per pitch. Readers supply these, including explicit false flags.

@@ -1041,3 +1041,10 @@ its pitches; report that renderer limitation instead of changing the score to
 match one consumer's playback. Human Playback's ornament speed/acceleration is
 also a performance realization, not a source notation correction.
 
+# 2026-10-12: retain inverted marcato in the existing articulation vocabulary
+
+Add `strong-accent-down` to the existing string articulation representation;
+it means inverted marcato and exports to `strong-accent type="down"`. This keeps
+the established component expansion for combined marks and avoids discarding
+their orientation. Unknown-font and blank-character definitions are excluded.
+

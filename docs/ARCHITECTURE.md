@@ -1789,6 +1789,16 @@ placements use248: Peaceful Days8, Hikari2, Determination36, MEGALOVANIA4.
 There is no new binary layout or performance note-off rule; portato durations
 in Human Playback are not rewritten into notation.
 
+#### Marcato glyph variants (2026-10-12, F20)
+
+The official Maestro chart identifies171/216 as above/below marcato and172/232
+as above/below marcato plus staccato. With verified Maestro font, map them to
+strong-accent and, for composite glyphs, staccato. `strong-accent-down` retains
+the inverted glyph orientation and exports as standard `strong-accent type=down`.
+SMB3 Athletic assigns172 twice and171 once; its two zero-character assignments
+remain separate R01 playback controls, never invented marcato. Main/alternate
+symbol placement is independent of identifying this symbol's components.
+
 ### Known format facts — Unicode expression descriptions and dynamics
 
 Numeric-pool `.mus` **others tag 241** stores the expression description at

@@ -1502,7 +1502,10 @@ def _append_note(
         if marks:
             articulations = ET.SubElement(notations, "articulations")
             for name in marks:
-                ET.SubElement(articulations, name)
+                if name == "strong-accent-down":
+                    ET.SubElement(articulations, "strong-accent", type="down")
+                else:
+                    ET.SubElement(articulations, name)
         if ornaments:
             ornament_group = ET.SubElement(notations, "ornaments")
             for ornament in ornaments:

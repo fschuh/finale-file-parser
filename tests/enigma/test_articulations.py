@@ -125,6 +125,27 @@ def test_portato_is_not_guessed_from_a_letter_without_the_source_font(font: str 
     assert articulations_by_entry(doc) == {}
 
 
+@pytest.mark.parametrize(
+    "character,marks",
+    [
+        (171, ("strong-accent",)),
+        (216, ("strong-accent-down",)),
+        (172, ("strong-accent", "staccato")),
+        (232, ("strong-accent-down", "staccato")),
+    ],
+)
+def test_maestro_marcato_variants_retain_orientation_and_components(
+    character: int, marks: tuple[str, ...]
+) -> None:
+    doc = document(definitions={1: character}, assignments=((7, 1),), font="Maestro")
+    assert articulations_by_entry(doc) == {7: marks}
+
+
+def test_a_blank_or_an_unestablished_font_does_not_become_marcato() -> None:
+    doc = document(definitions={1: 0, 2: 172}, assignments=((7, 1), (8, 2)), font="Times New Roman")
+    assert articulations_by_entry(doc) == {}
+
+
 def test_a_part_variant_definition_is_ignored() -> None:
     """Score records only, as everywhere else -- a part override would shadow
     the score's definition."""
