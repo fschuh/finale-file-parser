@@ -118,6 +118,7 @@ class _SlurPosition:
 
 
 _SlurNotations = dict[tuple[str, int, int, int], tuple[_SlurNotation, ...]]
+_TremoloNotations = dict[SlurEndpoint, tuple[str, int]]
 
 
 class ExportError(FinaleFileError):
@@ -396,6 +397,7 @@ def _append_part(
     if octave_directions is None:
         octave_directions = _octave_directions((part,))
     first = True
+    tremolos = _tremolo_notations(part)
     for measure in part.measures:
         _append_measure(
             element,
@@ -408,6 +410,7 @@ def _append_part(
             slur_notations=slur_notations,
             octaves=octave_directions.get((part.id, measure.number), ()),
             octave_spans=part.octave_shifts,
+            tremolo_notations=tremolos,
         )
         first = False
 
@@ -1172,6 +1175,41 @@ def _is_glyph(text: str) -> bool:
     return len(text) <= _MAX_GLYPH and not any(character.isalnum() for character in text)
 
 
+def _tremolo_notations(part: Part) -> _TremoloNotations:
+    events = {
+        SlurEndpoint(measure.number, voice.number, index): event
+        for measure in part.measures
+        for voice in measure.voices
+        for index, event in enumerate(voice.events)
+    }
+    result: _TremoloNotations = {}
+    for span in part.tremolos:
+        a, b = events.get(span.start), events.get(span.end)
+        adjacent = span.end == SlurEndpoint(
+            span.start.measure, span.start.voice, span.start.event_index + 1
+        )
+        if (
+            not adjacent
+            or a is None
+            or b is None
+            or a.is_rest
+            or b.is_rest
+            or a.is_grace
+            or b.is_grace
+        ):
+            raise ExportError("tremolo endpoints must be adjacent pitched events in the same voice")
+        if (
+            not 1 <= span.marks <= 8
+            or a.duration != b.duration
+            or a.written_duration != b.written_duration
+        ):
+            raise ExportError("tremolo requires matching rhythmic values and 1..8 strokes")
+        if span.start in result or span.end in result:
+            raise ExportError("overlapping tremolo pairs")
+        result[span.start], result[span.end] = ("start", span.marks), ("stop", span.marks)
+    return result
+
+
 def _append_measure(
     parent: ET.Element,
     measure: Measure,
@@ -1184,6 +1222,7 @@ def _append_measure(
     slur_notations: _SlurNotations | None = None,
     octaves: tuple[_OctaveDirection, ...] = (),
     octave_spans: tuple[OctaveShift, ...] = (),
+    tremolo_notations: _TremoloNotations | None = None,
 ) -> None:
     element = ET.SubElement(parent, "measure", number=str(measure.number))
     _append_barline(element, measure, "left")
@@ -1244,6 +1283,9 @@ def _append_measure(
                 arpeggio_numbers=numbers,
                 slurs=slurs,
                 octave_displacement=displacement,
+                tremolo=(tremolo_notations or {}).get(
+                    SlurEndpoint(measure.number, voice.number, event_index)
+                ),
             )
             if not event.is_grace:
                 onset += event.duration
@@ -1374,6 +1416,7 @@ def _append_event(
     arpeggio_numbers: tuple[str, ...] = (),
     slurs: tuple[_SlurNotation, ...] = (),
     octave_displacement: int = 0,
+    tremolo: tuple[str, int] | None = None,
 ) -> None:
     if event.note_ties and len(event.note_ties) != len(event.pitches):
         raise ExportError("per-note tie flags must match the number of pitches")
@@ -1399,6 +1442,7 @@ def _append_event(
             arpeggio_numbers=arpeggio_numbers,
             slurs=slurs if not index else (),
             ornaments=tuple(mark for mark in event.ornaments if mark.pitch_index == index),
+            tremolo=tremolo if not index else None,
         )
 
 
@@ -1414,6 +1458,7 @@ def _append_note(
     arpeggio_numbers: tuple[str, ...] = (),
     slurs: tuple[_SlurNotation, ...] = (),
     ornaments: tuple[Ornament, ...] = (),
+    tremolo: tuple[str, int] | None = None,
 ) -> None:
     note = ET.SubElement(element, "note")
     if not event.visible:
@@ -1481,7 +1526,17 @@ def _append_note(
     digits = () if chord else event.fingerings
     fermatas = () if chord else event.fermatas
     arpeggios = event.arpeggios if pitch is not None else ()
-    if ties.start or ties.stop or marks or digits or ornaments or fermatas or arpeggios or slurs:
+    if (
+        ties.start
+        or ties.stop
+        or marks
+        or digits
+        or ornaments
+        or fermatas
+        or arpeggios
+        or slurs
+        or tremolo
+    ):
         notations = ET.SubElement(note, "notations")
         if ties.stop:
             ET.SubElement(notations, "tied", type="stop")
@@ -1506,8 +1561,10 @@ def _append_note(
                     ET.SubElement(articulations, "strong-accent", type="down")
                 else:
                     ET.SubElement(articulations, name)
-        if ornaments:
+        if ornaments or tremolo:
             ornament_group = ET.SubElement(notations, "ornaments")
+            if tremolo is not None:
+                ET.SubElement(ornament_group, "tremolo", type=tremolo[0]).text = str(tremolo[1])
             for ornament in ornaments:
                 if ornament.kind not in {"upper-mordent", "trill"}:
                     raise ExportError(f"unsupported ornament {ornament.kind!r}")

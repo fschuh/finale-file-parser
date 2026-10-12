@@ -1479,6 +1479,12 @@ def test_every_entry_keyed_detail_this_adapter_emits_is_in_the_tag_map() -> None
         tag = keywords.get("tag")
         if "entnum" in names and isinstance(tag, ast.Constant):
             emitted.add(tag.value)
+        elif (
+            "entnum" in names and isinstance(tag, ast.Subscript) and isinstance(tag.value, ast.Dict)
+        ):
+            emitted.update(
+                value.value for value in tag.value.values if isinstance(value, ast.Constant)
+            )
 
     assert emitted == set(mus_details.ENTRY_DETAIL_TAGS)
 
@@ -1490,4 +1496,7 @@ def test_the_tag_map_names_the_raw_tags_the_adapter_reads() -> None:
         "tupletDef": TAG_TUPLET_DEF,
         "lyrDataVerse": TAG_LYRIC_VERSE,
         "smartShapeEntryMark": TAG_SMART_SHAPE_ENTRY_MARK,
+        "beamExtUp": 1021,
+        "beamExtDown": 1022,
+        "noteheadMod": 1058,
     }

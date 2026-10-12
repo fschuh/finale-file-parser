@@ -1056,3 +1056,13 @@ an explicit natural is different from absence. Resolve only unique same-entry,
 music-font small signs positioned above an ornament. Export a standard ornament
 accidental-mark without changing the written pitch or generating MIDI notes.
 
+# 2026-10-12: normalize Finale's tremolo display construction into a musical pair
+
+Represent two-note tremolos as `Part.tremolos` with exact event endpoints and
+stroke count. Recover only hidden two-note stretched tuplets corroborated by
+detached beam extensions or half-notehead overrides. Replace their artificial
+short written values with the true tremolo values; keep the exact sounded time.
+Export standard start/stop ornaments and their required time modification.
+Source ornament/tremolo performance attacks are not inserted into the written
+score, and Human Playback's cadence is not encoded as a fabricated tempo curve.
+

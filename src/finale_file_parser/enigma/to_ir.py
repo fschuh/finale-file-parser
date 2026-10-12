@@ -49,6 +49,7 @@ from finale_file_parser.enigma.smart_shapes import stale_smart_shapes
 from finale_file_parser.enigma.text import file_info, staff_names
 from finale_file_parser.enigma.timesig import TimeSignature as EnigmaTimeSignature
 from finale_file_parser.enigma.timesig import time_signatures
+from finale_file_parser.enigma.tremolos import recover_tremolos
 from finale_file_parser.enigma.tuplet import entry_chain, sounded_durations, tuplets_by_entry
 from finale_file_parser.ir import (
     Arpeggio,
@@ -188,6 +189,17 @@ def build_score(document: EnigmaDocument) -> Score:
                 )
             )
 
+    tremolo_written, tremolos = recover_tremolos(document, slur_positions)
+    for (staff, measure, entry), endpoints in slur_positions.items():
+        if entry not in tremolo_written:
+            continue
+        written = Fraction(tremolo_written[entry], _WHOLE_EDU)
+        for endpoint in endpoints:
+            events = cells[staff, measure].events_by_layer[endpoint.voice]
+            event = events[endpoint.event_index]
+            events[endpoint.event_index] = replace(
+                event, written_duration=written, tuplet_ratio=event.duration / written, beams=()
+            )
     for cell in cells.values():
         _apply_beams(cell)
         for layer, events in cell.events_by_layer.items():
@@ -249,6 +261,7 @@ def build_score(document: EnigmaDocument) -> Score:
             slurs=slurs.get(staff, ()),
             abbreviation=names[staff].abbreviated if staff in names else "",
             octave_shifts=octaves.get(staff, ()),
+            tremolos=tremolos.get(staff, ()),
         )
         for staff in staves
     ]

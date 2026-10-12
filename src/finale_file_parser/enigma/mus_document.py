@@ -365,7 +365,7 @@ def read_mus_document(path: str | os.PathLike[str]) -> EnigmaDocument:
             return _rows_document(path)
         raise
     year = _banner_year(path)
-    translated_details = _details_records(details)
+    translated_details = _details_records(details, year=year)
     entries = read_mus_entry_records(path)
     translated_others = _others_records(
         others, _FALLBACK_ENCODING.get(_banner_platform(path) or "", "cp1252"), year=year
@@ -1685,7 +1685,9 @@ def _detail_scope(record: MusDetailRecord) -> dict[str, str]:
     return {"part": str(record.part)} if record.part else {}
 
 
-def _details_records(records: tuple[MusDetailRecord, ...]) -> list[Record]:
+def _details_records(
+    records: tuple[MusDetailRecord, ...], *, year: int | None = None
+) -> list[Record]:
     out: list[Record] = []
     # Logical incidences and duplicate suppression are local to each part.
     lyric_incidence: dict[int, dict[int, int]] = {}
@@ -1693,6 +1695,7 @@ def _details_records(records: tuple[MusDetailRecord, ...]) -> list[Record]:
     artic_incidence: dict[int, dict[int, int]] = {}
     artic_seen: dict[int, set[tuple[int, int, bool]]] = {}
     shape_incidence: dict[int, dict[int, int]] = {}
+    display_incidence: dict[tuple[int, int, int], int] = {}
     for record in records:
         if record.tag == TAG_GFHOLD:
             out.append(
@@ -1740,6 +1743,54 @@ def _details_records(records: tuple[MusDetailRecord, ...]) -> list[Record]:
                     fields=_staff_group(record.payload),
                 )
             )
+        elif record.tag in {1021, 1022, 1058}:
+            expected = 20 if record.tag == 1058 else 10
+            if not record.payload or (
+                len(record.payload) % expected
+                if record.tag == 1058
+                else len(record.payload) != expected
+            ):
+                raise CorruptScoreError("entry display detail has an unsupported layout")
+            for at in range(0, len(record.payload), expected):
+                identity = (record.tag, entry_key(record), record.part)
+                incidence = display_incidence.get(identity, 0)
+                display_incidence[identity] = incidence + 1
+                fields: dict[str, str | tuple[str, ...] | Record | tuple[Record, ...]]
+                if record.tag == 1058:
+                    fields = {
+                        "noteID": str(_u16(record.payload, at)),
+                        "customChar": str(
+                            _u32(record.payload, at + 6)
+                            if year is not None and year >= 2012
+                            else _u16(record.payload, at + 6)
+                        ),
+                        **(
+                            {"useCustomFont": ""}
+                            if record.payload[at + (10 if year is not None and year >= 2012 else 8)]
+                            & 1
+                            else {}
+                        ),
+                    }
+                else:
+                    fields = {
+                        "leftAdjust": str(_s16(record.payload, at)),
+                        "rightAdjust": str(_s16(record.payload, at + 2)),
+                        "beamMask": str(_u16(record.payload, at + 8)),
+                    }
+                out.append(
+                    Record(
+                        tag={1021: "beamExtUp", 1022: "beamExtDown", 1058: "noteheadMod"}[
+                            record.tag
+                        ],
+                        attrs={
+                            "entnum": str(entry_key(record)),
+                            "inci": str(incidence),
+                            **_detail_scope(record),
+                        },
+                        text="",
+                        fields=fields,
+                    )
+                )
         elif record.tag == TAG_TUPLET_DEF and len(record.payload) >= 8:
             out.append(
                 Record(
@@ -1747,7 +1798,18 @@ def _details_records(records: tuple[MusDetailRecord, ...]) -> list[Record]:
                     attrs={"entnum": str(entry_key(record)), **_detail_scope(record)},
                     text="",
                     fields={
-                        name: str(_u16(record.payload, offset)) for name, offset in _TUPLET_FIELDS
+                        **{
+                            name: str(_u16(record.payload, offset))
+                            for name, offset in _TUPLET_FIELDS
+                        },
+                        **(
+                            {
+                                "numberStyle": str(_u16(record.payload, 18) & 0xF),
+                                "brackStyle": str((_u16(record.payload, 18) & 0x3000) >> 12),
+                            }
+                            if len(record.payload) >= 20
+                            else {}
+                        ),
                     },
                 )
             )

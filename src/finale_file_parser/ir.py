@@ -45,6 +45,7 @@ __all__ = [
     "SlurEndpoint",
     "Tempo",
     "TimeSignature",
+    "Tremolo",
     "Voice",
 ]
 
@@ -548,6 +549,16 @@ class Slur:
 
 
 @dataclass(frozen=True)
+class Tremolo:
+    """Two written notes/chords alternating over their shared rhythmic span."""
+
+    start: SlurEndpoint
+    end: SlurEndpoint
+    marks: int
+    """The number of detached tremolo strokes, without inserted performance notes."""
+
+
+@dataclass(frozen=True)
 class Part:
     """One instrumental part."""
 
@@ -565,6 +576,7 @@ class Part:
     """The staff's abbreviated name, kept separately from a group label."""
     octave_shifts: tuple[OctaveShift, ...] = ()
     """Written Event pitches remain unchanged; these determine sounding octaves."""
+    tremolos: tuple[Tremolo, ...] = ()
 
 
 @dataclass(frozen=True)

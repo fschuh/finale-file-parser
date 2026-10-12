@@ -1822,6 +1822,57 @@ trill-step; runtime support must be distinguished from standard XML preservation
 Authored tests cover altered keys, explicit natural/sharp, chords, visibility and
 ambiguous competing ornaments. No performance attacks become written notes.
 
+#### Two-note tremolo display constructions (2026-10-12, F17)
+
+Finale's [tremolo instructions](https://usermanuals.finalemusic.com/Finale2014Mac/Content/Finale/Tremolos.htm)
+describe two notes whose combined time is notated on each member, with Human
+Playback generating the alternation. The supplied source uses hidden augmented
+tuplets plus explicit display modifications, rather than a dedicated tremolo bit.
+Require two adjacent pitched non-grace entries of equal32nd value, a single
+beam group, a hidden tuplet spanning exactly those entries, and corroborating
+display data. Ordinary tuplets, Sub Castle's10/14-note cadenza tuplets, unrelated
+custom noteheads and ordinary beams do not meet that rule.
+
+* Title Screen upper bar2: entries99/728 each store128EDU; hidden tuplet1x256 in
+  1x2048 yields1024EDU each. Both have Maestro half-notehead override250. Their
+  true written tremolo value is2048EDU on each member, spanning2048EDU combined.
+* Spider Dance upper bars35/39:1070/1071 and1221/1222 each store128EDU; hidden
+  2x128 in1x1024 yields512EDU each. Up/down beam-extension records shorten all
+  three beams at both ends, showing detached tremolo strokes. Written values
+  become1024EDU each; the combined time remains1024EDU.
+
+Normalize numeric details1021/1022 as beamExtUp/Down: exact10-byte data, signed
+left/right adjustments+0/+2, beam mask+8. Spider's four rows have20/-20 and0x0B80.
+Published `FCBeamExtensionMod` and released RGP getters corroborate the layout:
+base0x40, GetLeftAdjustment0x6DD9C reads+0, GetExtend0x6CB54 reads+8, tests
+has-extension bit11 (0x800), and selected levels0x200/0x100/0x80 for eighth,
+sixteenth,32nd. These are extension fields, not primary beam-mode or stem fields.
+
+Numeric detail1058 has packed20-byte notehead modifications (20/40/60-byte
+payloads in this corpus); split every complete group, retaining source scope
+and noteID at+0. Legacy customChar is u16+6, Unicode-era getter uses32bits at+6;
+custom-font flag is bit0 at+8/+10 respectively. RGP Allocate0x4DEC22 gives
+bases0x40/0x54 and DataSizeLoad0x4DEC0A gives20; GetCustomChar0x5B576 and
+GetUseCustomFont0x5BB3A anchor the fields. Tremolo recovery uses only established
+inherited Maestro half-heads, excluding custom fonts. Packed note IDs can repeat
+in retained source records; do not let one erase its neighboring modification.
+
+Tuplet number style is flag low-nibble at serialized+18; bracket style uses
+0x3000 there. RGP GetSymbolicNumber0x796E0 anchors base0x40 to existing+0,
+GetNumberStyle0x4DF7F6 and GetShapeStyle0x4DF80E read base+18. Zero/zero explicitly
+hides both decorations. Short old ratio-only records do not imply hidden display.
+
+Store canonical `Part.tremolos` with exact event endpoints and stroke count,
+correct the written values while retaining exact metric durations, and export
+start/stop tremolo ornaments. MusicXML's required duration/type relation and2/1
+time-modification follow [W3C](https://www.w3.org/2021/06/musicxml40/musicxml-reference/elements/tremolo/).
+Reject dangling/overlapping/nonadjacent pairs. Authored tests include chords,
+ordinary tuplets, packed heads, signed offsets and partial hostile records.
+Actual MuseScore4.7.5 imports one Title and two Spider TremoloTwoChord objects;
+rendered Title page verified. Its32nd alternation rate differs from Human
+Playback's context-dependent rate (reference8+16 extra attacks). Its existing
+post-jump-repeat limitation also remains; neither difference changes notation.
+
 Numeric-pool `.mus` **others tag 241** stores the expression description at
 serialized **payload +36**. Earlier files use an 8-bit string; a **Finale 2012
 or newer banner selects UTF-16LE**. The old adapter stopped at the first NUL
