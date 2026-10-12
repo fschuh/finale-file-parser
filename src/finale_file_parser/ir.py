@@ -26,6 +26,7 @@ __all__ = [
     "Ending",
     "Event",
     "Expression",
+    "ExpressionPlayback",
     "Fermata",
     "Hairpin",
     "Lyric",
@@ -282,6 +283,16 @@ class Ending:
 
 
 @dataclass(frozen=True)
+class ExpressionPlayback:
+    """A typed source playback instruction; printed text does not define its type."""
+
+    kind: str
+    value: int
+    beat_unit: Fraction | None = None
+    pass_number: int = 0
+
+
+@dataclass(frozen=True)
 class Expression:
     """A marking the score attaches to one measure of one staff.
 
@@ -360,6 +371,7 @@ class Expression:
 
     Independent of drawing adjustments; signed offsets are preserved.
     """
+    playback: ExpressionPlayback | None = None
 
 
 @dataclass(frozen=True)

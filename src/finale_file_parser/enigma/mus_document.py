@@ -947,6 +947,19 @@ def _text_expr_def(
         # A definition with no playback level writes zero; the `.musx` omits the
         # field entirely, and `expressions` reads absent as "no level".
         fields["value"] = str(value)
+    if len(payload) >= _EXPR_DEF_DESC:
+        flags = _u16(payload, 10)
+        fields["playType"] = {0: "none", 1: "tempo", 2: "amplitude", 14: "swing"}.get(
+            flags & 0xFF, f"legacy-{flags & 0xFF}"
+        )
+        fields["playbackValue"] = str(_s16(payload, 4))
+        if flags & 0x1000:
+            fields["auxdata1"] = str(_u16(payload, 6))
+        if flags & 0x2000:
+            fields["valueIsExecutableShape"] = ""
+        play_pass = _u16(payload, 8)
+        if play_pass:
+            fields["playPass"] = str(play_pass)
     description = _expression_description(payload, fallback, year)
     if description:
         fields["descStr"] = description

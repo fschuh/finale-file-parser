@@ -134,7 +134,7 @@ from finale_file_parser.formats.dynamics import (
     described_dynamic,
     dynamic_for,
 )
-from finale_file_parser.ir import Expression, Tempo
+from finale_file_parser.ir import Expression, ExpressionPlayback, Tempo
 
 __all__ = ["SCORE_WIDE_STAFF", "expressions_by_measure"]
 
@@ -303,9 +303,31 @@ def expressions_by_measure(
                 if marking is None and label is None
                 else None,
                 offset=offset,
+                playback=_playback(definition),
             )
         )
     return {where: tuple(items) for where, items in out.items()}
+
+
+def _playback(definition: Record) -> ExpressionPlayback | None:
+    kind = definition.fields.get("playType")
+    if not isinstance(kind, str) or "valueIsExecutableShape" in definition.fields:
+        return None
+    value = field_int(definition.fields.get("playbackValue", definition.fields.get("value", "0")))
+    play_pass = field_int(definition.fields.get("playPass", "0"))
+    if value is None or play_pass is None or not 0 <= play_pass <= 32767:
+        raise CorruptScoreError("textExprDef: invalid typed playback value/pass")
+    unit = None
+    if kind == "tempo":
+        edu = field_int(definition.fields.get("auxdata1", "0"))
+        if edu is None or not 0 <= edu <= 32767:
+            raise CorruptScoreError("textExprDef: invalid tempo beat unit")
+        unit = Fraction(edu, 4096) if edu else None
+    if kind == "amplitude" and not -32768 <= value <= 32767:
+        raise CorruptScoreError("textExprDef: stored key velocity is outside signed 16-bit bounds")
+    if kind == "swing" and not 0 <= value <= 32767:
+        raise CorruptScoreError("textExprDef: swing value is outside supported bounds")
+    return ExpressionPlayback(kind, value, unit, play_pass)
 
 
 def _rehearsal_labels(

@@ -972,3 +972,13 @@ default tempo as sound-only when there is no explicit initial metronome; retain
 control range/mode rather than blindly cutting a whole-score export to the UI
 selection. Unknown ignore/reset/expression-mode toggles remain an evidence gate.
 Use the documented high-word-first conversion for split EDU controls.
+
+## 2026-10-12 — DECIDED: printed expressions and typed playback are independent
+
+Append `Expression.playback` with kind, signed value, optional beat unit and pass
+condition. Preserve the old untyped value for compatibility but never export it
+as velocity. Export scalar tempo/key-velocity only where source type and valid
+absolute meaning are established; keep print tempo unchanged. Explicit "none"
+does not imply a printed rate is active. Nonabsolute/zero source controls stay
+in canonical data and structured diagnostics rather than failing the whole
+score or changing their type to match a performance MIDI.

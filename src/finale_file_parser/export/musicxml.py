@@ -158,7 +158,9 @@ def _append_default_tempo(root: ET.Element, score: Score) -> None:
         return
     initial = score.parts[0].measures[0].number if score.parts[0].measures else None
     if any(
-        expression.tempo is not None and expression.offset == 0
+        expression.tempo is not None
+        and expression.offset == 0
+        and (expression.playback is None or expression.playback.kind == "tempo")
         for part in score.parts
         for measure in part.measures
         if measure.number == initial
@@ -950,11 +952,10 @@ def _append_expressions(element: ET.Element, measure: Measure, divisions: int) -
     * an unidentified music-font glyph is **dropped**, because printing it
       literally is worse than omitting it. The IR keeps it either way.
 
-    `velocity` is deliberately not emitted. MusicXML carries playback on
-    `<sound dynamics="...">` as a percentage of MIDI velocity 90, and converting
-    Finale's own scale to that is a claim this project has not verified. The
-    reader keeps the number; the exporter drops it at the edge, which is the
-    split `ir` records.
+    The legacy untyped `velocity` is not emitted. A separately decoded key-
+    velocity instruction uses MusicXML's percentage of MIDI forte 90; a typed
+    tempo can differ from its printed metronome. Nonabsolute source values are
+    retained with diagnostics rather than converted into impossible controls.
     """
     for expression in measure.expressions:
         if expression.tempo is not None:
@@ -979,6 +980,7 @@ def _append_expressions(element: ET.Element, measure: Measure, divisions: int) -
             words.text = expression.text
         else:
             continue
+        _append_expression_playback(direction, expression)
         if expression.offset:
             offset = ET.Element("offset", sound="yes")
             offset.text = str(_duration_in_divisions(expression.offset, divisions))
@@ -988,6 +990,37 @@ def _append_expressions(element: ET.Element, measure: Measure, divisions: int) -
                 (i for i, child in enumerate(direction) if child.tag == "sound"), len(direction)
             )
             direction.insert(at, offset)
+
+
+def _append_expression_playback(direction: ET.Element, expression: Expression) -> None:
+    playback = expression.playback
+    if playback is None:
+        return
+    if playback.kind != "tempo" or playback.value <= 0:
+        for existing_sound in direction.findall("sound"):
+            existing_sound.attrib.pop("tempo", None)
+            if not existing_sound.attrib and not len(existing_sound):
+                direction.remove(existing_sound)
+    if playback.kind == "none":
+        return
+    attrs = {}
+    if playback.kind == "tempo" and playback.beat_unit is not None:
+        rate = playback.value * playback.beat_unit * 4
+        if rate <= 0:
+            return
+        attrs["tempo"] = _decimal_number(rate)
+    elif playback.kind == "amplitude":
+        if not 0 <= playback.value <= 127:
+            return
+        attrs["dynamics"] = _decimal_number(Fraction(playback.value * 100, 90))
+    if not attrs:
+        return
+    sound = direction.find("sound")
+    if sound is None:
+        sound = ET.SubElement(direction, "sound")
+    sound.attrib.update(attrs)
+    if playback.pass_number:
+        sound.set("time-only", str(playback.pass_number))
 
 
 def _decimal_number(value: Fraction) -> str:

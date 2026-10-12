@@ -64,6 +64,7 @@ from finale_file_parser.ir import (
     PartGroup,
     Pitch,
     Score,
+    ScoreDiagnostic,
     SlurEndpoint,
     TimeSignature,
     Voice,
@@ -254,9 +255,31 @@ def build_score(document: EnigmaDocument) -> Score:
         title=info.get("title", ""),
         composer=info.get("composer", ""),
         metadata={k: v for k, v in info.items() if k not in {"title", "composer"}},
-        diagnostics=diagnostics,
+        diagnostics=diagnostics + _playback_diagnostics(tuple(parts)),
         playback=playback_preferences(document),
     )
+
+
+def _playback_diagnostics(parts: tuple[Part, ...]) -> tuple[ScoreDiagnostic, ...]:
+    result = []
+    for part in parts:
+        for measure in part.measures:
+            for index, expression in enumerate(measure.expressions):
+                playback = expression.playback
+                if playback is None:
+                    continue
+                if (playback.kind == "tempo" and playback.value <= 0) or (
+                    playback.kind == "amplitude" and not 0 <= playback.value <= 127
+                ):
+                    result.append(
+                        ScoreDiagnostic(
+                            "nonabsolute-expression-playback",
+                            f"Source {playback.kind} value {playback.value} is retained; "
+                            "it cannot establish an absolute MusicXML rate/velocity.",
+                            f"{part.id}/measure[{measure.number}]/expression[{index}]",
+                        )
+                    )
+    return tuple(result)
 
 
 RESERVED_STAFF = 0x7FFF

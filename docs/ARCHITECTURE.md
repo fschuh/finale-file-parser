@@ -1074,6 +1074,37 @@ The original implementation did not read `repeatBack.target`, `trigger`, `action
 them differently. `repeatEndingText` — a bracket's custom label, used by three corpus documents — is
 also unread; the text is derived from the pass numbers instead.
 
+### Typed expression playback (2026-10-12)
+
+Numeric textExprDef tag 241's flags are the word at +10: low byte 0 none, 1
+tempo, 2 key velocity, 14 swing. Published EDT/PDK methods and the read-only RGP
+type dispatch independently corroborate these meanings; the already paired
+value +4, auxdata1 +6 and playPass +8 anchor the structure. Value is signed
+16-bit for typed playback, even though the older untyped field retained its
+unsigned reading. Flag 0x1000 enables auxiliary tempo beat EDU; 0x2000 makes
+the value an executable-shape ID instead of a scalar playback rate. A zero
+typed value must not vanish through the old optional-value convention.
+
+`Expression.playback` separates these instructions from printed metronomes and
+from the old untyped `velocity`. Export uses explicit tempo value/unit in sound
+while retaining the printed beat/rate: Dr Wily prints 180 and plays 178; Athletic
+prints 150 and plays 152, matching the source/MIDI. Explicit key velocity in
+0..127 uses MusicXML dynamics as a percentage of default MIDI forte 90. Pass
+conditions use time-only. An explicit no-playback expression does not invent a
+tempo from its printed words. Swing is typed here for its separate export step.
+
+The audit also exposes source controls that are not valid absolute rates:
+Objection's copied forte stores -100; Player Select and Ending contain a tempo
+type with value zero, eighth-note unit and words "Swing e's". Retain and diagnose
+these exact settings instead of turning them into velocity 65436, zero BPM or
+an inferred typed swing setting. Human Playback can interpret instruction words
+independently; reproducing that interpretation is a separate renderer issue.
+Executable scalar-shape playback likewise is not converted to a tempo.
+
+Evidence: [PDK expression API](https://pdk.finalelua.com/class_f_c_text_expression_def.html),
+its `ff_other.h` source, released RGP getters, source definitions and
+[MusicXML sound units](https://www.w3.org/2021/06/musicxml40/musicxml-reference/elements/sound/).
+
 ### Document playback controls (2026-10-12)
 
 The published PDK `_FCEDTPlaybackPrefs` names each legacy field, and RGP Lua
