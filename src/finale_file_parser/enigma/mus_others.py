@@ -117,6 +117,13 @@ because the two records always share a measure; the payloads separate them. 206
 is 12 bytes and opens with the pass number itself (1 for a first ending, 2 for a
 second, 31 of 31 paired records), while 204 is 24 bytes of bracket geometry."""
 
+TAG_TEXT_REPEAT_ASSIGN = 243
+"""Placed 24-byte text repeat records; PDK layout and source evidence."""
+TAG_TEXT_REPEAT_DEF = 244
+"""Text repeat font, substitution and alignment definition (12-byte core)."""
+TAG_TEXT_REPEAT_TEXT = 246
+"""Aligned UTF-16LE text for a text-repeat definition, independently of banner."""
+
 TAG_INST_USED = 159
 """`instUsed` — the staves the score lays out, in layout order.
 

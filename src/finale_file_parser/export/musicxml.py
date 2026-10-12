@@ -16,6 +16,7 @@ from decimal import Decimal
 from fractions import Fraction
 
 from finale_file_parser.errors import FinaleFileError
+from finale_file_parser.export.navigation import append_navigation
 from finale_file_parser.ir import (
     Ending,
     Event,
@@ -148,6 +149,7 @@ def to_musicxml(score: Score) -> bytes:
 
     _append_default_tempo(root, score)
     _append_default_swing(root, score)
+    append_navigation(root, score)
 
     ET.indent(root, space="  ")
     body = ET.tostring(root, encoding="unicode")
@@ -1174,6 +1176,8 @@ def _append_measure(
     _append_barline(element, measure, "left")
     _append_attributes(element, measure, divisions, emit_divisions=emit_divisions)
     for words in measure.directions:
+        if any(mark.text == words for mark in measure.navigation):
+            continue
         # Before the notes: the marking applies to the measure, and a direction
         # placed after them would read as belonging to the next bar.
         direction = ET.SubElement(element, "direction", placement="above")

@@ -32,7 +32,7 @@ from finale_file_parser.enigma.fingerings import fingerings_by_entry
 from finale_file_parser.enigma.graces import grace_slash, slash_flagged_grace_notes
 from finale_file_parser.enigma.groups import staff_groups, staff_order
 from finale_file_parser.enigma.hairpins import hairpins_by_staff
-from finale_file_parser.enigma.jumps import jumps_by_measure
+from finale_file_parser.enigma.jumps import jumps_by_measure, navigation_by_measure
 from finale_file_parser.enigma.key import Mode, decode_key
 from finale_file_parser.enigma.location import effective_keys, locate_entries
 from finale_file_parser.enigma.lyrics import Lyric as EnigmaLyric
@@ -58,6 +58,7 @@ from finale_file_parser.ir import (
     Fermata,
     Lyric,
     Measure,
+    Navigation,
     NoteTies,
     Ornament,
     Part,
@@ -69,6 +70,7 @@ from finale_file_parser.ir import (
     TimeSignature,
     Voice,
 )
+from finale_file_parser.playback import PlaybackError, navigation_target
 
 __all__ = ["build_score"]
 
@@ -204,6 +206,7 @@ def build_score(document: EnigmaDocument) -> Score:
     info = file_info(document)
     repeats = repeats_for(document)
     directions = jumps_by_measure(document)
+    navigation = navigation_by_measure(document)
     barlines = barline_styles(document)
     expressions = expressions_by_measure(document)
     staves = _ordered_staves(document, {staff for staff, _ in cells})
@@ -238,6 +241,7 @@ def build_score(document: EnigmaDocument) -> Score:
                     directions=directions,
                     barlines=barlines,
                     expressions=expressions,
+                    navigation=navigation,
                 )
                 for index, number in enumerate(numbers)
             ),
@@ -255,9 +259,41 @@ def build_score(document: EnigmaDocument) -> Score:
         title=info.get("title", ""),
         composer=info.get("composer", ""),
         metadata={k: v for k, v in info.items() if k not in {"title", "composer"}},
-        diagnostics=diagnostics + _playback_diagnostics(tuple(parts)),
+        diagnostics=diagnostics
+        + _playback_diagnostics(tuple(parts))
+        + _navigation_diagnostics(tuple(parts)),
         playback=playback_preferences(document),
     )
+
+
+def _navigation_diagnostics(parts: tuple[Part, ...]) -> tuple[ScoreDiagnostic, ...]:
+    if not parts:
+        return ()
+    result = []
+    part = parts[0]
+    for measure in part.measures:
+        for mark in measure.navigation:
+            if mark.kind == "unknown-glyph":
+                result.append(
+                    ScoreDiagnostic(
+                        "unsupported-navigation-glyph",
+                        "Navigation glyph has no established font mapping",
+                        f"{mark.mark_id}, measure {measure.number}",
+                    )
+                )
+            if mark.playback is None or mark.playback.action in {"noJump", "stop"}:
+                continue
+            try:
+                navigation_target(part, measure.number, mark)
+            except PlaybackError as exc:
+                result.append(
+                    ScoreDiagnostic(
+                        "unresolved-navigation-target",
+                        str(exc),
+                        f"{mark.mark_id}, measure {measure.number}, target {mark.playback.target}",
+                    )
+                )
+    return tuple(result)
 
 
 def _playback_diagnostics(parts: tuple[Part, ...]) -> tuple[ScoreDiagnostic, ...]:
@@ -591,6 +627,7 @@ def _measure(
     directions: dict[int, tuple[str, ...]] | None = None,
     barlines: dict[int, str] | None = None,
     expressions: dict[tuple[int, int], tuple[Expression, ...]] | None = None,
+    navigation: dict[int, tuple[Navigation, ...]] | None = None,
     clef_changes: dict[tuple[int, int], tuple[ClefPosition, ...]] | None = None,
 ) -> Measure:
     cell = cells.get((staff, number))
@@ -655,6 +692,7 @@ def _measure(
         repeat_passes=here.passes,
         endings=here.endings,
         repeat_playback=here.playback,
+        navigation=(navigation or {}).get(number, ()),
     )
 
 

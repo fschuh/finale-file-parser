@@ -979,7 +979,8 @@ those across 10 documents.
 the 17 name a `textRepeatDef` that exists while its `textRepeatText` does not, so the file carries no
 words for them.
 
-Three limits, each deliberate:
+The original MVP had three deliberate limits (superseded by the source-evidenced
+navigation work below):
 
 | not done | why |
 | --- | --- |
@@ -987,8 +988,68 @@ Three limits, each deliberate:
 | segno and coda signs | Some markings are a single music-font character (`%` for the segno). Printing that literally puts a percent sign in the score, and the definitions carrying one have **no `fontID`** to identify the glyph with — the same blocker as fingerings. |
 | the `.mus` side | Exactly **one** paired document carries a text repeat, with two assignments. A key set that small matches several tags by chance, so no tag can be identified. |
 
-Corpus: **6 markings across 3 documents** — "Fine" and "D.C. al Coda". Small, and that is the point:
+Original corpus: **6 markings across 3 documents** — "Fine" and "D.C. al Coda". Small, and that is the point:
 the palette would have given hundreds.
+
+#### Numeric navigation and traversal (2026-10-12)
+
+Numeric tags **243** (24-byte assignment slots), **244** (12-byte definition
+core) and **246** (aligned UTF-16LE text) form the same three-record join. The
+text records identify their own palette by spelling D.C./D.S./Fine; only 21
+actual assignments in 14 supplied scores place marks. UTF-16 is independent
+of the file's 2011/2012 banner and is decoded with aligned terminators and strict
+Unicode/control-character validation. A further definition block is retained
+as opaque legacyExtra rather than guessed as a pass list.
+
+Assignment offsets: +0 signed horizontal EVPU, +2 signed actuate/pass, +4 signed
+target, +6 repnum, +8 signed vertical EVPU, +10 flags, +12 staff list. The RGP
+FCTextRepeat loaded structure starts at +0x38, anchored by GetHorizontalPos
+0x1368c8, GetTotalPasses 0x137d88, GetTarget 0x138150 and GetID 0x134fce. Flags
+&0x70 give automatic/absolute/relative/mark/stop/disabled actions at
+0/0x10/0x20/0x30/0x40/0x50; &0xC00 give always/on-pass/until-pass at
+0/0x400/0x800. Hidden 0x4000, reset 4 and top-staff 2 match published getters.
+GetAction 0x4c4830 independently tests stop/disabled and the pass controls.
+The definition's font ID +4, size +6 and styles +8 are anchored by GetFontInfo
+0x12fb9e; +10 carries alignment and pound substitution. Resolve the font registry
+before interpreting % as segno (Maestro/Engraver) or character 222 as coda
+(Maestro). Text alone never supplies a playback destination.
+
+Canonical `Measure.navigation` preserves printed text/sign, mark identity,
+visibility and `RepeatPlayback`. Hidden marks retain independent playback;
+disabled optional text acquires no invented jump. A bounded traversal keeps
+separate text-repeat counters and advances the consumed pass at alternative
+endings without a closing repeat. Pass lists 1,3 and 2,4 therefore select the
+correct branches after a D.C./D.S.; ordinary 1/2 lists retain their consumed
+final ending unless the source resets them. No filename/MIDI routes are used.
+All source controls in the supplied scores operate at bar boundaries; EVPU
+drawing positions do not become rhythmic offsets or partial-note stops.
+
+Nine navigation-bearing paired scores now match every source/MIDI attack using
+the source route (including optional Dire Dire Docks). SM64 has two silent-anchor
+source attacks and 34 glissando realizations; Spider has 40 trill/tremolo
+realizations; MEGALOVANIA has 16 optional coincident unisons and four ornament
+auxiliaries. These remain separately tracked. Spear of Justice's always-absolute
+D.C. targets measure 0: preserve the rule, issue unresolved-navigation-target,
+and refuse to invent a canonical route for it. Its words still render; a player
+may interpret them independently from this invalid source setting.
+
+MusicXML emits placed signs, exact destination labels, fine and pass conditions,
+with end-of-bar offsets for jump words. For D.S./D.C. al Fine/Coda, the standard
+sound is measure-level and the direction retains its complete words. This avoids
+a verified MuseScore 4.7.5 importer issue: embedded dalsegno makes it classify
+D.S. al Fine as plain D.S. and set playUntil=end; independent sound plus words
+correctly imports playUntil=fine. Both encodings validate against MusicXML 4.0.
+The importer ignores time-only/after-jump policy, so its default playback still
+skips some repeats after jumps in Dr Wily, Star Light, Scrap Brain, SM64, Ground,
+MEGALOVANIA and Spider. Retain correct source rules/XML and report that playback
+limit rather than changing ending labels or expanding the written score.
+
+Evidence: [PDK text-repeat API](https://pdk.finalelua.com/class_f_c_text_repeat.html),
+its ff_other.h layout/getters, released RGP disassembly (the previously recorded
+binary hash), [Maestro chart](https://usermanuals.finalemusic.com/FinaleWin/Content/Finale/font-maestro.htm),
+[MusicXML sound](https://www.w3.org/2021/06/musicxml40/musicxml-reference/elements/sound/),
+the source records and the user's isolated MuseScore 4.7.5 runtime. Local check
+artifacts are retained outside git; authored records exercise parser bounds.
 
 ### Known format facts — three things that are not invariants
 

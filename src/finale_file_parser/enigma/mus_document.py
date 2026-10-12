@@ -98,6 +98,9 @@ from finale_file_parser.enigma.mus_others import (
     TAG_STAFF_SPEC,
     TAG_TEXT_BLOCK,
     TAG_TEXT_EXPR_DEF,
+    TAG_TEXT_REPEAT_ASSIGN,
+    TAG_TEXT_REPEAT_DEF,
+    TAG_TEXT_REPEAT_TEXT,
     MusOther,
     read_mus_others,
 )
@@ -184,10 +187,10 @@ UNTRANSLATED = (
     "player where to go, are still unidentified, and the 2001-2005 cohort has "
     "no paired .musx anywhere to verify a payload layout against. See "
     "enigma.jumps and formats.tags.",
-    "Repeat jumps: repeatBack's target/trigger/action, and textRepeatAssign's "
-    "action/target, describe where a repeat sends the player rather than what is "
-    "printed. Neither container reads them, so both are equally silent -- a "
-    "missing feature rather than a .mus gap.",
+    "DCL repeat-jump assignment layouts remain unresolved. Numeric 2011/2012 "
+    "text-repeat assignments, fonts, UTF-16 text and playback rules ARE read; "
+    "both containers retain canonical navigation. General custom targets and "
+    "renderer-specific repeat policies may require review.",
     "Fingering fonts: articDef's fontMain cannot be read from a .mus -- its "
     "offset moves within the 2011 era, and the best single offset matches only "
     "363 of 373 paired records. Fingerings themselves ARE read, from the "
@@ -1095,6 +1098,52 @@ def _others_records(
             out.append(Record("fontName", attrs, "", {"name": name}))
         elif record.tag == TAG_TEXT_BLOCK:
             out.append(Record("textBlock", attrs, "", _text_block(record.payload)))
+        elif record.tag == TAG_TEXT_REPEAT_ASSIGN:
+            if not record.payload or len(record.payload) % 24:
+                raise CorruptScoreError("textRepeatAssign: expected complete 24-byte records")
+            for inci, at in enumerate(range(0, len(record.payload), 24)):
+                out.append(
+                    Record(
+                        "textRepeatAssign",
+                        {**attrs, "inci": str(inci)},
+                        "",
+                        _text_repeat_assign(record.payload[at : at + 24]),
+                    )
+                )
+        elif record.tag == TAG_TEXT_REPEAT_DEF:
+            if len(record.payload) < 12 or len(record.payload) % 12:
+                raise CorruptScoreError("textRepeatDef: expected complete 12-byte blocks")
+            flags = _u16(record.payload, 10)
+            fields: dict[str, str | tuple[str, ...] | Record | tuple[Record, ...]] = {
+                "fontID": str(_u16(record.payload, 4)),
+                "fontSize": str(_u16(record.payload, 6)),
+                "efx": str(_u16(record.payload, 8)),
+                "justify": ("left", "right", "center", "full")[flags & 3],
+                "poundReplace": {0: "passes", 0x40: "repeatID", 0x80: "measNum"}.get(
+                    flags & 0xC0, "unknown"
+                ),
+            }
+            if len(record.payload) > 12:
+                fields["legacyExtra"] = record.payload[12:].hex()
+            out.append(Record("textRepeatDef", attrs, "", fields))
+        elif record.tag == TAG_TEXT_REPEAT_TEXT:
+            if len(record.payload) % 2:
+                raise CorruptScoreError("textRepeatText: incomplete UTF-16LE code unit")
+            end = next(
+                (
+                    at
+                    for at in range(0, len(record.payload), 2)
+                    if record.payload[at : at + 2] == b"\0\0"
+                ),
+                len(record.payload),
+            )
+            try:
+                text = record.payload[:end].decode("utf-16-le")
+            except UnicodeDecodeError as exc:
+                raise CorruptScoreError("textRepeatText: malformed UTF-16LE text") from exc
+            if any((ord(c) < 32 and c not in "\t\r\n") or ord(c) in (0xFFFE, 0xFFFF) for c in text):
+                raise CorruptScoreError("textRepeatText: illegal literal character")
+            out.append(Record("textRepeatText", attrs, "", {"rptText": text}))
         elif record.tag == TAG_SMART_SHAPE:
             out.append(_smart_shape(record.payload, attrs))
         elif record.tag == TAG_SMART_SHAPE_MEAS_MARK:
@@ -1223,6 +1272,37 @@ def _others_records(
                     )
                 )
     return out
+
+
+def _text_repeat_assign(
+    payload: bytes,
+) -> dict[str, str | tuple[str, ...] | Record | tuple[Record, ...]]:
+    flags = _u16(payload, 10)
+    actions = {
+        0: "jumpAuto",
+        0x10: "jumpAbsolute",
+        0x20: "jumpRelative",
+        0x30: "jumpToMark",
+        0x40: "stop",
+        0x50: "noJump",
+    }
+    triggers = {0: "always", 0x400: "onPass", 0x800: "untilPass"}
+    if flags & 0x70 not in actions or flags & 0xC00 not in triggers:
+        raise CorruptScoreError("textRepeatAssign: unsupported action or trigger flags")
+    fields: dict[str, str | tuple[str, ...] | Record | tuple[Record, ...]] = {
+        "horzPos": str(_s16(payload, 0)),
+        "actuate": str(_s16(payload, 2)),
+        "target": str(_s16(payload, 4)),
+        "repnum": str(_u16(payload, 6)),
+        "vertPos": str(_s16(payload, 8)),
+        "staffList": str(_u16(payload, 12)),
+        "action": actions[flags & 0x70],
+        "trigger": triggers[flags & 0xC00],
+    }
+    for name, mask in (("hidden", 0x4000), ("clrOnChange", 4), ("topStaffOnly", 2)):
+        if flags & mask:
+            fields[name] = ""
+    return fields
 
 
 def _pass_list(payload: bytes) -> tuple[str, ...]:

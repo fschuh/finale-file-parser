@@ -992,3 +992,20 @@ Intermediate source amounts stay an evidence gate rather than using a fitted
 MIDI ratio. Keep standards-compliant export despite the verified MuseScore 4.7.5
 ratio conversion bug; record the renderer limitation and native control result
 in review evidence instead of encoding a false ratio for every other importer.
+
+## 2026-10-12 — DECIDED: navigation text does not define source playback
+
+Append `Measure.navigation` with placed text/sign, font-established kind,
+mark identity, visibility and typed source repeat rule. Preserve optional,
+hidden and malformed-destination controls without assigning them a guessed
+D.C./D.S. action from their words. Keep the words-only helper for compatibility.
+Traverse canonical rules with independent encounters and completed ending state;
+advance 1,3/2,4 lists through navigation jumps without replaying ordinary consumed
+1/2 endings. Retain invalid source targets as diagnostics and bounded traversal
+errors, independently of whether their notation can still be exported.
+
+Use standard MusicXML signs, sound destinations and pass conditions. Keep sound
+measure-level for al Fine/Coda instructions so MuseScore can import the complete
+printed instruction; its embedded-sound classifier discards that qualifier.
+Document other importer policy limits rather than changing source ending labels
+or synthesizing duplicated notation to reproduce a performance route.

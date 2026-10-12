@@ -194,10 +194,11 @@ limit is verified by mutation, because no real corpus archive trips one.
       See `docs/DECISIONS.md`.
 - [x] **Empty measures** — every part now covers every measure, with a full-measure rest where it is
       silent. 6,362 rests; 420 of 731 parts had a gap. See `docs/DECISIONS.md`.
-- [x] **Text repeats (jumps)** — `enigma/jumps.py`, `.musx` only. The words of "Fine", "D.C. al
-      Coda" and their kin, printed at their measure. 6 markings across 3 documents; the palette
-      every document carries is deliberately not read. Playback semantics, segno/coda signs and the
-      `.mus` side are all out of reach on this corpus — see `docs/ARCHITECTURE.md`.
+- [x] **Text repeats (jumps)** — placed words, font-established segno/coda signs
+      and typed navigation in MUSX and numeric 2011/2012 MUS. The supplied 75-file
+      audit provides 21 placements in 14 scores and source-driven D.C./D.S./Fine
+      traversal; unused palettes place nothing. DCL assignments and MuseScore's
+      ignored pass/after-jump policy remain documented limits in ARCHITECTURE.
 - [x] **Barline styles** — `enigma/barlines.py`, both containers. Double and final bars: 216 and
       110 measures across 89 documents, identical from `.mus` and `.musx` on all 6 paired documents
       that use them. A `.mus` declines to report a final bar; see `docs/ARCHITECTURE.md`.

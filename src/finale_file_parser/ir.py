@@ -31,6 +31,7 @@ __all__ = [
     "Hairpin",
     "Lyric",
     "Measure",
+    "Navigation",
     "NoteTies",
     "OctaveShift",
     "Ornament",
@@ -396,6 +397,19 @@ class RepeatPlayback:
 
 
 @dataclass(frozen=True)
+class Navigation:
+    """A placed navigation mark with source playback independent of its words."""
+
+    text: str
+    kind: str = "words"
+    """words, segno or coda; sign recognition requires the source font."""
+    mark_id: str = ""
+    playback: RepeatPlayback | None = None
+    visible: bool = True
+    """Hiding a printed sign does not disable its source playback rule."""
+
+
+@dataclass(frozen=True)
 class Measure:
     """One measure of one part."""
 
@@ -414,9 +428,8 @@ class Measure:
     clef_line: int | None = None
 
     directions: tuple[str, ...] = ()
-    """Words printed over this measure -- "Fine", "D.C. al Coda". Text only:
-    what a jump *does* is not modelled, because Enigma's is not read; see
-    `enigma.jumps`."""
+    """Legacy words-only view, including text repeats. Structured navigation
+    retains source playback independently; export avoids printing both views."""
 
     expressions: tuple[Expression, ...] = ()
     """Markings placed on *this staff* at this measure -- dynamics, tempo words,
@@ -446,6 +459,7 @@ class Measure:
     clef_changes: tuple[ClefChange, ...] = ()
     """Timed clefs, including a source list's initial clef at offset zero."""
     repeat_playback: RepeatPlayback | None = None
+    navigation: tuple[Navigation, ...] = ()
 
 
 @dataclass(frozen=True)
