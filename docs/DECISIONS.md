@@ -1096,3 +1096,12 @@ extent, corroborated by Game Over/Swimming source PDFs. Keep exact pitch coverag
 on Arpeggio; the drawing's endpoint order does not establish roll direction.
 This resolves the cross-staff limitation recorded in the initial F18 decision.
 
+# 2026-10-12: preserve explicit pedal commands separately from automatic sustain
+
+Add timed symbol/line `Measure.pedals` to canonical IR. Resolve explicit
+music-font signs at exact entry offsets and export standard pedal directions
+plus damper-pedal sound instructions. A same-offset release/start is a change.
+Shared source routing supplies instrument scope across staves. Automatic
+Human Playback sustain does not authorize manufacturing printed pedal signs;
+MuseScore's missing repeated MIDI pedal controls do not authorize score unrolling.
+

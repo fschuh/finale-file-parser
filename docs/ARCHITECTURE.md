@@ -2413,6 +2413,37 @@ MuseScore4.7.5 imports the cross-staff line and four arpeggios per added SMW sco
 Rendered Game Over page verified against the source. Authored regressions cover
 the drawing construction, partial coverage and cross-staff endpoints.
 
+#### Explicit sustain-pedal symbols (2026-10-12, F21)
+
+With established Maestro font, visible score articulation characters161/42
+mean pedal down/release (official chart and Finale's Human Playback instructions).
+Resolve them through the existing definition/assignment join, excluding shape
+aliases, hidden copies and linked-part overrides. A text font's asterisk does
+not become pedal release. No new byte field is guessed.
+
+The93-file corpus has28 explicit symbols: Prelude16, Ending Theme10 and Sub
+Castle2. Prelude's bass-staff starts at odd-bar beat0 and releases at even-bar
+beat3.75. Ending's starts at53/55–58 and releases at54beat3,55–57beat3.5,58beat3;
+some releases attach to treble layer2. Sub Castle starts on bass bar1beat0 and
+releases on treble bar2beat0. Use exact event offsets including frame startTime,
+tuplet scaling and grace timing; one linear voice scan prevents quadratic work
+on hostile files with many assignments. Drawing offsets do not change timing.
+
+Store `Measure.pedals` as timed start/stop/change events, retaining symbol versus
+line appearance. A simultaneous explicit release/start on one staff becomes
+change. Export standard pedal directions, sign=yes/line=no for these glyphs,
+with damper-pedal sound instructions. Shared source instrument routing keeps
+cross-staff starts/stops on one exported piano. No visible pedal marks are
+invented for the six other MIDIs with Human Playback automatic sustain.
+
+Actual MuseScore4.7.5 imports8/5/1 pedal spans respectively and exports controls
+at their nominal first-pass positions (only small renderer tick delays). Its
+Prelude MIDI repeats the512 note attacks over128quarters but emits only the
+first16CC64 controls; reference and canonical route contain32. This repeat/export
+limitation is recorded independently; do not unroll the written score or invent
+extra signs. Authored tests cover frame offsets, chords, re-pedaling and fonts;
+rendered Sub Castle and native cross-staff span endpoints were checked.
+
 The same SmartShape definitions carry phrase slurs. Solid types **0** (`slurDown`),
 **1** (`slurUp`) and **15** (`slurAuto`) are documented by the published PDK
 [SmartShape enums and structs](https://pdk.finalelua.com/ff__smartshapes_8h_source.html)

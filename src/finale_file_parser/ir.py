@@ -39,6 +39,7 @@ __all__ = [
     "Ornament",
     "Part",
     "PartGroup",
+    "Pedal",
     "Pitch",
     "PlaybackPreferences",
     "RepeatPlayback",
@@ -431,6 +432,17 @@ class Navigation:
 
 
 @dataclass(frozen=True)
+class Pedal:
+    """An explicit sustain-pedal change on a staff at an exact metric offset."""
+
+    offset: Fraction
+    kind: str
+    """start, stop or change (release and reapply at the same instant)."""
+    sign: bool = True
+    line: bool = False
+
+
+@dataclass(frozen=True)
 class Measure:
     """One measure of one part."""
 
@@ -481,6 +493,7 @@ class Measure:
     """Timed clefs, including a source list's initial clef at offset zero."""
     repeat_playback: RepeatPlayback | None = None
     navigation: tuple[Navigation, ...] = ()
+    pedals: tuple[Pedal, ...] = ()
 
 
 @dataclass(frozen=True)

@@ -342,6 +342,8 @@ def _divisions_for(part: Part) -> int:
     for measure in part.measures:
         for expression in measure.expressions:
             denominator = math.lcm(denominator, (expression.offset * 4).denominator)
+        for pedal in measure.pedals:
+            denominator = math.lcm(denominator, (pedal.offset * 4).denominator)
         for change in measure.clef_changes:
             denominator = math.lcm(denominator, (change.offset * 4).denominator)
         for voice in measure.voices:
@@ -1030,6 +1032,34 @@ is for.
 """
 
 
+def _append_pedals(element: ET.Element, measure: Measure, divisions: int) -> None:
+    extent = max(
+        (
+            v.start_offset + sum((e.duration for e in v.events if not e.is_grace), Fraction(0))
+            for v in measure.voices
+        ),
+        default=Fraction(0),
+    )
+    if measure.time is not None:
+        extent = max(extent, Fraction(measure.time.beats, measure.time.beat_type))
+    for pedal in sorted(measure.pedals, key=lambda p: p.offset):
+        if pedal.kind not in {"start", "stop", "change"} or not 0 <= pedal.offset <= extent:
+            raise ExportError("pedal requires a supported change at a position within its measure")
+        direction = ET.SubElement(element, "direction", placement="below")
+        ET.SubElement(
+            ET.SubElement(direction, "direction-type"),
+            "pedal",
+            type=pedal.kind,
+            sign="yes" if pedal.sign else "no",
+            line="yes" if pedal.line else "no",
+        )
+        if pedal.offset:
+            ET.SubElement(direction, "offset").text = str(
+                _duration_in_divisions(pedal.offset, divisions)
+            )
+        ET.SubElement(direction, "sound", {"damper-pedal": "no" if pedal.kind == "stop" else "yes"})
+
+
 def _append_expressions(element: ET.Element, measure: Measure, divisions: int) -> None:
     """Emit this staff's markings.
 
@@ -1330,6 +1360,7 @@ def _append_measure(
         direction = ET.SubElement(element, "direction", placement="above")
         ET.SubElement(ET.SubElement(direction, "direction-type"), "words").text = words
     _append_expressions(element, measure, divisions)
+    _append_pedals(element, measure, divisions)
     _append_wedges(element, wedges, divisions)
     _append_octaves(element, octaves, divisions)
     _append_clef_changes(element, measure, divisions)

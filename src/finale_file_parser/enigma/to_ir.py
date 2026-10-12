@@ -9,6 +9,7 @@ working.
 from __future__ import annotations
 
 from collections import defaultdict
+from collections.abc import Iterator
 from dataclasses import dataclass, field, replace
 from fractions import Fraction
 
@@ -42,6 +43,7 @@ from finale_file_parser.enigma.models import CorruptScoreError
 from finale_file_parser.enigma.music import Note, read_entry
 from finale_file_parser.enigma.octaves import octaves_by_staff
 from finale_file_parser.enigma.ornaments import ornaments_by_entry
+from finale_file_parser.enigma.pedals import pedals_by_entry
 from finale_file_parser.enigma.pitch import StaffTransposition, read_transposition, spell_note
 from finale_file_parser.enigma.playback_preferences import playback_preferences
 from finale_file_parser.enigma.repeats import Repeats, repeats_for
@@ -66,6 +68,7 @@ from finale_file_parser.ir import (
     Ornament,
     Part,
     PartGroup,
+    Pedal,
     Pitch,
     Score,
     ScoreDiagnostic,
@@ -230,6 +233,7 @@ def build_score(document: EnigmaDocument) -> Score:
     hairpins = hairpins_by_staff(document, ignored_shapes=ignored_shapes)
     slurs = slurs_by_staff(document, slur_positions, ignored_shapes=ignored_shapes)
     octaves = octaves_by_staff(document, ignored_shapes=ignored_shapes)
+    pedals = _pedal_directions(document, cells, slur_positions)
     glissandi, shaped_arpeggios = glissandi_by_staff(
         document, slur_positions, ignored_shapes=ignored_shapes
     )
@@ -263,6 +267,7 @@ def build_score(document: EnigmaDocument) -> Score:
                     barlines=barlines,
                     expressions=expressions,
                     navigation=navigation,
+                    pedals=pedals,
                 )
                 for index, number in enumerate(numbers)
             ),
@@ -288,6 +293,49 @@ def build_score(document: EnigmaDocument) -> Score:
         + _navigation_diagnostics(tuple(parts)),
         playback=playback_preferences(document),
     )
+
+
+def _entry_attachment_offsets(
+    cells: dict[tuple[int, int], _Cell],
+    positions: dict[tuple[int, int, int], list[SlurEndpoint]],
+    wanted: set[int],
+) -> Iterator[tuple[int, int, int, Fraction]]:
+    """One linear voice scan for attached directions, including frame starts and graces."""
+    selected: dict[tuple[int, int, int], dict[int, list[int]]] = defaultdict(
+        lambda: defaultdict(list)
+    )
+    for (staff, measure, entry), endpoints in positions.items():
+        if entry in wanted:
+            for point in endpoints:
+                selected[staff, measure, point.voice][point.event_index].append(entry)
+    for (staff, measure, voice), indices in selected.items():
+        cell = cells[staff, measure]
+        offset = Fraction(cell.start_times.get(voice, 0), _WHOLE_EDU)
+        for index, event in enumerate(cell.events_by_layer[voice]):
+            for entry in indices.get(index, ()):
+                yield staff, measure, entry, offset
+            if not event.is_grace:
+                offset += event.duration
+
+
+def _pedal_directions(
+    document: EnigmaDocument,
+    cells: dict[tuple[int, int], _Cell],
+    positions: dict[tuple[int, int, int], list[SlurEndpoint]],
+) -> dict[tuple[int, int], tuple[Pedal, ...]]:
+    assignments = pedals_by_entry(document)
+    kinds: dict[tuple[int, int], dict[Fraction, set[str]]] = defaultdict(lambda: defaultdict(set))
+    for staff, measure, entry, offset in _entry_attachment_offsets(
+        cells, positions, set(assignments)
+    ):
+        kinds[staff, measure][offset].update(assignments[entry])
+    return {
+        key: tuple(
+            Pedal(offset, "change" if values == {"start", "stop"} else next(iter(values)))
+            for offset, values in sorted(offsets.items())
+        )
+        for key, offsets in kinds.items()
+    }
 
 
 def _navigation_diagnostics(parts: tuple[Part, ...]) -> tuple[ScoreDiagnostic, ...]:
@@ -672,6 +720,7 @@ def _measure(
     barlines: dict[int, str] | None = None,
     expressions: dict[tuple[int, int], tuple[Expression, ...]] | None = None,
     navigation: dict[int, tuple[Navigation, ...]] | None = None,
+    pedals: dict[tuple[int, int], tuple[Pedal, ...]] | None = None,
     clef_changes: dict[tuple[int, int], tuple[ClefPosition, ...]] | None = None,
 ) -> Measure:
     cell = cells.get((staff, number))
@@ -694,6 +743,7 @@ def _measure(
 
     return Measure(
         number=number,
+        pedals=(pedals or {}).get((staff, number), ()),
         voices=(
             tuple(
                 Voice(
