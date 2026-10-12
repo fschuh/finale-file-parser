@@ -795,6 +795,9 @@ def _options_records(records: tuple[MusOther, ...], year: int | None) -> list[Re
             if option is not None:
                 out.append(option)
                 break
+    playback = _playback_options(records)
+    if playback is not None:
+        out.append(playback)
     stride = _CLEF_ENTRY_STRIDE.get(year or 0)
     if stride is None:
         return out
@@ -813,6 +816,41 @@ def _options_records(records: tuple[MusOther, ...], year: int | None) -> list[Re
         out.append(Record(tag="clefOptions", attrs={}, text="", fields={"clefDef": definitions}))
         break
     return out
+
+
+def _playback_options(records: tuple[MusOther, ...]) -> Record | None:
+    # The published RGP PL fragment map names exact preference/word locations.
+    # Numeric preference tags are ETF decimal preference numbers plus 14.
+    locations = {
+        "metronomeBeat": (27, 2, 2),
+        "metronomeSpeed": (53, 6, 2),
+        "swing": (50, 0, 2),
+        "baseKeyVelocity": (50, 10, 2),
+        "startAtMeas": (51, 0, 2),
+        "startAtMode": (51, 2, 2),
+        "stopAtMeas": (51, 4, 2),
+        "startEdu": (61, 0, 4),
+        "stopEdu": (61, 4, 4),
+        "startPass": (61, 8, 2),
+        "endPass": (61, 10, 2),
+    }
+    prefs = {r.tag: r for r in records if r.cmper == OPTIONS_CMPER and not r.part}
+    if not all(tag in prefs for tag, _, _ in locations.values()):
+        return None
+    fields: dict[str, str | tuple[str, ...] | Record | tuple[Record, ...]] = {}
+    for name, (tag, at, size) in locations.items():
+        payload = prefs[tag].payload
+        if len(payload) != 12:
+            raise CorruptScoreError(f"playbackOptions: preference {tag} requires twelve bytes")
+        if size == 4:
+            # Map conversion 1: two platform-endian words, high word first.
+            value = _u16(payload, at) * 65536 + _u16(payload, at + 2)
+            if value >= 0x80000000:
+                value -= 0x100000000
+        else:
+            value = _s16(payload, at)
+        fields[name] = str(value)
+    return Record("playbackOptions", {}, "", fields)
 
 
 def _grace_slash_options(payload: bytes, order: ByteOrder = "little") -> Record | None:

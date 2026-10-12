@@ -42,6 +42,7 @@ from finale_file_parser.enigma.music import read_entry
 from finale_file_parser.enigma.octaves import octaves_by_staff
 from finale_file_parser.enigma.ornaments import ornaments_by_entry
 from finale_file_parser.enigma.pitch import StaffTransposition, read_transposition, spell_note
+from finale_file_parser.enigma.playback_preferences import playback_preferences
 from finale_file_parser.enigma.repeats import Repeats, repeats_for
 from finale_file_parser.enigma.slurs import slurs_by_staff
 from finale_file_parser.enigma.smart_shapes import stale_smart_shapes
@@ -254,6 +255,7 @@ def build_score(document: EnigmaDocument) -> Score:
         composer=info.get("composer", ""),
         metadata={k: v for k, v in info.items() if k not in {"title", "composer"}},
         diagnostics=diagnostics,
+        playback=playback_preferences(document),
     )
 
 

@@ -146,9 +146,37 @@ def to_musicxml(score: Score) -> bytes:
         else:
             _append_multistaff_part(root, bundle, score.groups)
 
+    _append_default_tempo(root, score)
+
     ET.indent(root, space="  ")
     body = ET.tostring(root, encoding="unicode")
     return f'<?xml version="1.0" encoding="UTF-8"?>\n{_DOCTYPE}\n{body}\n'.encode()
+
+
+def _append_default_tempo(root: ET.Element, score: Score) -> None:
+    if score.playback is None or not score.parts:
+        return
+    initial = score.parts[0].measures[0].number if score.parts[0].measures else None
+    if any(
+        expression.tempo is not None and expression.offset == 0
+        for part in score.parts
+        for measure in part.measures
+        if measure.number == initial
+        for expression in measure.expressions
+    ):
+        return
+    measure = root.find("part/measure")
+    if measure is not None:
+        position = next(
+            (
+                i
+                for i, element in enumerate(measure)
+                if element.tag not in {"barline", "attributes"}
+            ),
+            len(measure),
+        )
+        sound = ET.Element("sound", tempo=_decimal_number(score.playback.quarter_bpm))
+        measure.insert(position, sound)
 
 
 def _append_part_list(

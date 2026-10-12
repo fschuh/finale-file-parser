@@ -36,6 +36,7 @@ __all__ = [
     "Part",
     "PartGroup",
     "Pitch",
+    "PlaybackPreferences",
     "RepeatPlayback",
     "Score",
     "Slur",
@@ -556,6 +557,27 @@ class ScoreDiagnostic:
 
 
 @dataclass(frozen=True)
+class PlaybackPreferences:
+    """Explicit document controls, independent of printed score instructions."""
+
+    beat_unit: Fraction
+    per_minute: Fraction
+    swing_amount: Fraction = Fraction(0)
+    base_velocity: int = 64
+    start_measure: int = 1
+    start_offset: Fraction = Fraction(0)
+    start_mode: int = 0
+    stop_measure: int | None = None
+    stop_offset: Fraction = Fraction(0)
+    start_pass: int = 1
+    stop_pass: int = 1
+
+    @property
+    def quarter_bpm(self) -> Fraction:
+        return self.beat_unit * self.per_minute * 4
+
+
+@dataclass(frozen=True)
 class Score:
     """A whole score."""
 
@@ -571,3 +593,4 @@ class Score:
     puts the loss at the exporter, not the reader."""
     diagnostics: tuple[ScoreDiagnostic, ...] = ()
     """Recoverable source conditions, independent of notation or playback."""
+    playback: PlaybackPreferences | None = None

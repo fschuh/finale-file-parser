@@ -962,3 +962,13 @@ uses a MIDI-derived route or expands the written score into performed notes.
 Ordinary MusicXML barlines retain their standard after-jump flag outside endings;
 arbitrary Finale actions and playback-control stops require separate source and
 importer evidence before additional playback instructions are emitted.
+
+## 2026-10-12 — DECIDED: typed document playback preferences
+
+Append `Score.playback` with exact beat/rate, swing amount, base velocity and
+playback-control range/mode/pass fields. These are independent of printed marks
+and do not alter notes or replace the canonical score. Export an established
+default tempo as sound-only when there is no explicit initial metronome; retain
+control range/mode rather than blindly cutting a whole-score export to the UI
+selection. Unknown ignore/reset/expression-mode toggles remain an evidence gate.
+Use the documented high-word-first conversion for split EDU controls.

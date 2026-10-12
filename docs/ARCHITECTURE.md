@@ -1074,6 +1074,53 @@ The original implementation did not read `repeatBack.target`, `trigger`, `action
 them differently. `repeatEndingText` — a bracket's custom label, used by three corpus documents — is
 also unread; the text is derived from the pass numbers instead.
 
+### Document playback controls (2026-10-12)
+
+The published PDK `_FCEDTPlaybackPrefs` names each legacy field, and RGP Lua
+0.79 `__FCPrefsBase::MapPrefStruct` selects 48 PL mapping rows at virtual
+0x705660 (Mach-O file 0x709660). The mapping identifies preference number,
+incidence, word, size and conversion; numeric preference tags equal decimal ETF
+preference numbers plus 14. This follows the independently established grace
+preference mapping, not a fitted MIDI correlation. All supplied files contain
+these complete 12-byte score preference records at comparator 65534.
+
+| Field | Numeric tag, byte offset | Meaning |
+|---|---|---|
+| metronomeBeat | 27, +2 i16 | Beat duration in EDU |
+| metronomeSpeed | 53, +6 i16 | Beats per minute in that unit |
+| swing | 50, +0 i16 | Amount/1024, 0 straight and 1 standard triplet swing |
+| baseKeyVelocity | 50, +10 i16 | Base MIDI key velocity |
+| startAtMeas/startAtMode/stopAtMeas | 51, +0/+2/+4 i16 | Playback control measures/mode |
+| startEdu/stopEdu | 61, +0/+4 | Signed 32-bit EDU, high platform-endian word first |
+| startPass/endPass | 61, +8/+10 i16 | Control repeat passes |
+
+Conversion 1 is verified by `MakePrefsFourbyte`: first word becomes the high
+16 bits, second the low 16 bits. Stop 32767 means end of piece; a zero stop EDU
+stores the measure *after* the actual stop. These fields normalize into
+`playbackOptions` and canonical `Score.playback`, independently of notation.
+Missing complete preference sets do not invent controls; malformed complete
+records and invalid values fail with a clear error. Playback-range/mode data is
+retained without rewriting the score or imposing UI "current counter" state
+on a full-score conversion.
+
+Simone stores quarter=96; Invincibility stores half=130 (quarter=260). When no
+explicit first-bar metronome already establishes the tempo, export writes a
+measure-level `<sound tempo>` with no new printed marking. MuseScore 4.7.5's
+measure importer creates an invisible TempoText for this standard instruction
+before the first note. Displayed header text remains a distinct placement task.
+1UP stores quarter=100, Get Treasure/Uncover quarter=120, corroborating their
+reference MIDI rates independently of printed 225/100 markings. Other playback
+toggles must be decoded before selecting those rates over an explicit expression.
+Spring Yard stores end-of-piece, zero stop EDU and pass 1; no stored range in
+these controls explains its MIDI ending during the replay. The observed shorter
+reference is retained as an export/reference exception, not a parser stop rule.
+
+Evidence: [PDK playback controls](https://pdk.finalelua.com/class_f_c_playback_prefs.html),
+[`ff_prefs.h`](https://pdk.finalelua.com/ff__prefs_8h_source.html), read-only RGP
+mapping/getters (binary hash recorded with the grace evidence), source records
+and the verified MuseScore importer source. No released binary is executed or
+committed.
+
 ### Explicit backward-repeat state (2026-10-12)
 
 The 24-byte numeric tag-203 record stores actuate +2, signed target +4 and
