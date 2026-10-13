@@ -198,6 +198,27 @@ def _append_default_tempo(root: ET.Element, score: Score) -> None:
         for expression in measure.expressions
     ):
         return
+    # A display-only first-beat metronome must carry the independent source
+    # default alongside its printed rate. MuseScore otherwise infers playback
+    # from the notation and overrides a separate measure-level sound element.
+    attached = False
+    for part in root.findall("part"):
+        first = part.find("measure")
+        if first is None:
+            continue
+        for direction in first.findall("direction"):
+            if (
+                direction.find("direction-type/metronome") is None
+                or direction.findtext("offset", "0") != "0"
+            ):
+                continue
+            sound = direction.find("sound")
+            if sound is None:
+                sound = ET.SubElement(direction, "sound")
+            sound.set("tempo", _decimal_number(score.playback.quarter_bpm))
+            attached = True
+    if attached:
+        return
     measure = root.find("part/measure")
     if measure is not None:
         position = next(

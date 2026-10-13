@@ -1156,3 +1156,11 @@ Do not apply manual articulation data as if it were Finale Human Playback's
 rendered performance. Keep controls in IR and report the MusicXML realization
 limit rather than changing written note lengths or synthesizing MIDI velocities.
 
+# 2026-10-12: attach initial display-only tempo to its independent source default
+
+Put the document's default playback rate in the same first-beat MusicXML
+direction as a metronome that has no tempo playback. This keeps printed and
+performed rates distinct through MuseScore import. Do not override active
+source expressions with a MIDI-matching document default, and do not reset
+later display-only marks to the initial tempo.
+

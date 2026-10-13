@@ -9,7 +9,15 @@ from finale_file_parser.enigma.document import Record
 from finale_file_parser.enigma.expressions import _playback
 from finale_file_parser.enigma.mus_document import _text_expr_def
 from finale_file_parser.export.musicxml import to_musicxml
-from finale_file_parser.ir import Expression, ExpressionPlayback, Measure, Part, Score, Tempo
+from finale_file_parser.ir import (
+    Expression,
+    ExpressionPlayback,
+    Measure,
+    Part,
+    PlaybackPreferences,
+    Score,
+    Tempo,
+)
 
 
 def _definition(flags: int, value: int, unit: int = 0) -> Record:
@@ -81,3 +89,38 @@ def test_typed_rate_with_a_pass_condition_preserves_it_in_musicxml() -> None:
     )
     sound = root.find(".//sound")
     assert sound is not None and sound.attrib == {"tempo": "80", "time-only": "2"}
+
+
+def test_display_only_initial_metronome_carries_the_independent_default_playback_rate() -> None:
+    expression = Expression(
+        "q = 225",
+        "",
+        tempo=Tempo(Fraction(1, 4), Fraction(225)),
+        playback=ExpressionPlayback("none", 0),
+    )
+    score = Score(
+        parts=(Part("P1", "Authored", (Measure(1, expressions=(expression,)),)),),
+        playback=PlaybackPreferences(Fraction(1, 4), Fraction(100)),
+    )
+    root = DET.fromstring(to_musicxml(score))
+    assert root.findtext(".//metronome/per-minute") == "225"
+    sound = root.find(".//direction/sound")
+    assert sound is not None and sound.get("tempo") == "100"
+    assert root.find("part/measure/sound") is None
+
+
+def test_later_display_only_metronome_does_not_reset_to_the_document_default() -> None:
+    expression = Expression(
+        "q = 225",
+        "",
+        tempo=Tempo(Fraction(1, 4), Fraction(225)),
+        playback=ExpressionPlayback("none", 0),
+        offset=Fraction(1, 4),
+    )
+    score = Score(
+        parts=(Part("P1", "Authored", (Measure(1, expressions=(expression,)),)),),
+        playback=PlaybackPreferences(Fraction(1, 4), Fraction(100)),
+    )
+    root = DET.fromstring(to_musicxml(score))
+    assert root.find(".//direction/sound") is None
+    assert root.find("part/measure/sound") is not None

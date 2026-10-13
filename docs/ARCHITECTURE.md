@@ -2641,6 +2641,30 @@ remain unplaced. All105 production paths and schema checks pass after decoding
 these records. Canonical span projection and custom endpoint graphics remain
 the next R02 work; this foundation alone does not claim line export recovery.
 
+#### Initial printed tempo versus independent playback (2026-10-12, R04/F14)
+
+A first-beat display-only metronome now carries the independent document
+default in its own MusicXML sound element. A separate measure-level sound
+followed by an unsounded metronome let MuseScore infer the printed rate and
+overwrite the default. This applies only when no active first-beat tempo
+expression already establishes playback; later display-only metronomes do
+not reset the piece to its initial default. The original printed beat/rate
+survives. Authored quarter225/default100 imports in MuseScore4.7.5 as one
+TempoText with printed225 and tempo1.666667 quarters/second; Sonic's first-page
+half130 likewise retains quarter260 without a duplicate invisible tempo.
+
+Source inspection corrects a previous assumption about 1UP, Get Treasure and
+Uncover Secret: their first metronomes are active tempo expressions, not
+playType=none. Source values225/100/100 contrast with paired MIDI100/120/120
+and document defaults100/120/120. Preserve all three independent observations;
+neither a default value that agrees with MIDI nor the importer behavior proves
+that these active expressions should be disabled. Export the explicit source
+rates, and flag reference/export provenance or still-unmapped playback policy
+as unresolved. Dr Wily180/178 and Athletic150/152 are different: their explicit
+source playback values explain those MIDIs, and actual native import retains
+178/152 while printing180/150. The local tempo-source-check.log preserves the
+complete typed IR trace. All105 MusicXML schema paths and authored tests pass.
+
 #### Nonprinting articulation controls (2026-10-12, R01/R04)
 
 Assigned Maestro character8 in Objection (161 placements) and character0 in
