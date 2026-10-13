@@ -2621,7 +2621,7 @@ sets loaded size0x48. The relevant fields are:
 Evidence getter VMs: style2cf78e, character2d1190, font2d06c2, width2d0bc6,
 start cap2d1aa4, hook2d1a76 and raw text2d037a. Unicode character fields here
 are one little-endian32-bit field, unlike articulation definitions' two-word
-character storage. The used wavy definition39 has character126, Maestro0,
+character storage. The used wavy definition39 has character126, EngraverFontSet0,
 size24 and no endpoint caps; source raw bytes and font chart corroborate it.
 
 Spring Yard's NotePad banner has no parsed version year. A default legacy
@@ -2640,6 +2640,50 @@ corroborates smartShapeText. Unused Glissando, pedal and harmonic label palettes
 remain unplaced. All105 production paths and schema checks pass after decoding
 these records. Canonical span projection and custom endpoint graphics remain
 the next R02 work; this foundation alone does not claim line export recovery.
+
+#### Assigned line drawings and interchange limits (2026-10-12, R02)
+
+Canonical `Part.lines` now carries every eligible type10/11/29/32 assignment:
+exact whole-note measure offsets, source staff endpoints, active drawing
+adjustments in staff spaces, solid/dashed/wavy style, endpoint caps, signed
+hook direction and absolute hook length, endpoint labels and opaque custom
+endpoint resource references. Only score assignments place lines; hidden,
+part-only, unused palette and F05 stale records do not. Unknown font/layout or
+entry/lyric attachment emits a specific diagnostic rather than an invented
+metric span. Maestro and EngraverFontSet character126 are evidenced wavy-line
+glyphs; the [Engraver chart](https://usermanuals.finalemusic.com/FinaleWin/Content/Finale/font-engraver.htm)
+identifies Shift+grave as a trill extension, independently of the meaning of
+the drawing that repeats it. Dreadful Fight's custom definition39 uses
+EngraverFontSet0, not Maestro0.
+
+Export paired standard MusicXML brackets with exact divisions, line-end/type,
+hook end-length and relative endpoint geometry; offsets have sound=no. Reuse
+numbers1–16 only after the previous document-order interval closes. Explicit
+cross-staff endpoints join the corresponding staff-parts without inferring
+shared playback identities. Reversed/missing/out-of-bar endpoints and excess
+overlaps raise clear ExportError. Same-time drawings remain graphical; never
+insert notes, lengthen a bar or turn a custom line into an octave, slur, pedal
+controller or glissando merely from its style.
+
+The supplied105-file inventory yields46 lines in17 scores. All105 XML paths
+validate against MusicXML4.0, and normalized written pitches/durations/voices/
+ties match the pre-line outputs. Authored tests cover signed Efix hooks,
+non-grid offsets, source assignment gates, zero-time geometry, cross-staff
+pairing, number reuse/overflow and custom-resource diagnostics. Actual
+MuseScore4.7.5 imports on seven representative scores retain ordinary text
+lines and hooks, but the importer does not read bracket relative-x/y. Thus
+same-time hand brackets and other drawn geometry need manual layout. A custom
+endpoint such as shape107 in Opening/Terra stays an opaque source reference
+with line-endpoint-graphic diagnostics; the exported bracket omits the custom
+change-pedal spike. Center/continuation labels, when present, also have an
+explicit placement diagnostic. Unused pedal-text libraries place nothing.
+
+MuseScore's primary bracket importer maps line-type=wavy to a Trill spanner
+of PRALLPRALL_LINE type. This is a consumer interpretation, not new canonical
+ornament meaning; Dreadful Fight's same-time slanted flourish needs manual
+layout. These interchange limits do not justify fabricated playback controls.
+Local evidence is r02-line-check.json and the original/native opening renders
+in the generated validation directory, outside git.
 
 #### Green Hill's written tie gap versus held MIDI (2026-10-12, R03)
 

@@ -22,6 +22,7 @@ from finale_file_parser.ir import (
     Event,
     Expression,
     Hairpin,
+    LineSpan,
     Lyric,
     Measure,
     NoteEndpoint,
@@ -362,6 +363,9 @@ def _divisions_for(part: Part) -> int:
     for span in part.octave_shifts:
         for offset in (span.start_offset, span.end_offset):
             denominator = math.lcm(denominator, (offset * 4).denominator)
+    for line in part.lines:
+        for offset in (line.start_offset, line.end_offset):
+            denominator = math.lcm(denominator, (offset * 4).denominator)
     if denominator > _MAX_DIVISIONS:
         raise ExportError(f"durations require {denominator} divisions per quarter; refusing")
     return denominator
@@ -403,6 +407,7 @@ def _append_part(
     slur_notations: _SlurNotations | None = None,
     octave_directions: _OctaveDirections | None = None,
     glissando_notations: _GlissandoNotations | None = None,
+    line_directions: _LineDirections | None = None,
 ) -> None:
     element = ET.SubElement(root, "part", id=part.id)
     divisions = _divisions_for(part) if divisions is None else divisions
@@ -412,6 +417,8 @@ def _append_part(
         slur_notations = _slur_notations((part,))
     if octave_directions is None:
         octave_directions = _octave_directions((part,))
+    if line_directions is None:
+        line_directions = _line_directions((part,))
     first = True
     tremolos = _tremolo_notations(part)
     glissandi = (
@@ -431,6 +438,7 @@ def _append_part(
             octave_spans=part.octave_shifts,
             tremolo_notations=tremolos,
             glissando_notations=glissandi,
+            lines=line_directions.get((part.id, measure.number), ()),
         )
         first = False
 
@@ -443,6 +451,13 @@ def _staff_bundles(score: Score) -> tuple[tuple[Part, ...], ...]:
         if first.instrument_id is not None and first.instrument_id == second.instrument_id:
             joined[index] = True
     for part in score.parts:
+        for line in part.lines:
+            target = line.end_part_id or part.id
+            if target not in positions:
+                raise ExportError("line endpoint names a missing score part")
+            first_index, last_index = sorted((positions[part.id], positions[target]))
+            for index in range(first_index, last_index):
+                joined[index] = True
         for span in part.glissandi:
             target = span.end.part_id or part.id
             if target == part.id:
@@ -544,6 +559,7 @@ def _append_multistaff_part(
     temporary = ET.Element("parts")
     arpeggio_numbers = _arpeggio_numbers(parts)
     hairpin_directions = _hairpin_directions(parts)
+    line_directions = _line_directions(parts)
     slur_notations = _slur_notations(parts)
     octave_directions = _octave_directions(parts)
     glissando_notations = _glissando_notations(parts)
@@ -555,6 +571,7 @@ def _append_multistaff_part(
             divisions=divisions,
             arpeggio_numbers=arpeggio_numbers,
             hairpin_directions=hairpin_directions,
+            line_directions=line_directions,
             slur_notations=slur_notations,
             octave_directions=octave_directions,
             glissando_notations=glissando_notations,
@@ -692,6 +709,105 @@ def _merge_staff_measures(
 _DYNAMICS_PLACEMENT = "below"
 """Where dynamics are engraved, and where a reader expects them. Tempo and
 technique words go above; dynamics do not."""
+
+
+@dataclass(frozen=True)
+class _LineDirection:
+    offset: Fraction
+    type: str
+    number: str
+    span: LineSpan
+
+
+_LineDirections = dict[tuple[str, int], tuple[_LineDirection, ...]]
+
+
+def _line_directions(parts: tuple[Part, ...]) -> _LineDirections:
+    positions = {p.id: _hairpin_measure_positions(p) for p in parts}
+    staff_order = {p.id: i for i, p in enumerate(parts)}
+    intervals = []
+    for part in parts:
+        for span in part.lines:
+            if span.line_type not in {"solid", "dashed", "dotted", "wavy"}:
+                raise ExportError("unsupported drawn line type")
+            if span.start_cap not in {
+                "none",
+                "up",
+                "down",
+                "both",
+                "arrow",
+            } or span.end_cap not in {"none", "up", "down", "both", "arrow"}:
+                raise ExportError("unsupported drawn line cap")
+            if any(
+                length is not None and length < 0
+                for length in (span.start_cap_length, span.end_cap_length)
+            ):
+                raise ExportError("drawn line cap length must not be negative")
+            target = span.end_part_id or part.id
+            keys = []
+            for identity, measure, offset in (
+                (part.id, span.start_measure, span.start_offset),
+                (target, span.end_measure, span.end_offset),
+            ):
+                if identity not in positions or measure not in positions[identity]:
+                    raise ExportError("drawn line refers to a missing part or measure")
+                index, length = positions[identity][measure]
+                if not 0 <= offset <= length:
+                    raise ExportError("drawn line offset is outside its measure")
+                keys.append((index, staff_order[identity], offset))
+            if (keys[1][0], span.end_offset) < (keys[0][0], span.start_offset):
+                raise ExportError("drawn line end precedes its start")
+            intervals.append((min(keys), max(keys), part.id, target, span))
+    result: dict[tuple[str, int], list[_LineDirection]] = {}
+    active: list[tuple[tuple[int, int, Fraction], str]] = []
+    for low, high, owner, target, span in sorted(intervals, key=lambda i: i[:2]):
+        active = [(end, n) for end, n in active if end > low]
+        used = {n for _, n in active}
+        number = next((str(n) for n in range(1, 17) if str(n) not in used), None)
+        if number is None:
+            raise ExportError("more than 16 drawn lines overlap in MusicXML document order")
+        active.append((high, number))
+        for identity, measure, offset, kind in (
+            (owner, span.start_measure, span.start_offset, "start"),
+            (target, span.end_measure, span.end_offset, "stop"),
+        ):
+            result.setdefault((identity, measure), []).append(
+                _LineDirection(offset, kind, number, span)
+            )
+    return {
+        key: tuple(sorted(directions, key=lambda d: d.offset)) for key, directions in result.items()
+    }
+
+
+def _append_lines(element: ET.Element, lines: tuple[_LineDirection, ...], divisions: int) -> None:
+    for item in lines:
+        span = item.span
+        start = item.type == "start"
+        x, y = (span.start_x, span.start_y) if start else (span.end_x, span.end_y)
+        text = span.start_text if start else span.end_text
+        direction = ET.SubElement(element, "direction", placement="below" if y < 0 else "above")
+        if text:
+            ET.SubElement(ET.SubElement(direction, "direction-type"), "words").text = text
+        attributes = {
+            "type": item.type,
+            "number": item.number,
+            "line-type": span.line_type,
+            "line-end": span.start_cap if start else span.end_cap,
+            "relative-x": _decimal_number(x * 10),
+            "relative-y": _decimal_number(y * 10),
+        }
+        length = span.start_cap_length if start else span.end_cap_length
+        if length is not None:
+            attributes["end-length"] = _decimal_number(length * 10)
+        ET.SubElement(
+            ET.SubElement(direction, "direction-type"),
+            "bracket",
+            attributes,
+        )
+        if item.offset:
+            ET.SubElement(direction, "offset", sound="no").text = str(
+                _duration_in_divisions(item.offset, divisions)
+            )
 
 
 def _hairpin_measure_positions(part: Part) -> dict[int, tuple[int, Fraction]]:
@@ -1348,6 +1464,7 @@ def _append_measure(
     octave_spans: tuple[OctaveShift, ...] = (),
     tremolo_notations: _TremoloNotations | None = None,
     glissando_notations: _GlissandoNotations | None = None,
+    lines: tuple[_LineDirection, ...] = (),
 ) -> None:
     element = ET.SubElement(parent, "measure", number=str(measure.number))
     _append_barline(element, measure, "left")
@@ -1361,6 +1478,7 @@ def _append_measure(
         ET.SubElement(ET.SubElement(direction, "direction-type"), "words").text = words
     _append_expressions(element, measure, divisions)
     _append_pedals(element, measure, divisions)
+    _append_lines(element, lines, divisions)
     _append_wedges(element, wedges, divisions)
     _append_octaves(element, octaves, divisions)
     _append_clef_changes(element, measure, divisions)

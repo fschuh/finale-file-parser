@@ -40,6 +40,7 @@ from finale_file_parser.enigma.groups import staff_groups, staff_order
 from finale_file_parser.enigma.hairpins import hairpins_by_staff
 from finale_file_parser.enigma.jumps import jumps_by_measure, navigation_by_measure
 from finale_file_parser.enigma.key import KeySignature, Mode, decode_key
+from finale_file_parser.enigma.lines import lines_by_staff
 from finale_file_parser.enigma.location import effective_keys, locate_entries
 from finale_file_parser.enigma.lyrics import Lyric as EnigmaLyric
 from finale_file_parser.enigma.lyrics import lyrics_by_entry
@@ -249,6 +250,8 @@ def build_score(document: EnigmaDocument) -> Score:
         where = SCORE_WIDE_STAFF, numbers[0]
         expressions[where] = headers + expressions.get(where, ())
     ignored_shapes, diagnostics = stale_smart_shapes(document, numbers)
+    lines, line_diagnostics = lines_by_staff(document, ignored_shapes=ignored_shapes)
+    diagnostics += line_diagnostics
     placed_entries = {entry for _, _, entry in slur_positions}
     diagnostics += tuple(
         ScoreDiagnostic(
@@ -308,6 +311,7 @@ def build_score(document: EnigmaDocument) -> Score:
             octave_shifts=octaves.get(staff, ()),
             tremolos=tremolos.get(staff, ()),
             glissandi=glissandi.get(staff, ()),
+            lines=lines.get(staff, ()),
         )
         for staff in staves
     ]

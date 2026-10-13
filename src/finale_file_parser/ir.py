@@ -574,6 +574,36 @@ class SlurEndpoint:
 
 
 @dataclass(frozen=True)
+class LineSpan:
+    """An assigned visible line, with timing separate from drawing geometry.
+
+    This carries no inferred pedal, octave, glissando or playback meaning.
+    Custom endpoint resource IDs survive for renderers that can resolve them.
+    Offsets/lengths use staff spaces; musical offsets use whole-note units.
+    """
+
+    start_measure: int
+    start_offset: Fraction
+    end_measure: int
+    end_offset: Fraction
+    line_type: str = "solid"
+    start_cap: str = "none"
+    end_cap: str = "none"
+    start_x: Fraction = Fraction(0)
+    start_y: Fraction = Fraction(0)
+    end_x: Fraction = Fraction(0)
+    end_y: Fraction = Fraction(0)
+    start_text: str = ""
+    end_text: str = ""
+    start_symbol: str = ""
+    end_symbol: str = ""
+    end_part_id: str | None = None
+    source_ref: str = ""
+    start_cap_length: Fraction | None = None
+    end_cap_length: Fraction | None = None
+
+
+@dataclass(frozen=True)
 class Slur:
     """A phrase span, or an explicitly positioned curve on one event."""
 
@@ -646,6 +676,7 @@ class Part:
     glissandi: tuple[Glissando, ...] = ()
     instrument_id: str | None = None
     """Shared playback identity when every used layer routes to the same source instrument."""
+    lines: tuple[LineSpan, ...] = ()
 
 
 @dataclass(frozen=True)

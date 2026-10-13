@@ -1135,3 +1135,14 @@ syntax and font evidence. Such text has no expression playback; document
 preferences remain independent. Unassigned labels, repeated/later-page text
 and ambiguous font letters do not establish tempo or rhythmic placement.
 
+# 2026-10-12: retain assigned line drawings without inferring performance semantics
+
+Append `Part.lines` using canonical `LineSpan` with metric endpoints separate
+from drawing geometry. Export ordinary drawings as standard bracket directions;
+preserve opaque custom endpoint references and diagnose unsupported glyph,
+attachment and label-placement cases. Neither a custom pedal-like drawing nor
+a repeated wavy glyph establishes a controller or ornament playback instruction.
+Source geometry survives even when MuseScore ignores its positioning or maps
+the wavy style to a trill line. No notes or durations are manufactured to make
+zero-time drawings visible in one importer.
+
