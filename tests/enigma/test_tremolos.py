@@ -23,6 +23,7 @@ def _score(
     mask: int = 0xB80,
     symbolic: int = 256,
     second_beam: bool = False,
+    font: str = "Maestro",
 ) -> Score:
     reference = 2048 if heads else 1024
     mods = (
@@ -39,7 +40,7 @@ def _score(
     if chord:
         notes += '<note id="2"><harmLev>2</harmLev><harmAlt>0</harmAlt></note>'
     raw = f"""<finale><others>
-      <fontName cmper="0"><name>Maestro</name></fontName><staffSpec cmper="1"/>
+      <fontName cmper="0"><name>{font}</name></fontName><staffSpec cmper="1"/>
       <measSpec cmper="1"><beats>4</beats><divbeat>1024</divbeat></measSpec>
       <frameSpec cmper="1"><startEntry>1</startEntry><endEntry>2</endEntry></frameSpec>
     </others><details><gfhold cmper1="1" cmper2="1"><frame1>1</frame1></gfhold>
@@ -79,6 +80,19 @@ def test_hidden_tuplet_with_source_display_mods_becomes_one_exact_tremolo_pair(
 def test_chord_tremolo_marks_once_per_chord_without_losing_pitches() -> None:
     root = DET.fromstring(to_musicxml(_score(chord=True)))
     assert len(root.findall(".//pitch")) == 4 and len(root.findall(".//tremolo")) == 2
+
+
+@pytest.mark.parametrize("font", ["EngraverFontSet", "Engraver Font Set"])
+def test_engraver_half_notehead_pair_recovers_the_same_tremolo(font: str) -> None:
+    score = _score(heads=True, font=font)
+    assert len(score.parts[0].tremolos) == 1
+    notes = DET.fromstring(to_musicxml(score)).findall(".//note")
+    assert [note.findtext("type") for note in notes] == ["half", "half"]
+    assert [note.findtext("duration") for note in notes] == ["1", "1"]
+
+
+def test_unknown_font_half_notehead_value_cannot_create_a_tremolo() -> None:
+    assert not _score(heads=True, font="Unknown").parts[0].tremolos
 
 
 @pytest.mark.parametrize(

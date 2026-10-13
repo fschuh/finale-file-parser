@@ -2641,6 +2641,21 @@ remain unplaced. All105 production paths and schema checks pass after decoding
 these records. Canonical span projection and custom endpoint graphics remain
 the next R02 work; this foundation alone does not claim line export recovery.
 
+#### Engraver half-notehead tremolo in the expanded corpus (2026-10-12, F17)
+
+The added Battle to the Death score uses exactly the hidden-tuplet pair
+construction already recovered for Maestro, but its default font0 is
+EngraverFontSet. Bar1 bass entries1838/1839 have stable noteID1, noteheadMod
+character250, consecutive beamed32nds and a hidden256-EDU tuplet referenced
+to2048 EDU. The voice begins at2048 EDU; both metric durations remain1024 EDU.
+The original PDF shows two open half heads with three tremolo strokes, and
+the [official Engraver chart](https://usermanuals.finalemusic.com/FinaleWin/Content/Finale/font-engraver.htm)
+independently identifies ALT+0250 as a half notehead. Extend only this evidenced
+font gate, retaining the original hidden-tuplet/note-ID/adjacency gates and
+unknown-font refusal. This recovers one additional paired tremolo without
+altering its two pitches, frame start or sounded metric duration. Local trace:
+new-case-tremolos.log, generated artifacts remain outside git.
+
 #### Initial printed tempo versus independent playback (2026-10-12, R04/F14)
 
 A first-beat display-only metronome now carries the independent document

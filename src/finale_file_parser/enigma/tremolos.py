@@ -35,7 +35,11 @@ def recover_tremolos(
             and record.fields.get("customChar") == "250"
         ):
             note = field_int(record.fields.get("noteID"))
-            if note is not None and fonts.get(0, "").casefold() == "maestro":
+            if note is not None and fonts.get(0, "").casefold() in {
+                "maestro",
+                "engraverfontset",
+                "engraver font set",
+            }:
                 heads.setdefault(entry, set()).add(note)
     written: dict[int, int] = {}
     spans: dict[int, list[Tremolo]] = {}
