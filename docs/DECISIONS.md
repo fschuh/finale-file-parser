@@ -1164,3 +1164,30 @@ performed rates distinct through MuseScore import. Do not override active
 source expressions with a MIDI-matching document default, and do not reset
 later display-only marks to the initial tempo.
 
+# 2026-10-12: distinguish corpus pipeline coverage from performance equivalence
+
+Provide an opt-in external audit through make, with input hashes, exact pairing,
+written-note projection, explicit source-route failures and raw MIDI residuals.
+Keep contextual ornament/unison labels separate from candidate reattacks and
+unexplained events. Never fit routes, globally collapse unisons, compare human
+note-off durations as notation or synthesize controls to produce a perfect
+match. Record native process status alongside fresh artifacts; use individual
+MuseScore processes after the demonstrated batch teardown failure.
+
+# 2026-10-12: OPEN — remaining legacy playback routing and reference provenance
+
+The complete user-corpus audit records initial MIDI programs/banks and CC7/10,
+but the legacy field joins/function flags for those controls are not independently
+established. Numeric136 is an executable-shape palette and149 is fretInst;
+neither supplies a program merely because a small payload word matches a MIDI
+number. Numeric21412-byte records and channelPlayData124 remain research leads.
+Released InstrumentDef getters prove virtual-channel/perc-map fields in their
+API structure, not an unsupported bank/program interpretation of another word.
+Do not emit MIDI-derived programs, pan, volume or per-note velocities as source.
+
+Active 1UP225/Treasure100/Uncover100 tempo expressions disagree with the paired
+MIDIs100/120/120 and agree differently with source defaults. Literal navigation
+sentinels/counters in five expanded cases also need policy/provenance evidence.
+These discrepancies and the documented graphical interchange limits remain
+explicit review items; a schema/import pass does not close them.
+

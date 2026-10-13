@@ -7,7 +7,7 @@
 PY ?= uv run
 CODE ?= src tests scripts
 
-.PHONY: help install hooks test test-sweeps lint fmt typecheck check check-full spec hexpat clean
+.PHONY: help install hooks test test-sweeps lint fmt typecheck check check-full spec hexpat clean audit-corpus
 
 help:
 	@echo "Targets:"
@@ -23,6 +23,7 @@ help:
 	@echo "  check      lint + format-check + typecheck + test  (the pre-push gate)"
 	@echo "  spec         regenerate docs/formats/finale-formats.{html,pdf}"
 	@echo "  hexpat       regenerate docs/formats/finale-mus.hexpat"
+	@echo "  audit-corpus compare an external MUS/MIDI corpus; set AUDIT_ROOT and optional schema/player"
 	@echo "  clean      remove caches and build artifacts"
 
 install: hooks
@@ -109,6 +110,15 @@ spec:
 # offsets come from formats/layouts.py, never from this file.
 hexpat:
 	PYTHONPATH=scripts $(PY) python -m hexpat
+
+# External user scores and generated review files remain outside git. A schema
+# or player is optional and recorded as not run when absent, never as passed.
+AUDIT_ROOT ?=
+AUDIT_OUTPUT ?= files/external-corpus-audit
+AUDIT_SCHEMA ?=
+AUDIT_MUSESCORE ?=
+audit-corpus:
+	PYTHONPATH=scripts $(PY) python -m corpus_audit --root "$(AUDIT_ROOT)" --output "$(AUDIT_OUTPUT)" $(if $(AUDIT_SCHEMA),--schema "$(AUDIT_SCHEMA)") $(if $(AUDIT_MUSESCORE),--musescore "$(AUDIT_MUSESCORE)")
 
 clean:
 	rm -rf .pytest_cache .ruff_cache .mypy_cache build dist *.egg-info

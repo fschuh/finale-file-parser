@@ -2641,6 +2641,41 @@ remain unplaced. All105 production paths and schema checks pass after decoding
 these records. Canonical span projection and custom endpoint graphics remain
 the next R02 work; this foundation alone does not claim line export recovery.
 
+#### Repeatable external-corpus verification (2026-10-12, stage7)
+
+The opt-in make audit-corpus command uses canonical Score and separate analysis
+attacks, not a parallel score representation. It hashes external inputs,
+records exact stem pairing and each production stage, validates written-note
+multiplicity/timing through IR to MusicXML, and optionally runs the official
+schema and a supplied MuseScore executable. See [audit usage](CORPUS-AUDIT.md).
+The local105/104 source snapshot has209 unchanged hashes, no MIDI-only files,
+and Vampire Killer is MUS-only. All105 production/projection/schema paths pass;
+all105 individual MuseScore4.7.5 processes produce native/PDF/MIDI artifacts
+and exit0. A prior single-process105-score batch produced artifacts but aborted
+with double-free during teardown; fresh per-case processes avoid treating that
+batch exit as a passing check.
+
+Comparison preserves raw residuals, source scope, contiguous tie chains,
+silent notes, sounding ottavas and exact frame starts. Source-bound ornament
+windows include hidden glissando anchors and cross-staff/end-bar endpoints.
+Grace-chord/arpeggio timing contexts are separate from actual pitch coverage.
+Triplet backbeat timing is a source-derived analysis model; it cannot reproduce
+every Human Playback decision. Do not suppress swing on every tied note: that
+probe regressed otherwise matched cases. Spring's straight-timed tied bass
+offbeats therefore retain selective-swing candidate labels, alongside its
+shorter reference replay. Reattack candidates and reference/source anomalies
+remain reviewable rather than becoming invented notes or fake directions.
+
+Expanded literal-route exceptions are also retained: Terra/MAP7/Death Mountain
+have segno glyph assignments carrying jumpAbsolute target0, despite valid later
+D.S. targets; Spear carries D.C. words with target0; Crash Man's always D.S. and
+onPass2 To Coda eventually form a nonterminating literal route after the ending
+Repeat From action. These are format-policy/source-reference investigations,
+not proof that the written notes are corrupt. Do not convert target0 to measure1
+or fit a substitute route from MIDI. The named raw source trace is
+new-route-evidence.log in generated validation artifacts. Initial MIDI program/
+bank/CC7/10 observations are recorded; their source field joins remain unproven.
+
 #### Engraver half-notehead tremolo in the expanded corpus (2026-10-12, F17)
 
 The added Battle to the Death score uses exactly the hidden-tuplet pair
