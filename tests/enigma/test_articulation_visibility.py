@@ -24,17 +24,18 @@ from finale_file_parser.export.musicxml import to_musicxml
         (103, ("arpeggiate",)),
     ],
 )
-@pytest.mark.parametrize("visibility", ["visible", "hidden", "linked-part"])
+@pytest.mark.parametrize("visibility", ["visible", "hidden", "linked-part", "no-print"])
 def test_only_visible_score_assignments_print_their_symbols(
     character: int, symbols: tuple[str, ...], visibility: str
 ) -> None:
     """Each symbol is assigned to one C quarter; no external score is a fixture."""
     attributes = ' part="1"' if visibility == "linked-part" else ""
     flags = "<hide/>" if visibility == "hidden" else ""
+    definition_flags = "<noPrint/>" if visibility == "no-print" else ""
     document = parse_enigma(
         f"""<finale>
           <others>
-            <articDef cmper="1"><charMain>{character}</charMain></articDef>
+            <articDef cmper="1"><charMain>{character}</charMain>{definition_flags}</articDef>
             <staffSpec cmper="1"/>
             <measSpec cmper="1"><beats>1</beats><divbeat>1024</divbeat></measSpec>
             <frameSpec cmper="1"><startEntry>1</startEntry><endEntry>1</endEntry></frameSpec>

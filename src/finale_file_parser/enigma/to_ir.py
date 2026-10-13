@@ -14,6 +14,7 @@ from dataclasses import dataclass, field, replace
 from fractions import Fraction
 
 from finale_file_parser.enigma.arpeggios import EventPosition, arpeggios_by_entry, connect_arpeggios
+from finale_file_parser.enigma.articulation_playback import articulation_playback_by_entry
 from finale_file_parser.enigma.articulations import articulations_by_entry
 from finale_file_parser.enigma.barlines import barline_styles
 from finale_file_parser.enigma.beams import BeamedNote, beams_for
@@ -64,6 +65,7 @@ from finale_file_parser.enigma.tremolos import recover_tremolos
 from finale_file_parser.enigma.tuplet import entry_chain, sounded_durations, tuplets_by_entry
 from finale_file_parser.ir import (
     Arpeggio,
+    ArticulationPlayback,
     ClefChange,
     Event,
     Expression,
@@ -148,6 +150,7 @@ def build_score(document: EnigmaDocument) -> Score:
     transpositions = _transpositions(document)
     lyrics = lyrics_by_entry(document)
     articulations = articulations_by_entry(document)
+    articulation_playback, articulation_diagnostics = articulation_playback_by_entry(document)
     fingerings = fingerings_by_entry(document)
     ornaments = ornaments_by_entry(document)
     fermatas = fermatas_by_entry(document)
@@ -201,6 +204,7 @@ def build_score(document: EnigmaDocument) -> Score:
                     fermatas=fermatas.get(entnum, ()),
                     arpeggios=arpeggios.get(entnum, ()),
                     parentheses=parentheses.get(entnum, ()),
+                    articulation_playback=articulation_playback.get(entnum, ()),
                 )
             )
 
@@ -252,6 +256,7 @@ def build_score(document: EnigmaDocument) -> Score:
     ignored_shapes, diagnostics = stale_smart_shapes(document, numbers)
     lines, line_diagnostics = lines_by_staff(document, ignored_shapes=ignored_shapes)
     diagnostics += line_diagnostics
+    diagnostics += articulation_diagnostics
     placed_entries = {entry for _, _, entry in slur_positions}
     diagnostics += tuple(
         ScoreDiagnostic(
@@ -617,6 +622,7 @@ def _event(
     fermatas: tuple[Fermata, ...] = (),
     arpeggios: tuple[Arpeggio, ...] = (),
     parentheses: tuple[Parenthesis, ...] = (),
+    articulation_playback: tuple[ArticulationPlayback, ...] = (),
 ) -> Event:
     entry = read_entry(record)
     key = decode_key(key_raw)
@@ -668,6 +674,7 @@ def _event(
         fermatas=fermatas,
         arpeggios=arpeggios if pitches else (),
         parentheses=parentheses,
+        articulation_playback=articulation_playback,
     )
 
 

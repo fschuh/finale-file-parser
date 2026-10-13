@@ -2641,6 +2641,43 @@ remain unplaced. All105 production paths and schema checks pass after decoding
 these records. Canonical span projection and custom endpoint graphics remain
 the next R02 work; this foundation alone does not claim line export recovery.
 
+#### Nonprinting articulation controls (2026-10-12, R01/R04)
+
+Assigned Maestro character8 in Objection (161 placements) and character0 in
+Athletic (two) are character definitions, not custom shapes or missing accent
+glyphs. The independently decoded mainIsShape flag is clear in both. Their
+screen-only flag is also clear: the absence of a printed symbol here follows
+the character code, not an inferred hidden-shape instruction.
+
+The released FCArticulationDef getters establish flag1+10 mask0100 as noPrint,
+and flag2 at legacy+22/Unicode+24 has playArtic0040, attack-percent0010,
+duration-percent0020 and velocity-percent0008. Signed top/bottom words occupy
+legacy+36/+38 attack, +40/+42 duration and +44/+46 velocity; Unicode adds two
+bytes to each offset. Pointer VMs4c1026/4c1066/4c1086/4c10a6 and percentage/
+playback getters21bf3c/216bd6/218e22/21c9b0 independently anchor the map.
+Normalize selected units using EnigmaXML start/dur/amp Top/Bot Note
+Percent/Delta field names, retaining disabled definitions without activating
+their data. Do not mistake a raw value85 in the velocity slots for duration85.
+
+Objection's definition63 flags2=0060 selects duration75 percent on both ends
+of a chord; Athletic's definition63 flags2=0048 selects velocity85 percent.
+Its attack/duration values are zero. Canonical Event.articulation_playback
+retains active assigned controls with explicit EDU/percent/key-velocity units,
+including hidden/on-screen-only symbols. All printed articulation-derived
+resolvers now honor noPrint independently. Diagnostics distinguish a
+nonprinting glyph from the separate explicit manual playback controls.
+
+The [Finale articulation manual](https://usermanuals.finalemusic.com/FinaleWin/Content/Finale/ht-articulations.htm)
+states that manual articulation playback needs Human Playback disabled.
+Consequently these fields cannot be imposed on this corpus's performance
+MIDIs as literal note-off or velocity truth. Standard MusicXML attack/release
+cannot preserve top/bottom interpolation, multiple-effect ordering and Human
+Playback override policy together. Retain the values and an explicit
+articulation-playback interchange diagnostic; export written symbols without
+invented staccatos or altered metric durations. Actual MuseScore4.7.5 importer
+does not read note attack/release attributes. Authored binary/unit/visibility/
+inactive-palette tests pass, and all105 MusicXML schema paths remain valid.
+
 #### Assigned line drawings and interchange limits (2026-10-12, R02)
 
 Canonical `Part.lines` now carries every eligible type10/11/29/32 assignment:

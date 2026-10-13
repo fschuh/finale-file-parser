@@ -23,6 +23,7 @@ def parentheses_by_entry(document: EnigmaDocument) -> dict[int, tuple[Parenthesi
         if "part" not in r.attrs
         and "mainIsShape" not in r.fields
         and "noPrint" not in r.fields
+        and "noPrint" not in r.fields
         and field_int(r.fields.get("charMain")) in {40, 41}
         and fonts.get(field_int(r.fields.get("fontMain")) or 0, "").casefold() == "maestro"
     }

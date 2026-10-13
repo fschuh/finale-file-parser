@@ -1146,3 +1146,13 @@ Source geometry survives even when MuseScore ignores its positioning or maps
 the wavy style to a trill line. No notes or durations are manufactured to make
 zero-time drawings visible in one importer.
 
+# 2026-10-12: keep articulation playback controls separate from written notation
+
+Append explicit assigned top/bottom attack, duration and velocity adjustments
+to canonical Event, with their source units and references. Symbol visibility
+does not disable those controls. Honor noPrint in printed symbol resolvers,
+and diagnose nonprinting music-font characters without guessing a visible mark.
+Do not apply manual articulation data as if it were Finale Human Playback's
+rendered performance. Keep controls in IR and report the MusicXML realization
+limit rather than changing written note lengths or synthesizing MIDI velocities.
+

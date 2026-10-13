@@ -34,6 +34,7 @@ def _assignments(document: EnigmaDocument) -> dict[int, tuple[Record, ...]]:
         for record in document.others.of_tag("articDef")
         if "part" not in record.attrs
         and "mainIsShape" not in record.fields
+        and "noPrint" not in record.fields
         and field_int(record.fields.get("charMain")) == _ARPEGGIO_CHARACTER
     }
     definitions.discard(None)
@@ -62,6 +63,7 @@ def _downward_arrows(document: EnigmaDocument, rolls: dict[int, tuple[Record, ..
         for record in document.others.of_tag("articDef")
         if "part" not in record.attrs
         and "mainIsShape" not in record.fields
+        and "noPrint" not in record.fields
         and field_int(record.fields.get("charMain")) == 224
         and fonts.get(field_int(record.fields.get("fontMain")) or 0, "").casefold() == "maestro"
     }

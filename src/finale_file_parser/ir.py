@@ -286,6 +286,9 @@ class Event:
     parentheses: tuple[Parenthesis, ...] = ()
     """Notehead enclosures or retained positioned glyphs needing attachment review."""
 
+    articulation_playback: tuple[ArticulationPlayback, ...] = ()
+    """Explicit assigned controls, independent of symbol visibility and note length."""
+
     @property
     def is_rest(self) -> bool:
         return not self.pitches
@@ -293,6 +296,27 @@ class Event:
     @property
     def is_chord(self) -> bool:
         return len(self.pitches) > 1
+
+
+@dataclass(frozen=True)
+class PlaybackAdjustment:
+    """Articulation top/bottom values in percent, EDU or key-velocity units.
+
+    Values stay independent of written duration and Human Playback realization.
+    A percentage such as 75 is retained as 75, rather than as a guessed delta.
+    """
+
+    top: int
+    bottom: int
+    unit: str
+
+
+@dataclass(frozen=True)
+class ArticulationPlayback:
+    attack: PlaybackAdjustment
+    duration: PlaybackAdjustment
+    velocity: PlaybackAdjustment
+    source_ref: str = ""
 
 
 @dataclass(frozen=True)

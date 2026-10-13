@@ -104,7 +104,7 @@ def _definitions(document: EnigmaDocument) -> dict[int, tuple[str, ...]]:
     fonts = font_names(document)
     out: dict[int, tuple[str, ...]] = {}
     for record in document.others.of_tag(_DEFINITION):
-        if "part" in record.attrs or "mainIsShape" in record.fields:
+        if "part" in record.attrs or {"mainIsShape", "noPrint"}.intersection(record.fields):
             continue
         cmper = field_int(record.attrs.get("cmper"))
         character = field_int(record.fields.get("charMain"))

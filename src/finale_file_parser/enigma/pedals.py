@@ -8,7 +8,7 @@ def pedals_by_entry(document: EnigmaDocument) -> dict[int, tuple[str, ...]]:
     fonts = font_names(document)
     definitions = {}
     for record in document.others.of_tag("articDef"):
-        if "part" in record.attrs or "mainIsShape" in record.fields:
+        if "part" in record.attrs or {"mainIsShape", "noPrint"}.intersection(record.fields):
             continue
         number = field_int(record.attrs.get("cmper"))
         font = field_int(record.fields.get("fontMain"))

@@ -1421,9 +1421,18 @@ def _artic_def(payload: bytes) -> dict[str, str | tuple[str, ...] | Record | tup
     }
     if _u16(payload, 10) & 0x80:
         fields["useTopNote"] = ""
+    if _u16(payload, 10) & 0x100:
+        fields["noPrint"] = ""
     if flags & 2:
         fields["mainIsShape"] = ""
         fields["mainShape"] = str(_u16(payload, 34 if is_unicode else 32))
+    if flags & 0x40:
+        fields["playArtic"] = ""
+    base = 38 if is_unicode else 36
+    for name, at, mask in (("start", base, 0x10), ("dur", base + 4, 0x20), ("amp", base + 8, 8)):
+        unit = "Percent" if flags & mask else "Delta"
+        fields[f"{name}TopNote{unit}"] = str(_s16(payload, at))
+        fields[f"{name}BotNote{unit}"] = str(_s16(payload, at + 2))
     return fields
 
 

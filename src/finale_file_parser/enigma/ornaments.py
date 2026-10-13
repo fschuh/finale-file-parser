@@ -25,7 +25,7 @@ def ornaments_by_entry(document: EnigmaDocument) -> dict[int, tuple[Ornament, ..
     fonts = font_names(document)
     definitions: dict[int, str] = {}
     for record in document.others.of_tag("articDef"):
-        if "part" in record.attrs or "mainIsShape" in record.fields:
+        if "part" in record.attrs or {"mainIsShape", "noPrint"}.intersection(record.fields):
             continue
         number = field_int(record.attrs.get("cmper"))
         character = field_int(record.fields.get("charMain"))
@@ -42,7 +42,7 @@ def ornaments_by_entry(document: EnigmaDocument) -> dict[int, tuple[Ornament, ..
     assignments: dict[int, list[tuple[int, int]]] = {}
     small_accidentals: dict[int, int] = {}
     for record in document.others.of_tag("articDef"):
-        if "part" in record.attrs or "mainIsShape" in record.fields:
+        if "part" in record.attrs or {"mainIsShape", "noPrint"}.intersection(record.fields):
             continue
         number = field_int(record.attrs.get("cmper"))
         font = field_int(record.fields.get("fontMain"))

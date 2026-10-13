@@ -19,7 +19,7 @@ def fermatas_by_entry(document: EnigmaDocument) -> dict[int, tuple[Fermata, ...]
     """Resolve visible score fermatas, excluding library-only and linked-part marks."""
     definitions: dict[int, Fermata] = {}
     for record in document.others.of_tag("articDef"):
-        if "part" in record.attrs or "mainIsShape" in record.fields:
+        if "part" in record.attrs or {"mainIsShape", "noPrint"}.intersection(record.fields):
             continue
         definition = field_int(record.attrs.get("cmper"))
         character = field_int(record.fields.get("charMain"))
