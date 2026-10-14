@@ -661,6 +661,47 @@ This is source inspection, not a claim of runtime MuseScore validation.
 
 ### Known format facts — the `.mus` entry pool
 
+#### Manual rest positions (2026-10-14, PDF review P12)
+
+A valid rest with FLOATREST clear and first stored note ID31 has an explicit
+drawing position. This is separate from NOTEBIT and never supplies a musical
+pitch. The published [FCNoteEntry API](https://pdk.finalelua.com/class_f_c_note_entry.html)
+calls this a movable rest; read-only SDK inspection independently shows
+IsRestMovable0x4D5954 and GetRestDisplacement0x4D591E checking NOTEBIT,
+the stored-note count and ID31 before reading the signed harmonic level.
+The vendor `eeppd.txt` describes nonfloating rests' stored positions.
+[musxdom Entries.cpp](https://github.com/openmusx/musxdom/blob/main/src/musx/dom/Entries.cpp)
+distinguishes floating/zero-note rests from ordinary stored Note records;
+Note::calcNoteProperties applies the established key/clef position calculation
+to those records. No new numeric tag or allocation is required here.
+
+Entry.rest_position retains that first record independently of Entry.notes.
+The existing written-pitch spelling path supplies Event.rest_display_pitch,
+with no sounding pitch or accidental. MusicXML uses standard rest display-step
+and display-octave; hidden rests keep print-object=no, geometry and duration.
+Floating rests or an unestablished record identity do not invent a manual
+position. Invalid MusicXML octave positions fail clearly at export.
+
+Mario Main22's visible entries1642/1643 store level-5 (E3 in C), and24's
+1667/1668 store-6 (D3). Title Screen2's110/111 store23 (B7 in G).
+The converter formerly discarded all these positions. Source-visible entries
+are preserved even where the reference PDF differs. Maya5's204/210 and13's
+980/990 are coincident visible floating eighth rests in independent layers;
+209/979 are explicitly hidden quarter rests and remain hidden. Mario60's
+1606/1609 are visible floating quarter rests. There is no source evidence here
+for suppressing those events. Unproved layer/consolidation/style settings are
+not decoded from guessed numeric tags.
+
+The three target exports pass projection, schema and native import without
+changing their attack counts. An authored native fixture demonstrates that
+MuseScore4.7.5 separates two coincident rests above/below the staff even with
+identical center display pitches; zero manual offsets return to automatic
+voice layout. Target rest glyphs therefore are **not claimed PDF-perfect**.
+Default empty pickup rests and automatic native voice completion also remain
+separate from explicit source rest visibility. Seven authored regressions
+cover key-relative positions, floating/unknown records, hidden positions and
+invalid assignments; no source notes or metric time are removed.
+
 `read_mus_entries(path)` returns the same `Entry`/`Note`/`Duration` objects the `.musx` path builds,
 so `spell_note`, `decode_key` and the rest attach unchanged. Layout is Coda's, from `docs/eeppd.txt`,
 confirmed field-by-field against paired `.musx` files.

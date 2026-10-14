@@ -1879,6 +1879,8 @@ def _append_event(
 ) -> None:
     if not voice.playback:
         event = replace(event, playback=False)
+    if event.rest_display_pitch is not None and not event.is_rest:
+        raise ExportError("rest drawing position cannot be assigned to pitched notes")
     if event.note_ties and len(event.note_ties) != len(event.pitches):
         raise ExportError("per-note tie flags must match the number of pitches")
     if any(
@@ -1974,6 +1976,16 @@ def _append_note(
         rest = ET.SubElement(note, "rest")
         if event.is_measure_rest:
             rest.set("measure", "yes")
+        if event.rest_display_pitch is not None:
+            position = event.rest_display_pitch
+            if (
+                position.step not in "CDEFGAB"
+                or len(position.step) != 1
+                or not 0 <= position.octave <= 9
+            ):
+                raise ExportError("rest drawing position is outside MusicXML pitch bounds")
+            ET.SubElement(rest, "display-step").text = position.step
+            ET.SubElement(rest, "display-octave").text = str(position.octave)
     else:
         element_pitch = ET.SubElement(note, "pitch")
         ET.SubElement(element_pitch, "step").text = pitch.step

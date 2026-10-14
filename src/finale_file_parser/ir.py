@@ -320,6 +320,8 @@ class Event:
     """Per-pitch visual overrides; ordinary notes need no head modification."""
 
     cross_staff: tuple[CrossStaff, ...] = ()
+    rest_display_pitch: Pitch | None = None
+    """Explicit rest drawing position; it does not make the rest sound."""
 
     @property
     def is_rest(self) -> bool:

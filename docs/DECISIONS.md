@@ -1,5 +1,22 @@
 # Decisions
 
+## 2026-10-14 — DECIDED: rest drawing positions do not change rest visibility or time
+
+Append optional Event.rest_display_pitch to the canonical IR. A nonfloating
+RESTID31 record supplies drawing geometry through the established written
+position calculation, independently of musical pitches, playback, visibility
+and duration. Export standard rest display-step/display-octave; preserve hidden
+positions and reject invalid export coordinates. Floating or unknown records
+remain unspecified rather than acquiring guessed positions.
+
+The PDF-review rest investigation confirms visible source rests in the flagged
+Maya, Mario Main and Title Screen cells. No blanket hiding, layer collapse or
+MIDI-based rest deletion is justified. Authored native evidence also shows
+MuseScore moving coincident zero-offset rests into separate voice positions.
+Recovering the discarded manual positions is a parser/export fix; remaining
+native layout and unproved source consolidation policies are explicit limits,
+not a claim that these bars now match their PDFs exactly.
+
 The log of decisions made and questions still open. **Standing rule: don't silently resolve an open
 question in code — propose it here, get a decision, then build.** Newest entries at the top.
 

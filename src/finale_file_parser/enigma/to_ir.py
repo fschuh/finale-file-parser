@@ -765,6 +765,11 @@ def _event(
         ornaments = tuple(
             _resolve_ornament(ornament, entry.notes, key, transposition) for ornament in ornaments
         )
+    rest_position = (
+        spell_note(entry.rest_position, key, transposition).written
+        if entry.rest_position is not None
+        else None
+    )
     return Event(
         duration=duration,
         written_duration=written,
@@ -777,6 +782,9 @@ def _event(
         is_grace="graceNote" in record.fields,
         playback=entry.playback,
         visible=entry.visible,
+        rest_display_pitch=Pitch(rest_position.letter, rest_position.octave, 0)
+        if rest_position is not None
+        else None,
         grace_slash=True
         if "graceNote" in record.fields and "slashGrace" in record.fields
         else None,

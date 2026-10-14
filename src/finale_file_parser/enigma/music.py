@@ -100,6 +100,8 @@ class Entry:
     notes: tuple[Note, ...]
     playback: bool = True
     visible: bool = True
+    rest_position: Note | None = None
+    """Stored RESTID31 drawing record for a nonfloating rest, never musical pitches."""
 
 
 def read_entry(record: Record) -> Entry:
@@ -129,6 +131,9 @@ def read_entry(record: Record) -> Entry:
         notes=() if is_rest else notes,
         playback="noPlayback" not in record.fields,
         visible="ignore" not in record.fields,
+        rest_position=notes[0]
+        if is_rest and "floatRest" not in record.fields and notes and notes[0].note_id == 31
+        else None,
     )
 
 
