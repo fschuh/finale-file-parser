@@ -1220,3 +1220,13 @@ sentinels/counters in five expanded cases also need policy/provenance evidence.
 These discrepancies and the documented graphical interchange limits remain
 explicit review items; a schema/import pass does not close them.
 
+# 2026-10-14: Per-pitch notehead overrides keep source glyphs and musical data
+
+Add optional `Event.noteheads` to the canonical IR, retaining shape, explicit
+fill and source character/font on its pitch index. Join Finale modifications by
+stable note ID before discarding entry identifiers. A cross head changes visual
+appearance only; it does not erase its encoded pitch or imply percussion.
+Unknown mappings remain unresolved data with diagnostics. Keep ordinary notes
+free of inferred overrides, and append defaulted fields to preserve positional
+constructor compatibility. Parentheses and head shape share one XML element.
+

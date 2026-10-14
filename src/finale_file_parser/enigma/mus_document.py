@@ -1936,7 +1936,15 @@ def _details_records(
                             else _u16(record.payload, at + 6)
                         ),
                         **(
-                            {"useCustomFont": ""}
+                            {
+                                "useCustomFont": "",
+                                "fontID": str(
+                                    _u16(
+                                        record.payload,
+                                        at + (12 if year is not None and year >= 2012 else 10),
+                                    )
+                                ),
+                            }
                             if record.payload[at + (10 if year is not None and year >= 2012 else 8)]
                             & 1
                             else {}

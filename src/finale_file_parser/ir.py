@@ -33,6 +33,7 @@ __all__ = [
     "Lyric",
     "Measure",
     "Navigation",
+    "Notehead",
     "NoteTies",
     "NoteEndpoint",
     "OctaveShift",
@@ -193,6 +194,21 @@ class Parenthesis:
 
 
 @dataclass(frozen=True)
+class Notehead:
+    """An explicit per-pitch head override, independent of rhythm and playback.
+
+    Unknown glyphs retain their source character/font with ``shape=None``;
+    exporters must not guess their appearance from their numeric value.
+    """
+
+    pitch_index: int
+    shape: str | None
+    filled: bool | None = None
+    source_character: int | None = None
+    source_font: str | None = None
+
+
+@dataclass(frozen=True)
 class Event:
     """One note, chord, or rest.
 
@@ -288,6 +304,9 @@ class Event:
 
     articulation_playback: tuple[ArticulationPlayback, ...] = ()
     """Explicit assigned controls, independent of symbol visibility and note length."""
+
+    noteheads: tuple[Notehead, ...] = ()
+    """Per-pitch visual overrides; ordinary notes need no head modification."""
 
     @property
     def is_rest(self) -> bool:

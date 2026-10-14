@@ -48,6 +48,7 @@ from finale_file_parser.enigma.lyrics import lyrics_by_entry
 from finale_file_parser.enigma.models import CorruptScoreError
 from finale_file_parser.enigma.music import Note, read_entry
 from finale_file_parser.enigma.note_dynamics import dynamics_by_entry
+from finale_file_parser.enigma.noteheads import noteheads_by_entry
 from finale_file_parser.enigma.octaves import octaves_by_staff
 from finale_file_parser.enigma.ornaments import ornaments_by_entry
 from finale_file_parser.enigma.parentheses import parentheses_by_entry
@@ -73,6 +74,7 @@ from finale_file_parser.ir import (
     Lyric,
     Measure,
     Navigation,
+    Notehead,
     NoteTies,
     Ornament,
     Parenthesis,
@@ -159,6 +161,7 @@ def build_score(document: EnigmaDocument) -> Score:
     fermatas = fermatas_by_entry(document)
     arpeggios = arpeggios_by_entry(document)
     parentheses = parentheses_by_entry(document)
+    noteheads = noteheads_by_entry(document)
     assigned_entries: dict[EventPosition, int] = {}
     slur_positions: dict[tuple[int, int, int], list[SlurEndpoint]] = defaultdict(list)
     always_slash = slash_flagged_grace_notes(document)
@@ -208,6 +211,7 @@ def build_score(document: EnigmaDocument) -> Score:
                     arpeggios=arpeggios.get(entnum, ()),
                     parentheses=parentheses.get(entnum, ()),
                     articulation_playback=articulation_playback.get(entnum, ()),
+                    noteheads=noteheads.get(entnum, ()),
                 )
             )
 
@@ -263,6 +267,19 @@ def build_score(document: EnigmaDocument) -> Score:
     diagnostics += line_diagnostics
     diagnostics += articulation_diagnostics
     placed_entries = {entry for _, _, entry in slur_positions}
+    diagnostics += tuple(
+        ScoreDiagnostic(
+            "notehead-glyph",
+            f"Entry {entry} note {head.pitch_index} retains custom character "
+            f"{head.source_character} in font {head.source_font!r}; "
+            "its notehead meaning is not established for MusicXML.",
+            f"noteheadMod:{entry}",
+        )
+        for entry, heads in noteheads.items()
+        if entry in placed_entries
+        for head in heads
+        if head.shape is None
+    )
     diagnostics += tuple(
         ScoreDiagnostic(
             "parenthesis-attachment",
@@ -640,6 +657,7 @@ def _event(
     arpeggios: tuple[Arpeggio, ...] = (),
     parentheses: tuple[Parenthesis, ...] = (),
     articulation_playback: tuple[ArticulationPlayback, ...] = (),
+    noteheads: tuple[Notehead, ...] = (),
 ) -> Event:
     entry = read_entry(record)
     key = decode_key(key_raw)
@@ -692,6 +710,7 @@ def _event(
         arpeggios=arpeggios if pitches else (),
         parentheses=parentheses,
         articulation_playback=articulation_playback,
+        noteheads=noteheads,
     )
 
 

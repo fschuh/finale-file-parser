@@ -1698,6 +1698,11 @@ def _append_event(
     if event.note_ties and len(event.note_ties) != len(event.pitches):
         raise ExportError("per-note tie flags must match the number of pitches")
     if any(
+        not 0 <= head.pitch_index < len(event.pitches) or head.shape not in {None, "normal", "x"}
+        for head in event.noteheads
+    ) or len({head.pitch_index for head in event.noteheads}) != len(event.noteheads):
+        raise ExportError("invalid or duplicate notehead override")
+    if any(
         i < 0 or i >= len(event.pitches) for mark in event.arpeggios for i in mark.pitch_indices
     ):
         raise ExportError("arpeggio coverage contains an invalid chord pitch")
@@ -1807,8 +1812,16 @@ def _append_note(
         # triplet sounds 2/3, and is 3 notes in the time of 2.
         ET.SubElement(modification, "actual-notes").text = str(event.tuplet_ratio.denominator)
         ET.SubElement(modification, "normal-notes").text = str(event.tuplet_ratio.numerator)
-    if pitch is not None and any(m.pitch_index == pitch_index for m in event.parentheses):
-        ET.SubElement(note, "notehead", parentheses="yes").text = "normal"
+    if pitch is not None:
+        enclosed = any(m.pitch_index == pitch_index for m in event.parentheses)
+        head = next((h for h in event.noteheads if h.pitch_index == pitch_index), None)
+        if enclosed or (head is not None and head.shape is not None):
+            attributes = {"parentheses": "yes"} if enclosed else {}
+            if head is not None and head.filled is not None:
+                attributes["filled"] = "yes" if head.filled else "no"
+            ET.SubElement(note, "notehead", attributes).text = (
+                head.shape if head is not None and head.shape is not None else "normal"
+            )
     # Schema order puts <beam> after <time-modification> and before
     # <notations>. Only on a chord's principal note: the beam belongs to the
     # stem, and the schema allows at most eight per note.

@@ -1909,6 +1909,36 @@ GetUseCustomFont0x5BB3A anchor the fields. Tremolo recovery uses only establishe
 inherited Maestro half-heads, excluding custom fonts. Packed note IDs can repeat
 in retained source records; do not let one erase its neighboring modification.
 
+#### Assigned cross noteheads (2026-10-14, PDF review P04)
+
+Numeric1058 and typed `noteheadMod` assignments now join to the entry's stable
+note ID, not its serialized chord index. Air Man's assigned character192 heads
+(including bass26 entries1601/1659/1660 and staff6 equivalents) and Crash Man40
+entries1836-1842 use inherited Maestro. The published
+[Maestro chart](https://usermanuals.finalemusic.com/FinaleWin/Content/Finale/font-maestro.htm)
+and [Engraver chart](https://usermanuals.finalemusic.com/FinaleWin/Content/Finale/font-engraver.htm)
+identify character192 as the cross/non-pitched head. A visual head does not
+convert a pitched note to percussion or modify its playback.
+
+Custom font IDs are at legacy+10/Unicode+12, enabled only by the existing
+custom-font bit. RGP GetFontName0x5C0AC reads object+0x4A/+0x60 relative to
+the previously established bases0x40/0x54, independently corroborating the
+[PDK font selector](https://pdk.finalelua.com/class_f_c_notehead_mod.html).
+Inherited heads use the score's established default registry ID0, as tremolo
+recovery does. Unknown fonts/characters remain explicit `Notehead` data with
+an unresolved-glyph diagnostic, rather than a guessed shape. Linked-part mods
+do not override the score. Clear-character0 places no shape. Invalid or
+ambiguous note IDs and conflicting modifications raise a clear score error;
+identical repeats are idempotent. Authored mixed chords and packed20/40-byte
+records test both layouts and custom-font/part boundaries.
+
+`Event.noteheads` preserves per-pitch shape independently of rhythm/ties and
+allows later explicit fill recovery. Export combines an enclosure and shape
+in a single MusicXML notehead. The targeted Air/Crash exports pass written-note
+projection/XSD, import individually in MuseScore4.7.5 and render cross heads
+at the inspected passages. Air's extra active staves are a separate print-
+visibility investigation; Crash's unresolved literal route remains unchanged.
+
 Tuplet number style is flag low-nibble at serialized+18; bracket style uses
 0x3000 there. RGP GetSymbolicNumber0x796E0 anchors base0x40 to existing+0,
 GetNumberStyle0x4DF7F6 and GetShapeStyle0x4DF80E read base+18. Zero/zero explicitly
