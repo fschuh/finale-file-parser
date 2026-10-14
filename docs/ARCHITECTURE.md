@@ -2828,6 +2828,20 @@ Scratch `BoundaryMakefile` targets `hairpin-boundary` and
 
 #### Individual-note glissando attachments (2026-10-12, F18)
 
+**P16 native reassessment (2026-10-14):** Mario Main's three paired glissandi
+already retain their individual notes, voices and native Glissando objects.
+The latest enlarged rendering visibly includes22's short wavy G4-to-G3 line;
+the initial review's blanket absence flag for22/24 was too broad. Bar24 still
+does not visibly reproduce the source F4-to-Ab3 line. Its principal dotted
+quarter at2q overlaps the different-voice endpoint at3q; do not change those
+source durations or voices to force native spacing. Source relative-x/y
+adjustments remain in XML. Five original native fixtures confirm ordinary
+cross-voice, same-voice, wavy-slide and hidden-silent endpoint support; changing
+the tag is not a remedy. A differing end-adjustment fixture renders identically
+to its baseline: this native addGlissandoSlide path does not apply the drawing
+attributes. Preserve the standard endpoints/geometry and report the remaining
+bar24 layout limit, without declaring a general cross-voice parser omission.
+
 Preset SmartShape type25 is glissando in the published PDK enum. Its existing
 entry-based endpoints and start/endNoteID words (serialized+76/+78) identify
 individual chord pitches. Recover only assigned, visible, preset score shapes;
