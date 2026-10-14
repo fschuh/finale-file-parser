@@ -1338,6 +1338,38 @@ measures ask for both.
 
 ### Known format facts — repeats
 
+#### Custom ending labels (2026-10-14, PDF review P13)
+
+Numeric tag205 contains aligned, zero-terminated UTF-16LE custom ending text,
+keyed by the same measure as tag204's bracket and tag206's pass list. Terra19
+stores `31 00 2E 00` (1.) and21 stores `32 00 2E 00` (2.), each padded to12
+bytes, while their pass lists independently remain1,3 and2,4. Spring Yard8/11
+also store custom labels1/2. The [published FCEndingRepeat API](https://pdk.finalelua.com/class_f_c_ending_repeat.html)
+separates CreateTextString from GetPassNumbers; read-only CreateTextString
+0x4C7760 loads a distinct raw text keyed by the ending's measure. The independent
+[musxdom factory](https://github.com/openmusx/musxdom/blob/main/src/musx/factory/FieldPopulatorsOthers.cpp)
+maps RepeatEndingText's string to XML `rptText`, with separate RepeatPassList
+`act` values. This join, distinct strings/pass values and primary API establish
+the tag meaning; no label is inferred from the reference MIDI.
+
+The numeric adapter now retains repeatEndingText.rptText. It shares the bounded
+Unicode literal decoder with textRepeatText; odd code units, invalid surrogates
+and illegal XML literal characters raise CorruptScoreError. Numeric label
+decoding is independent of missing NotePad banner years, like numeric repeat
+text. The older ETF/DCL custom-text layout is not newly guessed here.
+The normalized resolver ignores linked-part overrides, joins the explicit label
+at the bracket start and carries it onto both endpoint Ending objects. Optional
+Ending.text is appended without changing pass lists or positional constructors:
+None derives the prior pass-list label; an explicit empty string remains empty.
+Typed nonscalar labels fail clearly.
+
+MusicXML ending content uses the source text, and its number attribute still
+uses the source playable passes. Twelve original MIT regressions cover these
+independent values and hostile/part text. All105 scores build/project. Native
+Terra and an authored multiple-pass fixture retain beginText1./2. with native
+endings1,3/2,4; the source target-0 route exception remains independently
+unresolved. Blank-label handling by a renderer is not promised by XML validity.
+
 Repeats live in two places at once, and reconstructing one bracket needs both.
 
 The **barlines** are flags on `measSpec`: `forRepBar` means a forward repeat at that measure's left

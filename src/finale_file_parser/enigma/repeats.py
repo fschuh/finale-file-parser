@@ -26,10 +26,9 @@ disagreement), and `nextEnd` where a `repeatEndingStart` supplies one. The
 remaining 67 brackets are single measures with no backward repeat -- a final
 "2." ending, which closes with no hook.
 
-Not read, and deliberately: `repeatBack.target`, `trigger`, `action`, and the
-`textRepeatAssign` family (D.C., D.S., Fine, To Coda). Those describe *jumps*
-rather than repeat barlines, and MusicXML expresses them differently; they are
-the next slice, not this one. See `docs/ARCHITECTURE.md`.
+Optional `repeatEndingText.rptText` supplies the printed label independently
+of repeatPassList. Backward playback rules are retained separately; the text
+repeat family is resolved by the navigation module. See `docs/ARCHITECTURE.md`.
 """
 
 from __future__ import annotations
@@ -94,14 +93,16 @@ def repeats_for(document: EnigmaDocument) -> Repeats:
     flags = _measure_flags(document)
     passes = _backward_passes(document)
     playback = _backward_playback(document)
+    labels = _ending_labels(document)
     out: dict[int, list[Ending]] = {}
     for start, stop, numbers in _endings(document, flags):
-        out.setdefault(start, []).append(Ending(numbers=numbers, type="start"))
+        label = labels.get(start)
+        out.setdefault(start, []).append(Ending(numbers=numbers, type="start", text=label))
         # A bracket closes with a downward hook only where the music actually
         # repeats there; the last ending of a set just stops being drawn, which
         # MusicXML spells "discontinue".
         closing = "stop" if flags.get(stop, _NO_FLAGS).backward else "discontinue"
-        out.setdefault(stop, []).append(Ending(numbers=numbers, type=closing))
+        out.setdefault(stop, []).append(Ending(numbers=numbers, type=closing, text=label))
 
     measures = set(out) | {m for m, f in flags.items() if f.forward or f.backward}
     return Repeats(
@@ -212,6 +213,22 @@ def _ending_starts(document: EnigmaDocument) -> set[int]:
         if "part" not in record.attrs
         and (measure := field_int(record.attrs.get("cmper"))) is not None
     }
+
+
+def _ending_labels(document: EnigmaDocument) -> dict[int, str]:
+    """Optional printed text uses rptText, independently of the pass list."""
+    result = {}
+    for record in document.others.of_tag("repeatEndingText"):
+        if "part" in record.attrs:
+            continue
+        measure = field_int(record.attrs.get("cmper"))
+        if measure is None:
+            continue
+        text = record.fields.get("rptText", "")
+        if not isinstance(text, str):
+            raise CorruptScoreError("repeatEndingText: expected a scalar label")
+        result[measure] = text
+    return result
 
 
 def _pass_lists(document: EnigmaDocument) -> dict[int, tuple[int, ...]]:

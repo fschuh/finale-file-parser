@@ -382,6 +382,9 @@ class Ending:
     """`start` where the bracket opens; at its close, `stop` if it ends in a
     downward hook and `discontinue` if it just stops being drawn."""
 
+    text: str | None = None
+    """Explicit source label; None derives the pass list, empty preserves a blank."""
+
 
 @dataclass(frozen=True)
 class ExpressionPlayback:

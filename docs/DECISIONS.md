@@ -1,5 +1,19 @@
 # Decisions
 
+## 2026-10-14 — DECIDED: explicit ending labels are independent of playback passes
+
+Append optional Ending.text to the canonical IR. Resolve the source
+repeatEndingText.rptText by the bracket's measure, independently of its existing
+pass list, and serialize it as MusicXML ending text without changing number.
+None preserves derived labels; an explicitly blank source label is retained.
+Keep linked-part overrides separate and reject malformed Unicode/nonscalar
+labels. Numeric205 is proven by distinct label/pass records and the independent
+primary repeat API; older DCL text remains unresolved rather than guessed.
+
+Terra's printed1./2. now survives while its playable1,3/2,4 remains unchanged.
+Native evidence confirms both fields; it does not resolve the separate source
+navigation target-0 policy or promise renderer handling of empty labels.
+
 ## 2026-10-14 — DECIDED: rest drawing positions do not change rest visibility or time
 
 Append optional Event.rest_display_pitch to the canonical IR. A nonfloating

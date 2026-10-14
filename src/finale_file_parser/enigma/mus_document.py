@@ -34,6 +34,7 @@ Translated:
 | others | `articDef` (121) | `charMain` — at +0 (2011) or +2 (2012) |
 | others | `repeatBack` (203) | `actuate` — Finale's "Total Passes" |
 | others | `repeatEndingStart` (204) | presence only; the bracket's extent comes from `barEnding` |
+| others | `repeatEndingText` (205) | optional printed label, independent of playback passes |
 | others | `repeatPassList` (206) | `act` — the passes the ending is taken on, a u16 array |
 | details | `staffGroup` (1057) | `startInst`, `endInst`, `bracket.id`, `fullID`, the barline bit |
 | texts | `verse` | the `^verse(N)…^end` sections of the text stream |
@@ -94,6 +95,7 @@ from finale_file_parser.enigma.mus_others import (
     TAG_PAGE_TEXT_ASSIGN,
     TAG_REPEAT_BACK,
     TAG_REPEAT_ENDING_START,
+    TAG_REPEAT_ENDING_TEXT,
     TAG_REPEAT_PASS_LIST,
     TAG_SMART_SHAPE,
     TAG_SMART_SHAPE_CUSTOM_LINE,
@@ -1309,23 +1311,11 @@ def _others_records(
                 fields["legacyExtra"] = record.payload[12:].hex()
             out.append(Record("textRepeatDef", attrs, "", fields))
         elif record.tag == TAG_TEXT_REPEAT_TEXT:
-            if len(record.payload) % 2:
-                raise CorruptScoreError("textRepeatText: incomplete UTF-16LE code unit")
-            end = next(
-                (
-                    at
-                    for at in range(0, len(record.payload), 2)
-                    if record.payload[at : at + 2] == b"\0\0"
-                ),
-                len(record.payload),
-            )
-            try:
-                text = record.payload[:end].decode("utf-16-le")
-            except UnicodeDecodeError as exc:
-                raise CorruptScoreError("textRepeatText: malformed UTF-16LE text") from exc
-            if any((ord(c) < 32 and c not in "\t\r\n") or ord(c) in (0xFFFE, 0xFFFF) for c in text):
-                raise CorruptScoreError("textRepeatText: illegal literal character")
+            text = _repeat_literal(record.payload, "textRepeatText")
             out.append(Record("textRepeatText", attrs, "", {"rptText": text}))
+        elif record.tag == TAG_REPEAT_ENDING_TEXT:
+            text = _repeat_literal(record.payload, "repeatEndingText")
+            out.append(Record("repeatEndingText", attrs, "", {"rptText": text}))
         elif record.tag == TAG_SMART_SHAPE:
             out.append(_smart_shape(record.payload, attrs))
         elif record.tag == TAG_SMART_SHAPE_MEAS_MARK:
@@ -1514,6 +1504,23 @@ def _artic_def(payload: bytes) -> dict[str, str | tuple[str, ...] | Record | tup
         fields[f"{name}TopNote{unit}"] = str(_s16(payload, at))
         fields[f"{name}BotNote{unit}"] = str(_s16(payload, at + 2))
     return fields
+
+
+def _repeat_literal(payload: bytes, tag: str) -> str:
+    """Aligned, bounded Unicode repeat text; do not trim an authored label."""
+    if len(payload) % 2:
+        raise CorruptScoreError(f"{tag}: incomplete UTF-16LE code unit")
+    end = next(
+        (at for at in range(0, len(payload), 2) if payload[at : at + 2] == b"\0\0"),
+        len(payload),
+    )
+    try:
+        text = payload[:end].decode("utf-16-le")
+    except UnicodeDecodeError as exc:
+        raise CorruptScoreError(f"{tag}: malformed UTF-16LE text") from exc
+    if any((ord(c) < 32 and c not in "\t\r\n") or ord(c) in (0xFFFE, 0xFFFF) for c in text):
+        raise CorruptScoreError(f"{tag}: illegal literal character")
+    return text
 
 
 def _text_repeat_assign(

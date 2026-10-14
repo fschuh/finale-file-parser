@@ -1824,14 +1824,12 @@ def _append_barline(element: ET.Element, measure: Measure, location: str) -> Non
 
 
 def _ending_text(ending: Ending) -> str:
-    """What the bracket reads as: "1." for one pass, "1., 2." for several.
-
-    MusicXML takes the displayed text separately from `number`, and leaving it
-    empty makes a reader invent its own. Finale can store custom text
-    (`repeatEndingText`), which three corpus documents use and this does not
-    read; the derived form matches what the others display.
-    """
-    return ", ".join(f"{number}." for number in ending.numbers)
+    """The source label is independent of MusicXML's playback numbers."""
+    return (
+        ending.text
+        if ending.text is not None
+        else ", ".join(f"{number}." for number in ending.numbers)
+    )
 
 
 def _append_attributes(

@@ -118,6 +118,13 @@ other tag matches even once. See `enigma.repeats`."""
 TAG_REPEAT_ENDING_START = 204
 """`repeatEndingStart` — an ending bracket's detail record, keyed by measure."""
 
+TAG_REPEAT_ENDING_TEXT = 205
+"""Optional UTF-16LE `repeatEndingText`, sharing its bracket's measure key.
+
+Terra19/21 independently store 1./2. here while tag206 retains passes1,3/2,4;
+see ARCHITECTURE.md P13 for the source and primary API evidence.
+"""
+
 TAG_REPEAT_PASS_LIST = 206
 """`repeatPassList` — which passes an ending is taken on, keyed by measure.
 
