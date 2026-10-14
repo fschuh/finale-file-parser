@@ -1955,6 +1955,35 @@ no independently established suppression field was recovered in this task.
 Do not manufacture a half-note metric value or remove rhythmic dots to fit it.
 Authored chords confirm only the assigned member receives the fill override.
 
+#### Per-note cross-staff placement (2026-10-14, PDF review P03)
+
+Numeric detail1036 is the10-byte `crossStaff`/ETF CD entry detail: stable
+noteID u16+0, destination staff s16+2. Retain packed complete records and
+linked-part scope. Released RGP's CrossStaff constructor0x6714C establishes
+base+0x40/DataSize10; its vtable at0x6D3300 exposes Tag getter0x111B90
+(`edCD`) and size getter0x6B658. GetStaff0x67ABC reads signed+0x42.
+The [PDK](https://pdk.finalelua.com/class_f_c_cross_staff_mod.html) identifies
+this as the note's connected staff, separately from its stable noteID.
+`eeppd.txt` independently documents the per-note CROSSBIT0x10000000.
+Require that active flag and an unambiguous detail/note-ID join; unflagged
+retained modifications do not move notes. Missing/reserved destination staves,
+conflicting modifications and missing active attachments fail clearly.
+
+Steel Samurai has28 assigned bass-to-upper notes in21-24; Title Screen has
+two upper-to-lower notes107/108 in2. Their raw note flags agree with these
+details. Canonical `Event.cross_staff` stores per-pitch destination part IDs
+while retaining the source part, voice, spelled pitch, time and beam group.
+MusicXML bundles explicitly connected staff-parts, emits destination staff on
+only the assigned members, and keeps a common exported voice/beam group.
+An unassigned member of a mixed chord retains its original staff. Destination
+attachments can establish an otherwise resting staff's score membership.
+
+Both sources pass projection/XSD and isolated MuseScore4.7.5 import; actual
+Steel beam bridges and Title's changed staff destinations were visually checked.
+Their source attack comparisons remain unchanged. This native inspection also
+caught the separate P01 default-clef regression on Title's literal0 switch;
+that correction is tracked independently. Auxiliary rests remain P12 work.
+
 Tuplet number style is flag low-nibble at serialized+18; bracket style uses
 0x3000 there. RGP GetSymbolicNumber0x796E0 anchors base0x40 to existing+0,
 GetNumberStyle0x4DF7F6 and GetShapeStyle0x4DF80E read base+18. Zero/zero explicitly

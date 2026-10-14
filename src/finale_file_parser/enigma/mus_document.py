@@ -1914,11 +1914,11 @@ def _details_records(
                     fields=_staff_group(record.payload),
                 )
             )
-        elif record.tag in {1021, 1022, 1058}:
+        elif record.tag in {1021, 1022, 1036, 1058}:
             expected = 20 if record.tag == 1058 else 10
             if not record.payload or (
                 len(record.payload) % expected
-                if record.tag == 1058
+                if record.tag in {1036, 1058}
                 else len(record.payload) != expected
             ):
                 raise CorruptScoreError("entry display detail has an unsupported layout")
@@ -1950,6 +1950,11 @@ def _details_records(
                             else {}
                         ),
                     }
+                elif record.tag == 1036:
+                    fields = {
+                        "noteID": str(_u16(record.payload, at)),
+                        "staff": str(_s16(record.payload, at + 2)),
+                    }
                 else:
                     fields = {
                         "leftAdjust": str(_s16(record.payload, at)),
@@ -1958,9 +1963,12 @@ def _details_records(
                     }
                 out.append(
                     Record(
-                        tag={1021: "beamExtUp", 1022: "beamExtDown", 1058: "noteheadMod"}[
-                            record.tag
-                        ],
+                        tag={
+                            1021: "beamExtUp",
+                            1022: "beamExtDown",
+                            1036: "crossStaff",
+                            1058: "noteheadMod",
+                        }[record.tag],
                         attrs={
                             "entnum": str(entry_key(record)),
                             "inci": str(incidence),

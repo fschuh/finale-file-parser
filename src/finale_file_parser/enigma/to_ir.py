@@ -27,6 +27,7 @@ from finale_file_parser.enigma.clef import (
     clefs_by_measure,
     default_clefs,
 )
+from finale_file_parser.enigma.cross_staff import cross_staff_by_entry
 from finale_file_parser.enigma.document import EnigmaDocument, Record, field_int
 from finale_file_parser.enigma.expressions import (
     SCORE_WIDE_STAFF,
@@ -68,6 +69,7 @@ from finale_file_parser.ir import (
     Arpeggio,
     ArticulationPlayback,
     ClefChange,
+    CrossStaff,
     Event,
     Expression,
     Fermata,
@@ -162,6 +164,7 @@ def build_score(document: EnigmaDocument) -> Score:
     arpeggios = arpeggios_by_entry(document)
     parentheses = parentheses_by_entry(document)
     noteheads = noteheads_by_entry(document)
+    cross_staff = cross_staff_by_entry(document)
     assigned_entries: dict[EventPosition, int] = {}
     slur_positions: dict[tuple[int, int, int], list[SlurEndpoint]] = defaultdict(list)
     always_slash = slash_flagged_grace_notes(document)
@@ -212,6 +215,7 @@ def build_score(document: EnigmaDocument) -> Score:
                     parentheses=parentheses.get(entnum, ()),
                     articulation_playback=articulation_playback.get(entnum, ()),
                     noteheads=noteheads.get(entnum, ()),
+                    cross_staff=cross_staff.get(entnum, ()),
                 )
             )
 
@@ -253,7 +257,8 @@ def build_score(document: EnigmaDocument) -> Score:
     ):
         note_marks = tuple(replace(mark, offset=offset) for mark in note_dynamics[entry])
         expressions[staff, measure] = expressions.get((staff, measure), ()) + note_marks
-    staves = _ordered_staves(document, {staff for staff, _ in cells})
+    display_staves = {int(mark.part_id[1:]) for marks in cross_staff.values() for mark in marks}
+    staves = _ordered_staves(document, {staff for staff, _ in cells} | display_staves)
     keys = effective_keys(document)
     numbers = _measure_numbers(keys, cells)
     if len(staves) * len(numbers) > _MAX_SCORE_MEASURE_CELLS:
@@ -658,6 +663,7 @@ def _event(
     parentheses: tuple[Parenthesis, ...] = (),
     articulation_playback: tuple[ArticulationPlayback, ...] = (),
     noteheads: tuple[Notehead, ...] = (),
+    cross_staff: tuple[CrossStaff, ...] = (),
 ) -> Event:
     entry = read_entry(record)
     key = decode_key(key_raw)
@@ -711,6 +717,7 @@ def _event(
         parentheses=parentheses,
         articulation_playback=articulation_playback,
         noteheads=noteheads,
+        cross_staff=cross_staff,
     )
 
 

@@ -112,6 +112,7 @@ ENTRY_DETAIL_TAGS: dict[str, int] = {
     "beamExtUp": 1021,
     "beamExtDown": 1022,
     "noteheadMod": 1058,
+    "crossStaff": 1036,
 }
 """The detail records that hang off an *entry*, by the name `mus_document`
 gives them.

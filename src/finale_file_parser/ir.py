@@ -23,6 +23,7 @@ __all__ = [
     "Arpeggio",
     "Beam",
     "ClefChange",
+    "CrossStaff",
     "Ending",
     "Event",
     "Expression",
@@ -209,6 +210,14 @@ class Notehead:
 
 
 @dataclass(frozen=True)
+class CrossStaff:
+    """Draw one chord member on another staff, retaining its source voice/pitch."""
+
+    pitch_index: int
+    part_id: str
+
+
+@dataclass(frozen=True)
 class Event:
     """One note, chord, or rest.
 
@@ -307,6 +316,8 @@ class Event:
 
     noteheads: tuple[Notehead, ...] = ()
     """Per-pitch visual overrides; ordinary notes need no head modification."""
+
+    cross_staff: tuple[CrossStaff, ...] = ()
 
     @property
     def is_rest(self) -> bool:

@@ -1699,4 +1699,5 @@ def test_the_tag_map_names_the_raw_tags_the_adapter_reads() -> None:
         "beamExtUp": 1021,
         "beamExtDown": 1022,
         "noteheadMod": 1058,
+        "crossStaff": 1036,
     }

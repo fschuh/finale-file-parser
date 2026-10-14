@@ -77,6 +77,7 @@ class Note:
     tie_end: bool
     note_id: int = 0
     """Stable source identity within an entry; zero means absent, not a pitch index."""
+    cross_staff: bool = False
 
     @property
     def diatonic_step(self) -> int:
@@ -189,6 +190,7 @@ def _note(record: Record) -> Note:
         tie_start="tieStart" in record.fields,
         tie_end="tieEnd" in record.fields,
         note_id=_int(record.attrs.get("id", "0"), "note id"),
+        cross_staff="crossStaff" in record.fields,
     )
 
 

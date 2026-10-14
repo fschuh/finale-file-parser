@@ -429,6 +429,7 @@ def _append_part(
     octave_directions: _OctaveDirections | None = None,
     glissando_notations: _GlissandoNotations | None = None,
     line_directions: _LineDirections | None = None,
+    display_staves: dict[str, int] | None = None,
 ) -> None:
     element = ET.SubElement(root, "part", id=part.id)
     divisions = _divisions_for(part) if divisions is None else divisions
@@ -460,6 +461,7 @@ def _append_part(
             tremolo_notations=tremolos,
             glissando_notations=glissandi,
             lines=line_directions.get((part.id, measure.number), ()),
+            display_staves=display_staves,
         )
         first = False
 
@@ -491,6 +493,21 @@ def _staff_bundles(score: Score) -> tuple[tuple[Part, ...], ...]:
         for measure in part.measures:
             for voice in measure.voices:
                 for event in voice.events:
+                    if len({mark.pitch_index for mark in event.cross_staff}) != len(
+                        event.cross_staff
+                    ):
+                        raise ExportError("duplicate cross-staff note attachment")
+                    for placement in event.cross_staff:
+                        if (
+                            placement.part_id not in positions
+                            or not 0 <= placement.pitch_index < len(event.pitches)
+                        ):
+                            raise ExportError("invalid cross-staff note or destination part")
+                        first_index, last_index = sorted(
+                            (positions[part.id], positions[placement.part_id])
+                        )
+                        for index in range(first_index, last_index):
+                            joined[index] = True
                     for mark in event.arpeggios:
                         if not mark.part_ids:
                             continue
@@ -585,6 +602,7 @@ def _append_multistaff_part(
     octave_directions = _octave_directions(parts)
     glissando_notations = _glissando_notations(parts)
     next_voice = 1
+    display_staves = {part.id: staff for staff, part in enumerate(parts, start=1)}
     for staff, part in enumerate(parts, start=1):
         _append_part(
             temporary,
@@ -596,6 +614,7 @@ def _append_multistaff_part(
             slur_notations=slur_notations,
             octave_directions=octave_directions,
             glissando_notations=glissando_notations,
+            display_staves=display_staves,
         )
         voices = sorted({voice.number for measure in part.measures for voice in measure.voices})
         voice_ids = {str(voice): str(next_voice + index) for index, voice in enumerate(voices)}
@@ -624,9 +643,10 @@ def _assign_staff(part: ET.Element, staff: int, voices: dict[str, str]) -> None:
                     ),
                     len(element),
                 )
-                staff_element = ET.Element("staff")
-                staff_element.text = str(staff)
-                element.insert(at, staff_element)
+                if element.find("staff") is None:
+                    staff_element = ET.Element("staff")
+                    staff_element.text = str(staff)
+                    element.insert(at, staff_element)
             elif element.tag == "direction":
                 at = next(
                     (index for index, child in enumerate(element) if child.tag == "sound"),
@@ -1486,6 +1506,7 @@ def _append_measure(
     tremolo_notations: _TremoloNotations | None = None,
     glissando_notations: _GlissandoNotations | None = None,
     lines: tuple[_LineDirection, ...] = (),
+    display_staves: dict[str, int] | None = None,
 ) -> None:
     element = ET.SubElement(parent, "measure", number=str(measure.number))
     _append_barline(element, measure, "left")
@@ -1548,6 +1569,7 @@ def _append_measure(
                 arpeggio_numbers=numbers,
                 slurs=slurs,
                 octave_displacement=displacement,
+                display_staves=display_staves,
                 tremolo=(tremolo_notations or {}).get(
                     SlurEndpoint(measure.number, voice.number, event_index)
                 ),
@@ -1692,6 +1714,7 @@ def _append_event(
     octave_displacement: int = 0,
     tremolo: tuple[str, int] | None = None,
     glissandi: tuple[tuple[_GlissandoNotation, ...], ...] = (),
+    display_staves: dict[str, int] | None = None,
 ) -> None:
     if not voice.playback:
         event = replace(event, playback=False)
@@ -1740,6 +1763,14 @@ def _append_event(
             ornaments=tuple(mark for mark in event.ornaments if mark.pitch_index == index),
             tremolo=tremolo if not index else None,
             glissandi=glissandi[index] if glissandi else (),
+            display_staff=next(
+                (
+                    (display_staves or {}).get(mark.part_id)
+                    for mark in event.cross_staff
+                    if mark.pitch_index == index
+                ),
+                None,
+            ),
         )
 
 
@@ -1758,6 +1789,7 @@ def _append_note(
     ornaments: tuple[Ornament, ...] = (),
     tremolo: tuple[str, int] | None = None,
     glissandi: tuple[_GlissandoNotation, ...] = (),
+    display_staff: int | None = None,
 ) -> None:
     note = ET.SubElement(element, "note")
     if not event.visible:
@@ -1822,6 +1854,8 @@ def _append_note(
             ET.SubElement(note, "notehead", attributes).text = (
                 head.shape if head is not None and head.shape is not None else "normal"
             )
+    if display_staff is not None:
+        ET.SubElement(note, "staff").text = str(display_staff)
     # Schema order puts <beam> after <time-modification> and before
     # <notations>. Only on a chord's principal note: the beam belongs to the
     # stem, and the schema allows at most eight per note.
