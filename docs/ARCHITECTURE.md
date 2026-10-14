@@ -893,6 +893,23 @@ offsets out per record or era.
 
 ### Known format facts — the reserved staff 32767
 
+#### Active resting staves (2026-10-14, PDF review P02)
+
+The active score `instUsed` list establishes staff membership as well as
+ordering. Uncover's score list explicitly contains staves1/2 and its piano
+brace joins both, but only staff1 has a musical `gfhold`. Selecting parts
+solely from cells with entries discarded the real resting staff2 and shrank
+the brace. Keep listed resting staves and fill their existing measure range
+with the normal canonical measure rests. Stored `staffSpec` definitions alone
+do not establish active membership; linked-part lists and reserved32767
+remain separate. Staffs with music outside the list retain their placement.
+
+This expansion is bounded by1024 staves and1,000,000 staff/measure cells,
+before allocating complete parts or carried-clef grids. Repeated staff IDs
+in one active layout are rejected rather than emitted as duplicate XML parts.
+Authored C/D-score tests exercise resting and unused staves, score/part scope,
+clefs, measure rests, groups and malformed/allocation-boundary inputs.
+
 Every corpus document declares a staff numbered **32767** (0x7FFF, the sentinel the format also uses
 for "to the end" in `staffGroup.endMeas`). It is real data — its own `staffSpec`, a `gfhold` per
 measure, its own entries — but it is not part of the score:

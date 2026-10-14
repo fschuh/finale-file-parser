@@ -8,6 +8,8 @@ part-variant records that quietly double a group if they are not filtered out.
 
 from __future__ import annotations
 
+import pytest
+
 from finale_file_parser.enigma.document import (
     DetailsPool,
     EnigmaDocument,
@@ -19,7 +21,8 @@ from finale_file_parser.enigma.document import (
     TextsPool,
 )
 from finale_file_parser.enigma.groups import staff_groups, staff_order
-from finale_file_parser.enigma.to_ir import RESERVED_STAFF, _groups, _ordered_staves
+from finale_file_parser.enigma.models import CorruptScoreError
+from finale_file_parser.enigma.to_ir import RESERVED_STAFF, _groups, _ordered_staves, build_score
 
 EMPTY: tuple[Record, ...] = ()
 
@@ -198,6 +201,42 @@ def test_a_staff_with_music_but_no_slot_keeps_a_place() -> None:
     """It has notes; losing a part is worse than putting it last."""
     doc = document(others=inst_used(1, 2))
     assert _ordered_staves(doc, {1, 2, 7}) == [1, 2, 7]
+
+
+def test_active_resting_staff_keeps_its_source_position() -> None:
+    doc = document(others=inst_used(2, 1, RESERVED_STAFF))
+    assert _ordered_staves(doc, {1}) == [2, 1]
+
+
+def test_unused_staff_definition_is_not_an_active_resting_staff() -> None:
+    doc = document(others=(staff(1), staff(2)))
+    assert _ordered_staves(doc, {1}) == [1]
+
+
+def test_linked_part_layout_does_not_add_a_score_staff() -> None:
+    doc = document(others=inst_used(1) + inst_used(1, 2, part="1"))
+    assert _ordered_staves(doc, {1}) == [1]
+
+
+def test_layout_staff_allocation_is_bounded() -> None:
+    doc = document(others=inst_used(*range(1, 1026)))
+    with pytest.raises(CorruptScoreError, match="staff limit"):
+        _ordered_staves(doc, set())
+
+
+def test_empty_staff_measure_expansion_is_bounded() -> None:
+    measures = tuple(
+        Record("measSpec", {"cmper": str(number)}, "", {"beats": "4", "divbeat": "1024"})
+        for number in range(1, 1002)
+    )
+    doc = document(others=inst_used(*range(1, 1001)) + measures)
+    with pytest.raises(CorruptScoreError, match="expansion exceeds"):
+        build_score(doc)
+
+
+def test_repeated_layout_staff_does_not_duplicate_a_part() -> None:
+    with pytest.raises(CorruptScoreError, match="same staff twice"):
+        _ordered_staves(document(others=inst_used(1, 1)), {1})
 
 
 def test_ordering_falls_back_to_numeric_without_an_instrument_list() -> None:

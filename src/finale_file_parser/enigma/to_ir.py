@@ -27,7 +27,7 @@ from finale_file_parser.enigma.clef import (
     clefs_by_measure,
     default_clefs,
 )
-from finale_file_parser.enigma.document import EnigmaDocument, Record
+from finale_file_parser.enigma.document import EnigmaDocument, Record, field_int
 from finale_file_parser.enigma.expressions import (
     SCORE_WIDE_STAFF,
     expressions_by_measure,
@@ -92,6 +92,9 @@ __all__ = ["build_score"]
 
 _WHOLE_EDU = 4096
 _NO_TRANSPOSITION = StaffTransposition(interval=0, adjust=0)
+_MAX_SCORE_STAVES = 1024
+_MAX_SCORE_MEASURE_CELLS = 1_000_000
+"""Cap expansion of active but empty layout staves into complete measures."""
 
 _CLEF_ANCHORS = {
     ClefSign.G: (-10, 2),
@@ -249,6 +252,8 @@ def build_score(document: EnigmaDocument) -> Score:
     staves = _ordered_staves(document, {staff for staff, _ in cells})
     keys = effective_keys(document)
     numbers = _measure_numbers(keys, cells)
+    if len(staves) * len(numbers) > _MAX_SCORE_MEASURE_CELLS:
+        raise CorruptScoreError("score staff/measure expansion exceeds the cell limit")
     headers = first_page_tempos(document)
     if headers and numbers:
         where = SCORE_WIDE_STAFF, numbers[0]
@@ -522,14 +527,14 @@ def _carried_clefs(
 
 
 def _ordered_staves(document: EnigmaDocument, present: set[int]) -> list[int]:
-    """The staves carrying music, in the order the score lays them out.
+    """Musical and explicitly laid-out staves, in the source score's order.
 
-    `instUsed` gives that order, and it is not always ascending: 10 corpus
+    `instUsed` gives that order, including active staves resting throughout
+    the score. It is not always ascending: 10 corpus
     documents list their staves in an order the staff numbers do not follow, and
     sorting instead puts those parts down the page in the wrong places. Where
-    the document has no such list -- every `.mus`, whose equivalent record is
-    unidentified -- `staff_order` already falls back to numeric order, so this
-    changes nothing there.
+    the document has no such list, `staff_order` falls back to numeric order;
+    those stored definitions alone do not establish active resting parts.
 
     A staff with music but no slot in the list keeps a place, after the listed
     ones, rather than being dropped: it has notes, and losing a part is worse
@@ -537,7 +542,19 @@ def _ordered_staves(document: EnigmaDocument, present: set[int]) -> list[int]:
     document declares and none lays out.
     """
     order = staff_order(document)
-    wanted = present - {RESERVED_STAFF}
+    if len(set(order)) != len(order):
+        raise CorruptScoreError("score layout names the same staff twice")
+    has_layout = any(
+        "part" not in record.attrs
+        and field_int(record.attrs.get("inci")) is not None
+        and field_int(record.fields.get("inst")) is not None
+        for record in document.others.all_with("instUsed", 0)
+    )
+    # Numeric fallback order lists stored definitions, not active layout.
+    # Only an explicit score list establishes a resting staff's membership.
+    wanted = (present | (set(order) if has_layout else set())) - {RESERVED_STAFF}
+    if len(wanted) > _MAX_SCORE_STAVES:
+        raise CorruptScoreError("score exceeds the staff limit")
     listed = [staff for staff in order if staff in wanted]
     return listed + sorted(wanted - set(order))
 

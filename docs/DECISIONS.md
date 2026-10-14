@@ -10,6 +10,16 @@ and resolved ones **DECIDED**.
 
 ---
 
+## 2026-10-14 — DECIDED: active score layout retains resting staves
+
+The approved P02 task keeps staves explicitly present in the source score
+layout even when they have no entry cells. This restores Uncover's real
+resting bass staff while keeping stored unused definitions, linked-part
+layouts and reserved templates distinct. Existing canonical measure-rest,
+clef, naming and group logic applies, with explicit expansion bounds.
+Source print visibility remains the separate P08 task, and an empty musical
+staff is never deleted just to match a shorter MIDI or PDF version.
+
 ## 2026-10-14 — DECIDED: recover complete clef tables from unrecognized writers
 
 The approved PDF-review P01 investigation found real NotePad clef tables
