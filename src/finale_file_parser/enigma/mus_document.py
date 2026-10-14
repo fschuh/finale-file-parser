@@ -1048,6 +1048,13 @@ def _meas_expr_assign(
         "textExprID": str(_u16(slot, 0)),
         "staffAssign": str(_s16(slot, 8)),
     }
+    flags = _u16(slot, 10)
+    if flags & 0x4000:
+        fields["hidden"] = ""
+    if flags & 0x1000:
+        fields["noScoreAssignment"] = ""
+    if flags & 0x0800:
+        fields["noPartAssignment"] = ""
     for name, offset in (("horzEduOff", 2), ("horzEvpuOff", 4), ("vertOff", 6)):
         value = _s16(slot, offset)
         if value:

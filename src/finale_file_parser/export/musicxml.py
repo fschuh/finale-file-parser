@@ -292,7 +292,8 @@ def _append_default_tempo(root: ET.Element, score: Score) -> None:
         return
     initial = score.parts[0].measures[0].number if score.parts[0].measures else None
     if any(
-        expression.tempo is not None
+        expression.score_assignment
+        and expression.tempo is not None
         and expression.offset == 0
         and (expression.playback is None or expression.playback.kind == "tempo")
         for part in score.parts
@@ -342,7 +343,10 @@ def _append_default_swing(root: ET.Element, score: Score) -> None:
         return
     first = score.parts[0].measures[0]
     if any(
-        e.playback is not None and e.playback.kind == "swing" and e.offset == 0
+        e.score_assignment
+        and e.playback is not None
+        and e.playback.kind == "swing"
+        and e.offset == 0
         for part in score.parts
         for measure in part.measures
         if measure.number == first.number
@@ -1381,17 +1385,31 @@ def _append_expressions(element: ET.Element, measure: Measure, divisions: int) -
     """
     seen_swing = set()
     for expression in measure.expressions:
+        if not expression.score_assignment:
+            continue
         if expression.playback is not None and expression.playback.kind == "swing":
             identity = (
                 expression.offset,
                 expression.playback,
                 expression.score_wide,
                 expression.layer,
+                expression.visible,
             )
             if identity in seen_swing:
                 continue
             seen_swing.add(identity)
-        if expression.tempo is not None:
+        if not expression.visible:
+            direction = (
+                _append_tempo(element, expression.tempo)
+                if expression.tempo is not None
+                else ET.SubElement(element, "direction")
+            )
+            for kind in direction.findall("direction-type"):
+                direction.remove(kind)
+            kind = ET.Element("direction-type")
+            ET.SubElement(kind, "other-direction", {"print-object": "no"}).text = expression.text
+            direction.insert(0, kind)
+        elif expression.tempo is not None:
             direction = _append_tempo(element, expression.tempo)
         elif expression.playback is not None and expression.playback.kind == "swing":
             direction = ET.SubElement(element, "direction", placement="above")

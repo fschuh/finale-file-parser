@@ -268,7 +268,11 @@ def expressions_by_measure(
         if definition is None:
             continue
         offset = _offset(record)
-        if staff == SCORE_WIDE_STAFF and (measure, expr_id, offset) in on_a_staff:
+        if (
+            staff == SCORE_WIDE_STAFF
+            and (measure, expr_id, offset, "hidden" not in record.fields) in on_a_staff
+            and _score_assignment(record)
+        ):
             # The same expression is already placed on a real staff in this
             # measure, so the score-wide copy would print it twice. 102 of the
             # corpus's 746 list assignments are this shape.
@@ -298,9 +302,9 @@ def expressions_by_measure(
         # expression with neither is not a marking -- 461 corpus assignments
         # resolve to a definition with no text record and no naming description,
         # and a rehearsal mark whose style is unreadable has no label to print.
-        if not text and marking is None:
-            continue
         playback = _playback(definition)
+        if not text and marking is None and (playback is None or playback.kind == "none"):
+            continue
         if playback is not None and playback.kind == "swing":
             playback = replace(playback, beat_unit=swing_units.get(measure))
         out.setdefault((staff, measure), []).append(
@@ -317,6 +321,11 @@ def expressions_by_measure(
                 else None,
                 offset=offset,
                 playback=playback,
+                visible="hidden" not in record.fields
+                and not _empty_printed_text(document, definition, found),
+                score_assignment=_score_assignment(record),
+                part_assignment="noPartAssignment" not in record.fields
+                and record.fields.get("showStaffList") != "scoreOnly",
             )
         )
     return {where: tuple(items) for where, items in out.items()}
@@ -476,22 +485,44 @@ def _offset(record: Record) -> Fraction:
     return Fraction(edu, 4096)
 
 
-def _staffed(document: EnigmaDocument) -> set[tuple[int, int, Fraction]]:
+def _score_assignment(record: Record) -> bool:
+    mode = record.fields.get("showStaffList")
+    if mode is not None and (
+        not isinstance(mode, str) or mode not in {"", "scoreOnly", "partOnly"}
+    ):
+        raise CorruptScoreError("measExprAssign: unsupported showStaffList")
+    return (
+        "noScoreAssignment" not in record.fields
+        and record.fields.get("showStaffList") != "partOnly"
+    )
+
+
+def _empty_printed_text(document: EnigmaDocument, definition: Record, found: _Text | None) -> bool:
+    if found is not None:
+        return not found.printed and not found.is_rehearsal
+    block_id = field_int(definition.fields.get("textBlockID"))
+    if block_id == 0:
+        return True
+    block = document.others.get("textBlock", block_id) if block_id is not None else None
+    return block is not None and field_int(block.fields.get("textID")) == 0
+
+
+def _staffed(document: EnigmaDocument) -> set[tuple[int, int, Fraction, bool]]:
     """(measure, expression id) pairs already assigned to a real staff.
 
     A score expression is drawn once; where the document also assigns the same
     expression to a staff in that measure, the score-wide copy is redundant.
     """
-    out: set[tuple[int, int, Fraction]] = set()
+    out: set[tuple[int, int, Fraction, bool]] = set()
     for record in document.others.of_tag(_ASSIGN):
-        if "part" in record.attrs:
+        if "part" in record.attrs or not _score_assignment(record):
             continue
         staff = field_int(record.fields.get("staffAssign"))
         measure = field_int(record.attrs.get("cmper"))
         expr_id = field_int(record.fields.get("textExprID"))
         if staff is None or staff < 0 or measure is None or expr_id is None:
             continue
-        out.add((measure, expr_id, _offset(record)))
+        out.add((measure, expr_id, _offset(record), "hidden" not in record.fields))
     return out
 
 

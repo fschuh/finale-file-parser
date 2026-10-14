@@ -473,6 +473,11 @@ class Expression:
     playback: ExpressionPlayback | None = None
     page: int | None = None
     """Original page placement when a first-page tempo header is projected above the score."""
+    visible: bool = True
+    """Independent expression printing, including explicitly cleared source text."""
+    score_assignment: bool = True
+    part_assignment: bool = True
+    """Source assignment scope, independent of whether its symbol is hidden."""
 
 
 @dataclass(frozen=True)

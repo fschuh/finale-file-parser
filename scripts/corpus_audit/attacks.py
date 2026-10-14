@@ -129,7 +129,8 @@ def source_attacks(score: Score, *, linear_probe: bool = False) -> SourceAttacks
             for expression in parts[part.id][number].expressions:
                 control = expression.playback
                 if (
-                    control is not None
+                    expression.score_assignment
+                    and control is not None
                     and control.kind == "swing"
                     and (not control.pass_number or control.pass_number == visits[number])
                 ):

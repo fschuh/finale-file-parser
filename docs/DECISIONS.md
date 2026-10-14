@@ -10,6 +10,18 @@ and resolved ones **DECIDED**.
 
 ---
 
+## 2026-10-14 — DECIDED: hidden expressions retain independent playback
+
+P10 independently establishes assignment hidden/score/part bits and explicit
+cleared text references. Carry these facts in canonical Expression; suppress
+only source-ineligible printed symbols, preserve hidden active score controls,
+and exclude part-only controls from score execution without deleting source
+data. Keep intentionally independent staff assignments and do not use matching
+values as a dedup rule. P11's duplicated dynamics are already explained by
+these hidden flags, so no geometry guess is needed. Opening's extra accel.
+continuation remains a separate native-inference limitation, not a source
+drawing that can be deleted.
+
 ## 2026-10-14 — DECIDED: explicit pickup spacers and printed numbers stay separate
 
 P09 establishes legacy spacer incidences and simple decimal region numbering

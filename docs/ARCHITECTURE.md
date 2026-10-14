@@ -261,6 +261,57 @@ unmatched flags, as noted under "three things that are not invariants" below.
 
 ### Known format facts — pickup display and numbering (2026-10-14, P09)
 
+#### Expression printing and assignment scope (2026-10-14, P10/P11)
+
+Numeric177's complete24-byte assignment slots have their flag word at+10.
+FCExpression::GetID1A1824 reads object+38, anchoring serialized offset0;
+GetVisible1A3DEC inverts mask0x4000 at object+42(+10), while
+GetScoreAssignment1A201C and GetPartAssignment1A12E4 invert0x1000/0x0800.
+The [published FCExpression API](https://pdk.finalelua.com/class_f_c_expression.html)
+independently distinguishes visibility from score/part assignment. These bits
+are also separate from the previously established0x2000 shape-assignment bit.
+Normalized XML `hidden` and showStaffList=`scoreOnly`/`partOnly` have their
+published [musxdom factory meanings](https://github.com/openmusx/musxdom/blob/main/src/musx/factory/FieldPopulatorsOthers.cpp).
+Score-specific and linked-part records remain independent. Unsupported typed
+scope values raise a clear source error, including nonscalar values.
+
+Canonical Expression.visible, score_assignment and part_assignment retain
+these independent facts. Hidden expressions retain their typed controls and
+original rhythmic offsets; part-only assignments retain their source data but
+do not execute or print in the score. A hidden real-staff copy cannot swallow
+a visible staff-list copy in the pre-existing redundancy check. Swing display
+deduplication also distinguishes visibility. Intentionally independent real
+staff assignments remain distinct. Hidden controls serialize with standard
+other-direction print-object=no and independent sound; hidden explicit tempo
+keeps the prior rate projection, including untyped explicit metronomes.
+
+Air Man's expression61 names a pppp description and amplitude0, but its actual
+textBlock12 explicitly stores textID0 (numeric183+0). This is a cleared printed
+text, not a missing text record or permission to fall back to the unrelated
+expression section12. Preserve its mute instruction while suppressing the
+description-derived printed dynamic. An actually missing reference still keeps
+the prior description-based graded-symbol recovery. Explicitly resolved blank
+text is likewise distinct from unavailable text. Assigned typed controls with
+no printed text now survive as hidden controls instead of disappearing.
+
+Opening19's Coraggioso assignment has flags0x4200: its text is hidden and its
+tempo180 remains active. Battle's lower mp/ff/f at1/11/27 and Slider's lower f
+at1 also have the hidden bit; Slider's quarter-note-later offset is unchanged.
+The duplicated glyphs therefore need no coincident-position or value-dedup
+workaround (P11 reassessment). Native imports show only the intended upper
+dynamics. Four targeted projection/schema/native checks have unchanged attack
+comparisons; an authored native hidden-tempo fixture retains120BPM and an
+invisible Tempo object, with no printed mark. All105 scores build/project.
+
+**Native limit:** Opening's extra dashed continuation at16-19 is a synthesized
+GradualTempoChange from its correctly printed accel. at13. It is not an assigned
+source line at16-19. Its native MSCX records an accelerando span ending19; the
+standard XML contains accel. words and no such source bracket. Retain the
+legitimate words and separate this importer inference from P21 source geometry.
+The real visible graphical/custom lines retain their source endpoints (for
+example smartShape38 is within bar6); they are not deleted to hide the native
+continuation. No whole-source/PDF perfect-match claim follows from this fix.
+
 A legacy pickup is represented by a separate frame incidence containing
 startTime before the incidence containing its entries. This is the documented
 spacer mechanism in [musxdom's Frame](https://github.com/openmusx/musxdom/blob/main/src/musx/dom/Others.h)
