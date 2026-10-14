@@ -1633,6 +1633,10 @@ def _staff_spec(
     # FCStaff::GetHideMode uses moreFlags+44 in the independently evidenced
     # numeric 2011/2012 layouts. Older/DCL storage has different semantics.
     if decode_hide_mode and len(payload) in {84, 96}:
+        # GetShowTextRepeats independently maps instFlags+22 mask0x0200:
+        # this hides ending brackets/text repeats, not repeat bars/playback.
+        if _u16(payload, 22, order) & 0x0200:
+            fields["hideRepeats"] = ""
         mode = {0x4000: "score", 0x8000: "scoreParts", 0xC000: "cutaway"}.get(
             _u16(payload, 44, order) & 0xC000
         )

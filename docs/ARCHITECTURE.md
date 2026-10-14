@@ -1338,6 +1338,43 @@ measures ask for both.
 
 ### Known format facts — repeats
 
+#### Staff ending/text-repeat print policy (2026-10-14, PDF review P14)
+
+In the evidenced numeric84/96-byte staffSpec layouts, instFlags+22 mask0x0200
+means hideRepeats: hide ending brackets and text repeats, independently of
+repeat bars, staff hiding or playback. The [published staff API](https://pdk.finalelua.com/class_____f_c_staff_base.html)
+explicitly describes GetShowTextRepeats as this joint print setting.
+Read-only getter0x208B70 calls staff vtable+0x100 then inverts bit2 in the
+second byte; vtable6E4218 resolves that field accessor to0x10CD1C, which adds
+serialized0x16 to the version-specific storage. This independently anchors the
+mask and offset. GetShowRepeats0x20852C instead tests0x0040 in the same word:
+repeat-bar visibility is a separate policy and is not reinterpreted here.
+[musxdom Staff](https://github.com/openmusx/musxdom/blob/main/src/musx/dom/Staff.h)
+independently names hideRepeats as the endings/text setting.
+
+Spring Yard staff1 stores0x0000 and staff2 stores0x0600 at+22; the latter
+contains the proved0x0200 bit. Neither ending assignment8/11 sets topStaffOnly;
+the missing staff flag, rather than a value/label dedup rule, explains the
+extra lower brackets. Normalize hideRepeats in this known numeric layout and
+honor the typed XML field; linked-part definitions cannot hide score markings.
+Older/DCL layout or staff-style overrides are not inferred from this evidence.
+
+Append Ending.visible and apply the staff print policy to each staff's canonical
+ending endpoints and Navigation.visible. Keep ending pass lists, backward/
+forward repeats, text and navigation controls unchanged. MusicXML emits ending
+print-object=no for hidden copies. Independent parts retain their intentionally
+visible brackets. Shared XML parts merge only the differing print-object policy:
+the part-level bracket displays if any bundled source staff displays it. Other
+barline semantics must still match or export fails. MusicXML's shared bracket
+does not promise arbitrary below-staff positioning.
+
+Spring native rendering now omits the duplicate lower brackets, with unchanged
+reference comparison counts. Eight original MIT regressions and three authored
+native fixtures cover hidden lower copies, deliberately visible independent
+brackets, shared print selection and semantic conflict rejection. All105 source
+builds/projections pass; native imports retain music/repeats. The existing
+post-MIDI material and selective swing differences remain separate findings.
+
 #### Custom ending labels (2026-10-14, PDF review P13)
 
 Numeric tag205 contains aligned, zero-terminated UTF-16LE custom ending text,

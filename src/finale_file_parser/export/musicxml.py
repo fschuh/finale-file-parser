@@ -9,6 +9,7 @@ orderings, and is validated against the official W3C schema in the tests.
 
 from __future__ import annotations
 
+import copy
 import math
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass, replace
@@ -862,10 +863,18 @@ def _merge_staff_measures(
         other = {
             element.get("location", "right"): element for element in measure.findall("barline")
         }
-        if {key: ET.tostring(value) for key, value in other.items()} != {
-            key: ET.tostring(value) for key, value in barlines.items()
+        if {key: _barline_identity(value) for key, value in other.items()} != {
+            key: _barline_identity(value) for key, value in barlines.items()
         }:
             raise ExportError("connected staff parts have conflicting barlines")
+        # A shared part-level bracket prints when any source staff displays it.
+        # Hidden copies still carry the identical pass selection and timing.
+        for key, barline in other.items():
+            for selected, candidate in zip(
+                barlines[key].findall("ending"), barline.findall("ending"), strict=True
+            ):
+                if candidate.get("print-object") != "no":
+                    selected.attrib.pop("print-object", None)
     cursor = 0
     for measure in measures:
         if cursor:
@@ -889,6 +898,14 @@ def _merge_staff_measures(
         result.insert(0, barlines["left"])
     if "right" in barlines:
         result.append(barlines["right"])
+
+
+def _barline_identity(barline: ET.Element) -> bytes:
+    """Shared barline semantics exclude only independent bracket print policy."""
+    normalized = copy.deepcopy(barline)
+    for ending in normalized.findall("ending"):
+        ending.attrib.pop("print-object", None)
+    return ET.tostring(normalized)
 
 
 _DYNAMICS_PLACEMENT = "below"
@@ -1811,6 +1828,8 @@ def _append_barline(element: ET.Element, measure: Measure, location: str) -> Non
         ET.SubElement(barline, "bar-style").text = style
     for ending in endings:
         attrs = {"number": ",".join(str(n) for n in ending.numbers), "type": ending.type}
+        if not ending.visible:
+            attrs["print-object"] = "no"
         ET.SubElement(barline, "ending", attrs).text = _ending_text(ending)
     if repeat:
         attrs = {"direction": "forward" if left else "backward"}

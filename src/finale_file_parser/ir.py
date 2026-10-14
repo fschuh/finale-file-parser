@@ -385,6 +385,9 @@ class Ending:
     text: str | None = None
     """Explicit source label; None derives the pass list, empty preserves a blank."""
 
+    visible: bool = True
+    """Printed bracket visibility, independent of playable pass eligibility."""
+
 
 @dataclass(frozen=True)
 class ExpressionPlayback:

@@ -62,7 +62,7 @@ from finale_file_parser.enigma.repeats import Repeats, repeats_for
 from finale_file_parser.enigma.slurs import slurs_by_staff
 from finale_file_parser.enigma.smart_shapes import stale_smart_shapes
 from finale_file_parser.enigma.staff_playback import with_playback_scopes
-from finale_file_parser.enigma.staff_visibility import staff_hide_modes
+from finale_file_parser.enigma.staff_visibility import staff_hide_modes, staves_hiding_text_repeats
 from finale_file_parser.enigma.text import file_info, staff_names
 from finale_file_parser.enigma.timesig import TimeSignature as EnigmaTimeSignature
 from finale_file_parser.enigma.timesig import time_signatures
@@ -345,6 +345,7 @@ def build_score(document: EnigmaDocument) -> Score:
     clef_at = _carried_clefs(document, staves, numbers, clef_at, clef_changes)
     expressions = _place_score_wide(expressions, staves)
     hide_modes = staff_hide_modes(document)
+    hide_text_repeats = staves_hiding_text_repeats(document)
     labels, label_diagnostics = measure_labels(document, numbers)
     diagnostics += label_diagnostics
     spacer = _initial_pickup_spacer(document, cells, staves, numbers[0]) if numbers else Fraction(0)
@@ -378,6 +379,7 @@ def build_score(document: EnigmaDocument) -> Score:
                         clef_table=clef_table,
                         clef_at=clef_at,
                         clef_changes=clef_changes,
+                        show_text_repeats=staff not in hide_text_repeats,
                         repeats=repeats,
                         directions=directions,
                         barlines=barlines,
@@ -898,6 +900,7 @@ def _measure(
     navigation: dict[int, tuple[Navigation, ...]] | None = None,
     pedals: dict[tuple[int, int], tuple[Pedal, ...]] | None = None,
     clef_changes: dict[tuple[int, int], tuple[ClefPosition, ...]] | None = None,
+    show_text_repeats: bool = True,
 ) -> Measure:
     cell = cells.get((staff, number))
 
@@ -960,9 +963,14 @@ def _measure(
         repeat_forward=here.forward,
         repeat_backward=here.backward,
         repeat_passes=here.passes,
-        endings=here.endings,
+        endings=tuple(
+            replace(ending, visible=ending.visible and show_text_repeats) for ending in here.endings
+        ),
         repeat_playback=here.playback,
-        navigation=(navigation or {}).get(number, ()),
+        navigation=tuple(
+            replace(mark, visible=mark.visible and show_text_repeats)
+            for mark in (navigation or {}).get(number, ())
+        ),
     )
 
 

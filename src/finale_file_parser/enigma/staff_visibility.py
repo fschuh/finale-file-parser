@@ -23,3 +23,16 @@ def staff_hide_modes(document: EnigmaDocument) -> dict[int, HideMode]:
             raise CorruptScoreError("staffSpec: hideMode has no valid staff ID")
         result[staff] = _MODES[raw]
     return result
+
+
+def staves_hiding_text_repeats(document: EnigmaDocument) -> frozenset[int]:
+    """Explicit hideRepeats hides printed endings/text, never their playback."""
+    result = set()
+    for record in document.others.of_tag("staffSpec"):
+        if record.attrs.get("part", "0") != "0" or "hideRepeats" not in record.fields:
+            continue
+        staff = field_int(record.attrs.get("cmper"))
+        if staff is None:
+            raise CorruptScoreError("staffSpec: hideRepeats has no valid staff ID")
+        result.add(staff)
+    return frozenset(result)

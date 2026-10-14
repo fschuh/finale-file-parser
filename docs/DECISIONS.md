@@ -1,5 +1,20 @@
 # Decisions
 
+## 2026-10-14 — DECIDED: staff repeat printing does not disable navigation
+
+Honor proved staffSpec.hideRepeats by hiding each staff's canonical ending and
+navigation glyphs, while retaining their pass lists, text, barlines and playback
+rules. Append Ending.visible and use standard MusicXML print-object=no.
+Independent instrumental parts keep their own visible endings. When connected
+staves become one XML part, merge only ending print visibility, showing the
+part-level bracket if any source staff displays it; reject other differing
+barline semantics. Do not silently collapse arbitrary repeated brackets.
+
+Numeric instFlags+22 mask0200 is independently anchored by the staff getter;
+Spring Yard's lower staff stores it and its upper staff does not. This fixes
+the duplicated lower bracket. Older staff layouts, per-system staff styles and
+arbitrary shared-bracket placement still require separate source evidence.
+
 ## 2026-10-14 — DECIDED: explicit ending labels are independent of playback passes
 
 Append optional Ending.text to the canonical IR. Resolve the source
