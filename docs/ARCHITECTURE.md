@@ -3471,6 +3471,27 @@ P21/results.json and P21-fixture/run-5_ffwhb8 remains outside git. Authored MIT
 regressions cover resource joins, typed/binary parity, visibility/part gates,
 unknown commands, blank/default handling, hostile counts and allocation caps.
 
+#### PDF-review integration (2026-10-14)
+
+All22 approved source/compatibility tasks are addressed with their evidence
+gates retained. The final external audit on code64b8230 builds/exports/projects/
+schema-validates all105 MUS files and pairs all105 MIDIs. All210 input hashes
+and25 reviewed source-PDF hashes remain unchanged. Fresh native MSCX/MIDI/PDF
+sets parse for105 scores. MAP2 Overworld first exits-11 before its PDF; identical
+XML passes in a fresh process/profile. The manifest retains both attempts.
+The private outputs contain97 refreshed comparison cards; final visual checks
+are targeted checks plus the per-task reviews, not whole-PDF equivalence.
+
+make check2491passed/7skipped; check-full2491passed/177skipped. Licensed local
+repository-corpus fixtures are unavailable, so the external105 sweep is separate.
+83 pairs have zero raw attack residuals,17 retain differences and5 have unproved
+literal routes. Previously compared pair counts are unchanged; the added
+Vampire MIDI contributes646/0/0. Existing317 source-only/321 MIDI-only events
+remain visible. See [PDF_REVIEW_RECOVERY.md](PDF_REVIEW_RECOVERY.md) for task
+outcomes and remaining native/reference limits, including the newly flagged
+Spring27 source voice absent from the PDF. No performance-fitting deletion or
+navigation rule is introduced to make these counts vanish.
+
 #### Green Hill's written tie gap versus held MIDI (2026-10-12, R03)
 
 Green Hill Zone upper staff1/layer2/bar26 has contiguous F4 entries776,929,777.

@@ -1371,3 +1371,13 @@ provide a faithful standard-path rendering, so ship no importer-specific glyph,
 screenshot or artificial timing workaround. An exact source program retained
 in IR does not imply a PDF-perfect MusicXML render.
 
+# 2026-10-14: OPEN - Spring Yard's additional voice in the source and reference PDF
+
+Final refreshed review finds staff1/layer1 bar27 entries6368-6373, including
+the E5/F5/E5/D5 eighth-note run, in both the source and pre-fix XML. They have
+no per-entry ignore flags. The supplied PDF omits the full run. The earlier
+review's statement that only clefs, ending scope and beam grouping differ was
+too broad. An unproved layer/style/print-selection policy or reference version
+may explain it. Preserve the encoded notes and flag the discrepancy; do not
+deduce a deletion rule from the PDF or the reference MIDI's earlier ending.
+
