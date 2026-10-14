@@ -578,6 +578,10 @@ class Measure:
     repeat_playback: RepeatPlayback | None = None
     navigation: tuple[Navigation, ...] = ()
     pedals: tuple[Pedal, ...] = ()
+    leading_spacer: Fraction = Fraction(0)
+    """Explicit legacy pickup space, retained in source clocks but omitted in print."""
+    display_number: str | None = None
+    """Source printed label; empty means unnumbered, None means unspecified."""
 
 
 @dataclass(frozen=True)

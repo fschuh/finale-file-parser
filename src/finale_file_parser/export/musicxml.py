@@ -146,6 +146,7 @@ def to_musicxml(score: Score) -> bytes:
         ExportError: a duration has no MusicXML note type, or the divisions
             needed to express the score's durations exceed the guard.
     """
+    score = _pickup_display(score)
     root = ET.Element("score-partwise", version=MUSICXML_VERSION)
     _append_identification(root, score)
     if any(
@@ -178,10 +179,112 @@ def to_musicxml(score: Score) -> bytes:
     _append_default_tempo(root, score)
     _append_default_swing(root, score)
     append_navigation(root, score)
+    _append_measure_labels(root, bundles)
 
     ET.indent(root, space="  ")
     body = ET.tostring(root, encoding="unicode")
     return f'<?xml version="1.0" encoding="UTF-8"?>\n{_DOCTYPE}\n{body}\n'.encode()
+
+
+def _append_measure_labels(root: ET.Element, bundles: tuple[tuple[Part, ...], ...]) -> None:
+    for index, (xml_part, bundle) in enumerate(zip(root.findall("part"), bundles, strict=True)):
+        for xml, measure in zip(xml_part.findall("measure"), bundle[0].measures, strict=True):
+            if measure.leading_spacer:
+                xml.set("implicit", "yes")
+            if measure.display_number is not None:
+                # IDs keep source measure identity independent of the printed
+                # number (including repeated/unnumbered labels).
+                xml.set("id", f"source-measure-{index}-{measure.number}")
+                xml.set("number", measure.display_number or "0")
+                if not measure.display_number:
+                    xml.set("implicit", "yes")
+
+
+def _pickup_offset(value: Fraction, spacer: Fraction) -> Fraction:
+    if value == 0:
+        return value  # a measure-wide control still applies at the printed start
+    if value < spacer:
+        raise ExportError("a timed marking lies inside an omitted pickup spacer")
+    return value - spacer
+
+
+def _pickup_display(score: Score) -> Score:
+    """Project independently established spacers; retain the original IR clock."""
+    if not any(m.leading_spacer for p in score.parts for m in p.measures):
+        return score
+    offsets: dict[int, Fraction] = {}
+    for part in score.parts:
+        for measure in part.measures:
+            if measure.leading_spacer < 0:
+                raise ExportError("pickup spacer must not be negative")
+            if measure.number in offsets and offsets[measure.number] != measure.leading_spacer:
+                raise ExportError("score staves have conflicting pickup spacers")
+            offsets[measure.number] = measure.leading_spacer
+    parts = []
+    for part in score.parts:
+        measures = tuple(_pickup_measure(m) if m.leading_spacer else m for m in part.measures)
+        hairpins = tuple(
+            replace(
+                s,
+                start_offset=_pickup_offset(
+                    s.start_offset, offsets.get(s.start_measure, Fraction())
+                ),
+                end_offset=_pickup_offset(s.end_offset, offsets.get(s.end_measure, Fraction())),
+            )
+            for s in part.hairpins
+        )
+        octaves = tuple(
+            replace(
+                s,
+                start_offset=_pickup_offset(
+                    s.start_offset, offsets.get(s.start_measure, Fraction())
+                ),
+                end_offset=_pickup_offset(s.end_offset, offsets.get(s.end_measure, Fraction())),
+            )
+            for s in part.octave_shifts
+        )
+        lines = tuple(
+            replace(
+                s,
+                start_offset=_pickup_offset(
+                    s.start_offset, offsets.get(s.start_measure, Fraction())
+                ),
+                end_offset=_pickup_offset(s.end_offset, offsets.get(s.end_measure, Fraction())),
+            )
+            for s in part.lines
+        )
+        parts.append(
+            replace(part, measures=measures, hairpins=hairpins, octave_shifts=octaves, lines=lines)
+        )
+    return replace(score, parts=tuple(parts))
+
+
+def _pickup_measure(measure: Measure) -> Measure:
+    spacer = measure.leading_spacer
+    voices = []
+    for voice in measure.voices:
+        if voice.start_offset >= spacer:
+            voices.append(replace(voice, start_offset=voice.start_offset - spacer))
+        elif voice.start_offset == 0 and len(voice.events) == 1 and voice.events[0].is_measure_rest:
+            event = voice.events[0]
+            if event.duration <= spacer:
+                raise ExportError("pickup spacer consumes the whole resting measure")
+            voices.append(
+                replace(voice, events=(replace(event, duration=event.duration - spacer),))
+            )
+        else:
+            raise ExportError("a source note or written rest precedes the pickup spacer")
+    return replace(
+        measure,
+        voices=tuple(voices),
+        expressions=tuple(
+            replace(e, offset=_pickup_offset(e.offset, spacer)) for e in measure.expressions
+        ),
+        pedals=tuple(replace(e, offset=_pickup_offset(e.offset, spacer)) for e in measure.pedals),
+        clef_changes=tuple(
+            replace(e, offset=_pickup_offset(e.offset, spacer)) for e in measure.clef_changes
+        ),
+    )
 
 
 def _append_default_tempo(root: ET.Element, score: Score) -> None:
@@ -905,7 +1008,10 @@ def _hairpin_measure_positions(part: Part) -> dict[int, tuple[int, Fraction]]:
             ),
             default=Fraction(0),
         )
-        result[measure.number] = index, max(signature_length, written_length)
+        result[measure.number] = (
+            index,
+            max(signature_length - measure.leading_spacer, written_length),
+        )
     return result
 
 

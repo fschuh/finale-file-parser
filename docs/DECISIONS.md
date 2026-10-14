@@ -10,6 +10,17 @@ and resolved ones **DECIDED**.
 
 ---
 
+## 2026-10-14 — DECIDED: explicit pickup spacers and printed numbers stay separate
+
+P09 establishes legacy spacer incidences and simple decimal region numbering
+independently. Keep raw frame onsets/measure identities in canonical IR, carry
+the nonmusical printed spacer and displayed label separately, and translate
+only the MusicXML view. Ordinary delayed layers retain their delays. Do not
+trim bars from PDF/MIDI lengths or guess labels for unsupported numbering
+policies. Preserve note-index attachments, playback rules and all written notes;
+shorten only default measure-rest spans in the printed pickup. Source measure
+IDs make the audit independent of labels. Initial rest-print policy is separate.
+
 ## 2026-10-14 — DECIDED: explicit staff hiding is separate from retained music
 
 P08 establishes the score-hidden staff flag independently in the numeric

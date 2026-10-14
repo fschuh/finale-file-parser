@@ -1,5 +1,6 @@
 """Check written note multiplicity and timing across IR to MusicXML projection."""
 
+import re
 from collections import Counter
 from fractions import Fraction
 from xml.etree.ElementTree import Element
@@ -17,6 +18,7 @@ def check_projection(score: Score, xml: Element) -> dict[str, int]:
     for part in score.parts:
         for measure in part.measures:
             for voice in measure.voices:
+                spacer = measure.leading_spacer * 4
                 cursor = voice.start_offset * 4
                 for event in voice.events:
                     pitches = tuple(
@@ -38,11 +40,15 @@ def check_projection(score: Score, xml: Element) -> dict[str, int]:
                                 t for t, enabled in (("start", start), ("stop", stop)) if enabled
                             )
                         )
+                        onset = max(Fraction(0), cursor - spacer)
+                        duration = event.duration * 4
+                        if event.is_measure_rest and cursor < spacer:
+                            duration -= spacer - cursor
                         expected[
                             measure.number,
-                            cursor,
+                            onset,
                             pitch,
-                            event.duration * 4,
+                            duration,
                             event.is_grace,
                             bool(pitches) and not (event.playback and voice.playback),
                             flags,
@@ -52,7 +58,8 @@ def check_projection(score: Score, xml: Element) -> dict[str, int]:
     for xml_part in xml.findall("part"):
         divisions = 1
         for xml_measure in xml_part.findall("measure"):
-            number = int(xml_measure.get("number", "0"))
+            identity = re.fullmatch(r"source-measure-\d+-(\d+)", xml_measure.get("id", ""))
+            number = int(identity[1] if identity else xml_measure.get("number", "0"))
             cursor = previous = Fraction(0)
             for element in xml_measure:
                 if element.tag == "attributes":

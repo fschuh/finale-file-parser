@@ -259,6 +259,64 @@ retain their previous event-wide export behavior. A nonempty tuple of the wrong
 length raises `ExportError`. No pairing repair is attempted: the source can contain
 unmatched flags, as noted under "three things that are not invariants" below.
 
+### Known format facts — pickup display and numbering (2026-10-14, P09)
+
+A legacy pickup is represented by a separate frame incidence containing
+startTime before the incidence containing its entries. This is the documented
+spacer mechanism in [musxdom's Frame](https://github.com/openmusx/musxdom/blob/main/src/musx/dom/Others.h)
+and GFrameHoldContext::calcMinLegacyPickupSpacer (Entries.cpp): take the minimum
+spacer among populated layers/staves, including a zero from an unspaced real
+layer. Empty default-rest staves do not supply a real frame. The numeric/DCL
+adapters already merge these incidences; they now retain `legacySpacer` to
+distinguish that mechanism from an ordinary combined frame startTime delay.
+Do not infer a pickup merely because a first bar is incomplete or notes start
+late. Only the initial score measure receives the global printed spacer.
+
+Battle stores2048EDU and Maya/Koopa3584EDU in their real pickup frame spacers.
+Hikari instead encodes an actual1/4 opening meter and has no spacer; that
+construction is unchanged. The separate [FCMiscDocPrefs pickup duration](https://pdk.finalelua.com/class_f_c_misc_doc_prefs.html)
+is not a prerequisite for legacy pickups: its getter0x54745A reads object+80,
+allocated base3A, and the MI conversion table maps offset46 to preference71
+(numeric85), incidence0, word2. All four controls store0 there, consistent
+with the independently documented legacy-spacer mechanism.
+
+Canonical Measure.leading_spacer preserves the raw frame clock, and every
+written pitched event retains its original onset, metric duration and voice.
+The MusicXML view omits that nonmusical space from voice starts and timed
+attachments uniformly, shortening only generated whole-measure default rests.
+A real event before the spacer or a timed control inside it is an export error,
+not a clamp or deletion. Measure-wide offset0 controls still apply at the
+printed start. Hairpin/octave/custom-line endpoints share the translation;
+note-index slur/tremolo/glissando endpoints retain their identity. Source IR is
+immutable. The written-projection audit independently subtracts the explicit
+spacer and checks default-rest extent, as well as every pitched note/tie/cue.
+
+The Unicode measure-number-region body is numeric tag164, 350 bytes padded to
+360 in the record pool. FCMeasureNumberRegion's vtable0x6E21C8 allocation
+getter0x4B9962 selects object+1D6 for this era. GetStartMeasure4BCD46,
+GetEndMeasure4BCD8C and GetStartNumber4BCDD6 independently establish offsets
+140,142(exclusive),150(stored numberOffset, display adds1). Start character,
+base, prefix, suffix and flags are at144(u16),148(u16),152/248(96-byte Unicode
+arrays),344(u16). Their getters and decimal/time policy are separately visible
+in the SDK disassembly. Only this exact body is decoded; older/newer region
+layouts remain raw. All four controls select measures2..999 with decimal
+character48/base10/offset0/flags0x82 and empty affixes, independently proving
+the first full bar's printed1. Exotic styles/affixes/time policies remain
+diagnostics rather than inferred decimal labels; region count is capped256.
+
+measSpec's common flag word+10 mask0x1000 is `noMeasNum`: FCMeasure's
+GetIncludeInNumbering28AA2E inverts that bit through the already established
+MeFlag pointer. Excluded measures do not advance a region's counter. First
+matching source region wins, matching the published region-selection rule.
+Canonical display_number is independent of the source measure identity;
+MusicXML number/implicit print the label, while unique source-measure IDs keep
+the audit's original numbering. Navigation actions still use the original
+identities before final label serialization. Bundling and source timing remain
+unchanged. Native authored fixtures show pickup attacks at0 and1/2q versus
+ordinary delayed attacks at3 and7/2q. Four target source/projection/schema/native
+checks and the105-file build/projection smoke pass with unchanged source/MIDI
+attack counts. Initial default-rest visibility remains the separate P12 policy.
+
 ### Known format facts — clefs
 
 #### Explicit staff hiding (2026-10-14, PDF review P08)

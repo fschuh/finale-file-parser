@@ -705,6 +705,7 @@ def _rows_others(rows: MusRows, frames: dict[int, tuple[int, int, int | None]]) 
             }
             if start_time is not None:
                 fields[_FRAME_START_TIME] = str(start_time)
+                fields["legacySpacer"] = ""
             out.append(Record(tag="frameSpec", attrs=attrs, text="", fields=fields))
     return out
 
@@ -1209,7 +1210,26 @@ def _others_records(
             # A part-variant record; `part` absent means the score record, which
             # is the convention every downstream module filters on.
             attrs["part"] = str(record.part)
-        if record.tag == TAG_CLEF_ENUM:
+        if record.tag == 164 and len(record.payload) == 360:
+            # FCMeasureNumberRegion's Unicode350-byte body plus row padding;
+            # allocation/getter offsets are independently documented in ARCH.
+            out.append(
+                Record(
+                    "measNumbRegion",
+                    attrs,
+                    "",
+                    {
+                        "startMeas": str(_u16(record.payload, 140)),
+                        "endMeas": str(_u16(record.payload, 142)),
+                        "startChar": str(_u16(record.payload, 144)),
+                        "base": str(_u16(record.payload, 148)),
+                        "offset": str(_s16(record.payload, 150)),
+                        "numberFlags": str(_u16(record.payload, 344)),
+                        "hasAffixes": str(int(any(record.payload[152:344]))),
+                    },
+                )
+            )
+        elif record.tag == TAG_CLEF_ENUM:
             out.extend(_clef_enums(record.payload, attrs))
         elif record.tag == TAG_FONT_NAME:
             if len(record.payload) <= 12:
@@ -1335,6 +1355,7 @@ def _others_records(
                 }
                 if start_time is not None:
                     frame_fields[_FRAME_START_TIME] = str(start_time)
+                    frame_fields["legacySpacer"] = ""
                 out.append(Record(tag="frameSpec", attrs=attrs, text="", fields=frame_fields))
         elif record.tag == 230:
             if len(record.payload) != 48:
@@ -1655,7 +1676,10 @@ def _meas_spec(
         # nibble came out {0, 4, 6, 8, 12} where every little-endian file shows
         # {1, 2} -- normal and double -- and where those same documents show
         # {1, 2} at +11.
-        flags = _u16(payload, _MEAS_FLAGS, order) & 0xFF
+        word = _u16(payload, _MEAS_FLAGS, order)
+        if word & 0x1000:
+            fields["noMeasNum"] = ""
+        flags = word & 0xFF
         for name, bit in _MEAS_REPEAT_BITS.items():
             if flags & bit:
                 # Written as a bare presence, matching the `.musx`, where these

@@ -47,6 +47,7 @@ from finale_file_parser.enigma.lines import lines_by_staff
 from finale_file_parser.enigma.location import effective_keys, locate_entries
 from finale_file_parser.enigma.lyrics import Lyric as EnigmaLyric
 from finale_file_parser.enigma.lyrics import lyrics_by_entry
+from finale_file_parser.enigma.measure_numbers import measure_labels
 from finale_file_parser.enigma.models import CorruptScoreError
 from finale_file_parser.enigma.music import Note, read_entry
 from finale_file_parser.enigma.note_dynamics import dynamics_by_entry
@@ -344,6 +345,9 @@ def build_score(document: EnigmaDocument) -> Score:
     clef_at = _carried_clefs(document, staves, numbers, clef_at, clef_changes)
     expressions = _place_score_wide(expressions, staves)
     hide_modes = staff_hide_modes(document)
+    labels, label_diagnostics = measure_labels(document, numbers)
+    diagnostics += label_diagnostics
+    spacer = _initial_pickup_spacer(document, cells, staves, numbers[0]) if numbers else Fraction(0)
     diagnostics += tuple(
         ScoreDiagnostic(
             "staff-cutaway-geometry",
@@ -363,22 +367,26 @@ def build_score(document: EnigmaDocument) -> Score:
             if staff in names
             else f"Staff {staff}",
             measures=tuple(
-                _measure(
-                    staff=staff,
-                    number=number,
-                    previous=numbers[index - 1] if index else None,
-                    cells=cells,
-                    keys=keys,
-                    signatures=signatures,
-                    clef_table=clef_table,
-                    clef_at=clef_at,
-                    clef_changes=clef_changes,
-                    repeats=repeats,
-                    directions=directions,
-                    barlines=barlines,
-                    expressions=expressions,
-                    navigation=navigation,
-                    pedals=pedals,
+                replace(
+                    _measure(
+                        staff=staff,
+                        number=number,
+                        previous=numbers[index - 1] if index else None,
+                        cells=cells,
+                        keys=keys,
+                        signatures=signatures,
+                        clef_table=clef_table,
+                        clef_at=clef_at,
+                        clef_changes=clef_changes,
+                        repeats=repeats,
+                        directions=directions,
+                        barlines=barlines,
+                        expressions=expressions,
+                        navigation=navigation,
+                        pedals=pedals,
+                    ),
+                    leading_spacer=spacer if index == 0 else Fraction(0),
+                    display_number=labels.get(number),
                 )
                 for index, number in enumerate(numbers)
             ),
@@ -406,6 +414,31 @@ def build_score(document: EnigmaDocument) -> Score:
         + _navigation_diagnostics(tuple(parts)),
         playback=playback_preferences(document),
     )
+
+
+def _initial_pickup_spacer(
+    document: EnigmaDocument, cells: dict[tuple[int, int], _Cell], staves: list[int], number: int
+) -> Fraction:
+    frames = {
+        int(r.attrs["cmper"])
+        for r in document.others.of_tag("frameSpec")
+        if r.attrs.get("part", "0") == "0"
+        and "startTime" in r.fields
+        and ("legacySpacer" in r.fields or not {"startEntry", "endEntry"}.intersection(r.fields))
+    }
+    refs = {
+        (int(r.attrs["cmper1"]), layer): field_int(r.fields.get(f"frame{layer}"))
+        for r in document.details.of_tag("gfhold")
+        if r.attrs.get("part", "0") == "0" and int(r.attrs["cmper2"]) == number
+        for layer in range(1, 5)
+    }
+    starts = [
+        cell.start_times.get(layer, 0) if refs.get((staff, layer)) in frames else 0
+        for (staff, measure), cell in cells.items()
+        if staff in staves and measure == number
+        for layer in cell.events_by_layer
+    ]
+    return Fraction(min(starts, default=0), _WHOLE_EDU)
 
 
 def _entry_attachment_offsets(
