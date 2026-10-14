@@ -10,6 +10,17 @@ and resolved ones **DECIDED**.
 
 ---
 
+## 2026-10-14 — DECIDED: recover complete clef tables from unrecognized writers
+
+The approved PDF-review P01 investigation found real NotePad clef tables
+being skipped because the application banner supplies no supported year.
+Read independently evidenced full eighteen-definition tables in their known
+324/360-byte layouts while preserving known-era precedence. Partial unknown
+layouts stay unresolved, score/part scope remains distinct, and no default
+clefs or application versions are inferred from pitch or copyright text.
+The canonical clef and MusicXML paths consume the recovered source table
+unchanged. Evidence and allocation bounds are documented in ARCHITECTURE.md.
+
 ## 2026-10-11 — DECIDED: report wholly out-of-score shapes as stale source records
 
 **Context.** Assigned shapes refer entirely to bars beyond the current score

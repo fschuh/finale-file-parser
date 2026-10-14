@@ -223,11 +223,22 @@ no equivalent of. A distinct value is better than a plausible-looking lie."""
 _CLEF_ENTRY_STRIDE = {2011: 18, 2012: 20}
 """Bytes per clef-table entry, by the banner year that wrote the file.
 
-The two eras lay the entry out differently, and the file says which it is --
-the same era split `mus_payload` already uses to choose a codec. Deriving the
-stride from the payload length instead would need the entry count assumed, and
-324 and 360 are both divisible by 18 and 20, so the ambiguity is real.
+The two eras lay the entry out differently. A recognized writer also resolves
+partial tables: 360 bytes alone could be twenty legacy entries or eighteen
+Unicode entries. Unrecognized writers use only the independently established
+complete eighteen-definition layouts below.
 """
+
+_COMPLETE_CLEF_TABLE_STRIDES = {18 * 18: 18, 18 * 20: 20}
+"""Full eighteen-definition tables for writers with an unrecognized banner.
+
+NotePad's 324/360-byte tables have the same layouts as recognized Finale
+files, including byte-identical controls. This is not a variable-count length
+guess: partial tables without a known writer retain their unknown layout.
+See ARCHITECTURE, NotePad clef tables.
+"""
+_MAX_CLEF_DEFINITIONS = 256
+"""Bound file-driven table allocation; the observed full table has eighteen."""
 
 _CLEF_FIELD_OFFSETS = {
     18: {"adjust": 0, "clefChar": 2, "clefYDisp": 4, "shapeID": 8},
@@ -637,6 +648,8 @@ def _rows_options(rows: MusRows) -> list[Record]:
         # means this is not the table after all. Emit nothing rather than a
         # mis-strided one, which would produce plausible wrong clefs.
         return out
+    if len(record.payload) // _ROWS_CLEF_STRIDE > _MAX_CLEF_DEFINITIONS:
+        raise CorruptScoreError("clef table exceeds the definition limit")
     definitions = tuple(
         _clef_def(record.payload[at : at + _ROWS_CLEF_STRIDE], _ROWS_CLEF_STRIDE, rows.byte_order)
         for at in range(0, len(record.payload), _ROWS_CLEF_STRIDE)
@@ -805,17 +818,21 @@ def _options_records(records: tuple[MusOther, ...], year: int | None) -> list[Re
     playback = _playback_options(records)
     if playback is not None:
         out.append(playback)
-    stride = _CLEF_ENTRY_STRIDE.get(year or 0)
-    if stride is None:
-        return out
     for record in records:
-        if record.tag != TAG_CLEF_OPTIONS or record.cmper != OPTIONS_CMPER:
+        if record.tag != TAG_CLEF_OPTIONS or record.cmper != OPTIONS_CMPER or record.part:
+            continue
+        stride = _CLEF_ENTRY_STRIDE.get(year or 0) or _COMPLETE_CLEF_TABLE_STRIDES.get(
+            len(record.payload)
+        )
+        if stride is None:
             continue
         if not record.payload or len(record.payload) % stride:
             # The era says how wide an entry is; a payload that is not a whole
             # number of them means one of the two is wrong. Emit no table rather
             # than a mis-strided one, which would produce plausible wrong clefs.
             continue
+        if len(record.payload) // stride > _MAX_CLEF_DEFINITIONS:
+            raise CorruptScoreError("clef table exceeds the definition limit")
         definitions = tuple(
             _clef_def(record.payload[at : at + stride], stride)
             for at in range(0, len(record.payload), stride)

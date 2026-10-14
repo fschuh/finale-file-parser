@@ -317,13 +317,81 @@ def test_skips_a_clef_table_that_is_not_a_whole_number_of_entries(
     assert clef_definitions(read_mus_document(PATH)) == {}
 
 
-def test_skips_the_clef_table_when_the_era_is_unknown(pools: Callable[..., None]) -> None:
-    """No banner year means no way to know the entry width."""
+def test_skips_a_partial_clef_table_when_the_era_is_unknown(pools: Callable[..., None]) -> None:
+    """Only complete eighteen-definition tables establish an unknown writer's layout."""
     pools(
         others=(MusOther(TAG_CLEF_OPTIONS, OPTIONS_CMPER, 0, clef_entry(18, -10, 38, -6)),),
         year=None,
     )
     assert clef_definitions(read_mus_document(PATH)) == {}
+
+
+@pytest.mark.parametrize("stride", [18, 20])
+@pytest.mark.parametrize("year", [None, 2006])
+def test_complete_clef_table_survives_an_unrecognized_writer(
+    pools: Callable[..., None], stride: int, year: int | None
+) -> None:
+    """Authored C4 on a bass staff tests the table-to-IR-to-XML path.
+
+    The fixture is original test data under the repository's MIT license;
+    no external score or binary table is copied.
+    """
+    defs = [clef_entry(stride, -10, 38, -6) for _ in range(18)]
+    defs[3] = clef_entry(stride, 2, 63, -2)
+    defs[16] = clef_entry(stride, -10, 0, 0, shape=9)
+    pools(
+        year=year,
+        others=(
+            MusOther(TAG_CLEF_OPTIONS, OPTIONS_CMPER, 0, b"".join(defs)),
+            MusOther(FRAME_SPEC, 1, 0, entry_pair(1, 1)),
+            MusOther(MEAS_SPEC, 1, 0, meas_spec_payload(200, 0, 1, 1024)),
+            MusOther(MEAS_SPEC, 2, 0, meas_spec_payload(200, 0, 1, 1024)),
+        ),
+        details=(MusDetailRecord(GFHOLD, 1, 1, 0, gfhold_payload(3, 1)),),
+        entries=(
+            Record(
+                "entry",
+                {"entnum": "1", "prev": "0", "next": "0"},
+                "",
+                {
+                    "dura": "1024",
+                    "numNotes": "1",
+                    "note": Record("note", {}, "", {"harmLev": "0", "harmAlt": "0"}),
+                },
+            ),
+        ),
+    )
+    document = read_mus_document(PATH)
+    table = clef_definitions(document)
+    assert len(table) == 18
+    assert table[3].sign is ClefSign.F
+    assert table[3].adjust == 2
+    assert table[16].shape_id == 9
+    score = build_score(document)
+    assert [(m.clef_sign, m.clef_line) for m in score.parts[0].measures] == [
+        ("F", 4),
+        (None, None),
+    ]
+    assert score.parts[0].measures[1].voices[0].events[0].is_measure_rest
+    xml = DET.fromstring(to_musicxml(score))
+    assert xml.findtext("part/measure/attributes/clef/sign") == "F"
+    assert xml.findtext("part/measure/note/pitch/step") == "C"
+
+
+def test_linked_part_clef_table_does_not_override_the_score(pools: Callable[..., None]) -> None:
+    pools(
+        others=(
+            MusOther(TAG_CLEF_OPTIONS, OPTIONS_CMPER, 1, clef_entry(18, 2, 63, -2)),
+            MusOther(TAG_CLEF_OPTIONS, OPTIONS_CMPER, 0, clef_entry(18, -10, 38, -6)),
+        )
+    )
+    assert clef_definitions(read_mus_document(PATH))[0].sign is ClefSign.G
+
+
+def test_clef_table_allocation_is_bounded(pools: Callable[..., None]) -> None:
+    pools(others=(MusOther(TAG_CLEF_OPTIONS, OPTIONS_CMPER, 0, clef_entry(18, -10, 38, -6) * 257),))
+    with pytest.raises(CorruptScoreError, match="clef table exceeds"):
+        read_mus_document(PATH)
 
 
 def tuplet_payload(sym_num: int, sym_dur: int, ref_num: int, ref_dur: int) -> bytes:

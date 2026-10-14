@@ -261,6 +261,27 @@ unmatched flags, as noted under "three things that are not invariants" below.
 
 ### Known format facts — clefs
 
+#### NotePad clef tables (2026-10-14, PDF review P01)
+
+An unrecognized application banner does not mean the score lacks its clef
+definitions. NotePad 2006's Simone file stores numeric tag109, cmper65534,
+score part0, with eighteen 18-byte definitions (324 bytes). NotePad's
+2000-2012 banner in Spring stores eighteen 20-byte definitions (360 bytes).
+The latter complete payload is byte-identical to the recognized Finale2012
+Uncover control (SHA256 `4b44528ec5d02c6c05447fa730694b8360b5a442f6da10f935f037ee0d333f11`).
+Their resolved definitions agree with the existing legacy/Unicode field
+layouts, including index3's bass character63, adjust2 and displacement-2.
+Finale's [Clef Designer](https://usermanuals.finalemusic.com/Finale2012Win/Content/Finale/SMCLFDLG.htm)
+also documents eighteen customizable definitions.
+
+Use those two complete-table lengths as a bounded layout fallback when the
+writer's banner supplies no supported era. Partial tables still require a
+known era; no default glyph is invented, and custom/shape definitions survive.
+Known-era layouts retain precedence. Linked-part tables cannot replace the
+score's table, and definition allocations are capped at256 in both containers.
+This corrects missing IR/XML clefs without changing the header's version
+evidence or interpreting copyright years as application versions.
+
 Enigma keeps a document-wide table of clef definitions (`clefOptions.clefDef`, **18 entries in every
 corpus document**) and refers to them by index. Two things carry an index:
 
