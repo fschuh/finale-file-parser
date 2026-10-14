@@ -2434,6 +2434,33 @@ corpus counts above are not remeasured: the licensed corpus is absent here.
 
 ### Assigned octave SmartShapes (2026-10-11)
 
+#### Cursor-timed MusicXML spans (2026-10-14, PDF review P18)
+
+The source octave data and performed XML pitches were already correct. Emitting
+both same-bar direction endpoints before the notes, using only direction
+offsets, exposes an importer pitch/line timing discrepancy: 1UP's native15ma
+became zero-length even though the XML stop was at3q. The published
+[MuseScore4.6.5 first-pass direction parser](https://github.com/musescore/MuseScore/blob/v4.6.5/src/importexport/musicxml/internal/musicxml/import/importmusicxmlpass1.cpp)
+uses the current cursor for octave shifts and skips direction offsets. Isolated
+checks of the user's4.7.5 runtime reproduce that behavior. This older source
+inspection is corroboration, not a claim to have retrieved its exact4.7.5 code.
+
+Serialize each octave endpoint at its actual cursor time with standard forward
+elements and zero relative offset, then back up to zero before writing the
+original voices. The excursion introduces no rests/notes and changes no event
+onset or elapsed measure time. Keep the existing inclusive source endpoints,
+number allocation, performed note spelling, source transposition and stop
+conversion. Direction instants remain cursor+offset, not offset alone; tests
+independently read them that way, including cross-bar and projected staff cases.
+Reject out-of-order octave cursor targets rather than writing a negative gap.
+
+Native1UP now has a real0..3q15ma and lower written E4/G4/E5/C5/D5/G5, while
+its six MIDI pitches88/91/100/96/98/103, onsets, lengths and225BPM marking
+remain unchanged. Original native fixtures render/play both positive and
+negative two-octave spans (C4 written, C6/C2 sounding) correctly. All105 source
+builds/projections and the authored check suite pass. This is standard export
+ordering compatibility; no register-only respelling or tempo substitution.
+
 The Finale PDK `FCSmartShape` enum identifies type 4 as octave down, 5 as
 octave up, 20 as two octaves down and 21 as two octaves up. These types use the
 same measure/staff/EDU termination segments as hairpins, with 4096 EDU per whole

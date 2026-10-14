@@ -1151,7 +1151,19 @@ def _octave_directions(parts: tuple[Part, ...]) -> _OctaveDirections:
 def _append_octaves(
     element: ET.Element, directions: tuple[_OctaveDirection, ...], divisions: int
 ) -> None:
+    """Place shifts at their real cursor times, then rewind before note voices.
+
+    This standard serialization also supports importers whose pitch pass
+    ignores direction offsets. It adds no notes, rests or elapsed score time.
+    """
+    cursor = 0
     for mark in directions:
+        target = _duration_in_divisions(mark.offset, divisions)
+        if target < cursor:
+            raise ExportError("octave directions must follow their musical positions")
+        if target > cursor:
+            ET.SubElement(ET.SubElement(element, "forward"), "duration").text = str(target - cursor)
+            cursor = target
         direction = ET.SubElement(element, "direction", placement=mark.placement)
         ET.SubElement(
             ET.SubElement(direction, "direction-type"),
@@ -1160,9 +1172,9 @@ def _append_octaves(
             size=mark.size,
             number=mark.number,
         )
-        ET.SubElement(direction, "offset", sound="yes").text = str(
-            _duration_in_divisions(mark.offset, divisions)
-        )
+        ET.SubElement(direction, "offset", sound="yes").text = "0"
+    if cursor:
+        ET.SubElement(ET.SubElement(element, "backup"), "duration").text = str(cursor)
 
 
 def _hairpin_directions(parts: tuple[Part, ...]) -> _HairpinDirections:

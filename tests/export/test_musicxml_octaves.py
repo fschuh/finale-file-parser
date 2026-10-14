@@ -2,6 +2,7 @@
 
 from dataclasses import replace
 from fractions import Fraction
+from xml.etree.ElementTree import Element
 
 import pytest
 from defusedxml import ElementTree as DET
@@ -22,6 +23,28 @@ from finale_file_parser.ir import (
 
 NOTE = Event(Fraction(1, 4), Fraction(1, 4), (Pitch("C", 4, 1), Pitch("E", 4, 0)))
 GRACE = replace(NOTE, duration=Fraction(0), written_duration=Fraction(1, 8), is_grace=True)
+
+
+def _octave_positions(root: Element) -> list[Fraction]:
+    """Read actual cursor plus offset, independently of how directions were written."""
+    result = []
+    divisions = 1
+    for measure in root.findall(".//part/measure"):
+        cursor = Fraction(0)
+        for element in measure:
+            if element.tag == "attributes":
+                divisions = int(element.findtext("divisions", str(divisions)))
+            elif element.tag in {"forward", "backup"}:
+                duration = Fraction(element.findtext("duration", "0")) / divisions
+                cursor += duration if element.tag == "forward" else -duration
+            elif (
+                element.tag == "direction"
+                and element.find("direction-type/octave-shift") is not None
+            ):
+                result.append(cursor + Fraction(element.findtext("offset", "0")) / divisions)
+            elif element.tag == "note" and element.find("chord") is None:
+                cursor += Fraction(element.findtext("duration", "0")) / divisions
+    return result
 
 
 def _part(span: OctaveShift, *, events: tuple[Event, ...] = (NOTE,) * 4) -> Part:
@@ -47,14 +70,14 @@ def test_performed_xml_pitches_change_once_and_ir_spelling_remains_written(
     assert [p.octave for p in part.measures[0].voices[0].events[1].pitches] == [4, 4]
     marks = root.findall(".//octave-shift")
     assert [(m.get("type"), m.get("size")) for m in marks] == [(kind, size), ("stop", size)]
-    assert [e.text for e in root.findall(".//direction/offset")] == ["1", "3"]
+    assert _octave_positions(root) == [Fraction(1), Fraction(3)]
 
 
 def test_point_span_covers_graces_and_anchor_but_not_the_following_attack() -> None:
     part = _part(OctaveShift(-1, 1, Fraction(0), 1, Fraction(0)), events=(GRACE, NOTE, NOTE))
     root = DET.fromstring(to_musicxml(Score(parts=(part,))))
     assert [n.text for n in root.findall(".//note/pitch/octave")] == ["3", "3", "3", "3", "4", "4"]
-    assert [e.text for e in root.findall(".//direction/offset")] == ["0", "1"]
+    assert _octave_positions(root) == [Fraction(0), Fraction(1)]
     assert root.findall(".//note/grace")
 
 
@@ -75,7 +98,7 @@ def test_cross_bar_span_obeys_voice_offsets_and_clef_changes() -> None:
     root = DET.fromstring(to_musicxml(Score(parts=(part,))))
     assert root.findtext(".//attributes/divisions") == "2"
     assert [n.text for n in root.findall(".//note/pitch/octave")] == ["5", "5", "5", "5", "4", "4"]
-    assert [e.text for e in root.findall(".//direction/offset")] == ["1", "2"]
+    assert _octave_positions(root) == [Fraction(1, 2), Fraction(1)]
     assert root.findtext(".//clef/sign") == "F"
 
 
@@ -121,3 +144,23 @@ def test_overlapping_staff_spans_are_reported_instead_of_summing_guessed_octaves
     )
     with pytest.raises(ExportError, match="overlapping octave"):
         to_musicxml(Score(parts=(part,)))
+
+
+def test_octave_cursor_excursion_returns_to_zero_before_each_original_voice() -> None:
+    part = _part(OctaveShift(2, 1, Fraction(0), 1, Fraction(3, 4)))
+    original = part.measures[0]
+    voices = (original.voices[0], replace(original.voices[0], number=2))
+    part = replace(part, measures=(replace(original, voices=voices),))
+    root = DET.fromstring(to_musicxml(Score(parts=(part,))))
+    assert _octave_positions(root) == [Fraction(0), Fraction(4)]
+    assert len(root.findall(".//pitch")) == 16
+    cursor = Fraction(0)
+    onsets = []
+    for element in root.findall("part/measure")[0]:
+        duration = Fraction(element.findtext("duration", "0"))
+        if element.tag in {"forward", "backup"}:
+            cursor += duration if element.tag == "forward" else -duration
+        elif element.tag == "note" and element.find("chord") is None:
+            onsets.append((element.findtext("voice"), cursor))
+            cursor += duration
+    assert onsets == [(v, Fraction(i)) for v in ("1", "2") for i in range(4)]

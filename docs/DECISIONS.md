@@ -1,5 +1,19 @@
 # Decisions
 
+## 2026-10-14 — DECIDED: serialize octave spans at actual XML cursor times
+
+Use standard forward/backup excursions for octave directions, restoring cursor
+zero before the unchanged note voices. Retain exact source endpoints, inclusive
+stop conversion and performed XML pitch semantics. This supports importers whose
+octave pitch pass ignores direction offsets, without adding silent events or
+changing the canonical IR, metric time, pitches or tempo.
+
+The isolated1UP case changes from a zero-length native15ma/high ledger notes to
+a visible0..3q span and source written register. Its native performed pitches,
+note onsets/lengths and225BPM stay identical. Independent positive/negative
+two-octave native fixtures and existing cross-bar/grace/projected tests cover
+the conversion. Crash's part-bar case is reassessed separately as P19.
+
 ## 2026-10-14 — DECIDED: retain Uncover Secret's genuine empty final measure
 
 The P15 investigation finds two active score measure records. Score/linked-part
