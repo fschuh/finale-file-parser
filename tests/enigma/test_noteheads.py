@@ -66,7 +66,7 @@ def test_custom_font_selects_its_own_character_mapping(font_id: int, shape: str 
     assert ET.fromstring(to_musicxml(score)).findtext(".//notehead") == shape
 
 
-@pytest.mark.parametrize("character,font", [(193, "Maestro"), (192, "Unknown"), (250, "Maestro")])
+@pytest.mark.parametrize("character,font", [(193, "Maestro"), (192, "Unknown"), (251, "Maestro")])
 def test_unestablished_glyphs_retain_source_data_and_report_the_limit(
     character: int, font: str
 ) -> None:
@@ -81,6 +81,29 @@ def test_ordinary_cleared_and_linked_part_heads_do_not_place_score_modifications
     score = build_score(_document(_mod(character=0) + _mod(attrs='part="1"')))
     assert not score.parts[0].measures[0].voices[0].events[0].noteheads
     assert not score.diagnostics
+
+
+@pytest.mark.parametrize("font", ["Maestro", "EngraverFontSet", "Engraver Font Set"])
+def test_half_head_override_keeps_dotted_quarter_rhythm_and_other_chord_heads(font: str) -> None:
+    score = build_score(_document(_mod(character=250), font))
+    event = score.parts[0].measures[0].voices[0].events[0]
+    assert event.noteheads[0].shape == "normal" and event.noteheads[0].filled is False
+    assert event.duration == event.written_duration == Fraction(3, 8) and event.dots == 1
+    notes = ET.fromstring(to_musicxml(score)).findall(".//note")
+    assert [n.findtext("type") for n in notes] == ["quarter"] * 3
+    assert [n.findtext("duration") for n in notes] == ["3"] * 3
+    assert all(n.find("dot") is not None for n in notes)
+    head = notes[1].find("notehead")
+    assert head is not None and head.text == "normal" and head.get("filled") == "no"
+    assert notes[0].find("notehead") is None and notes[2].find("notehead") is None
+    assert not score.diagnostics
+
+
+def test_unknown_font_half_head_has_no_inferred_fill() -> None:
+    score = build_score(_document(_mod(character=250), "Unknown"))
+    head = score.parts[0].measures[0].voices[0].events[0].noteheads[0]
+    assert head.shape is None and head.filled is None
+    assert ET.fromstring(to_musicxml(score)).find(".//notehead") is None
 
 
 def test_identical_packed_assignments_are_idempotent_while_conflicting_heads_raise() -> None:

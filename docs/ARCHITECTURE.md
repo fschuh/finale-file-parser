@@ -1939,6 +1939,22 @@ projection/XSD, import individually in MuseScore4.7.5 and render cross heads
 at the inspected passages. Air's extra active staves are a separate print-
 visibility investigation; Crash's unresolved literal route remains unchanged.
 
+#### Explicit open-head fill (2026-10-14, PDF review P05)
+
+The same primary Maestro/Engraver charts independently identify character250
+as the half/open oval head. Resolve only this evidenced font-gated override
+as `Notehead(shape="normal", filled=False)`, using MusicXML
+[filled](https://www.w3.org/2021/06/musicxml40/musicxml-reference/elements/notehead/)
+independently of the note type and metric duration. Main Theme60 entry1607
+noteID1 stores250; its1536EDU G4 remains a dotted quarter with exact timing,
+and its silent invisible F3 glissando endpoint stays intact. MuseScore4.7.5
+imports a half `headType` and visibly renders the open head. Title Screen's
+already resolved half-head tremolo is a regression control; neither source's
+attack comparison changes. The PDF has different dot styling at60, for which
+no independently established suppression field was recovered in this task.
+Do not manufacture a half-note metric value or remove rhythmic dots to fit it.
+Authored chords confirm only the assigned member receives the fill override.
+
 Tuplet number style is flag low-nibble at serialized+18; bracket style uses
 0x3000 there. RGP GetSymbolicNumber0x796E0 anchors base0x40 to existing+0,
 GetNumberStyle0x4DF7F6 and GetShapeStyle0x4DF80E read base+18. Zero/zero explicitly

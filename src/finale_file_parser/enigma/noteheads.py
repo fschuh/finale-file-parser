@@ -38,9 +38,15 @@ def noteheads_by_entry(document: EnigmaDocument) -> dict[int, tuple[Notehead, ..
             else 0
         )
         font = fonts.get(font_id)
-        shape = "x" if character == 192 and font and font.casefold() in _CROSS_FONTS else None
+        shape: str | None = None
+        filled: bool | None = None
+        if font and font.casefold() in _CROSS_FONTS:
+            if character == 192:
+                shape = "x"
+            elif character == 250:
+                shape, filled = "normal", False
         index = indices[0]
-        head = Notehead(index, shape, source_character=character, source_font=font)
+        head = Notehead(index, shape, filled, source_character=character, source_font=font)
         previous = result[entnum].get(index)
         if previous is not None and previous != head:
             raise CorruptScoreError("conflicting notehead modifications for one note")
