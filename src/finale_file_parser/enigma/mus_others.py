@@ -47,6 +47,7 @@ __all__ = [
     "TAG_CLEF_OPTIONS",
     "TAG_CLEF_ENUM",
     "TAG_GRACE_SLASH_OPTIONS",
+    "TAG_BEAM_OPTIONS",
     "TAG_INST_USED",
     "TAG_FONT_NAME",
     "TAG_FRAME_SPEC",
@@ -221,6 +222,9 @@ An `others` record rather than a pool of its own: Enigma's document-wide options
 live in this pool under the `OPTIONS_CMPER` sentinel, and `EnigmaDocument` keeps
 them in `options` only because EnigmaXML puts them in a separate element.
 """
+
+TAG_BEAM_OPTIONS = 55
+"""Preference ^41, incidence0 word1 stores the independently mapped beam flags."""
 
 TAG_GRACE_SLASH_OPTIONS = 58
 """Preference ^44, whose fifth u16 is Always Slash Flagged Grace Notes.

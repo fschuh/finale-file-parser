@@ -82,6 +82,7 @@ from finale_file_parser.enigma.mus_entries import read_mus_entry_records
 from finale_file_parser.enigma.mus_others import (
     OPTIONS_CMPER,
     TAG_ARTIC_DEF,
+    TAG_BEAM_OPTIONS,
     TAG_CLEF_ENUM,
     TAG_CLEF_OPTIONS,
     TAG_FONT_NAME,
@@ -633,8 +634,13 @@ identity above: these are the 2011 era's own 18-byte entries."""
 
 
 def _rows_options(rows: MusRows) -> list[Record]:
-    """The clef table and flagged-grace slash setting, in the file's byte order."""
+    """Evidenced clef, rest-beam and grace options in the file's byte order."""
     out: list[Record] = []
+    beam = rows.others.get(("41", OPTIONS_CMPER))
+    if beam is not None:
+        option = _beam_options(beam.payload, rows.byte_order)
+        if option is not None:
+            out.append(option)
     slash = rows.others.get(("44", OPTIONS_CMPER))
     if slash is not None:
         option = _grace_slash_options(slash.payload, rows.byte_order)
@@ -803,8 +809,14 @@ def _banner_year(path: str | os.PathLike[str]) -> int | None:
 
 
 def _options_records(records: tuple[MusOther, ...], year: int | None) -> list[Record]:
-    """The clef table and flagged-grace slash setting for the zlib era."""
+    """Evidenced clef, rest-beam, grace and playback options for the zlib era."""
     out: list[Record] = []
+    for record in records:
+        if record.tag == TAG_BEAM_OPTIONS and record.cmper == OPTIONS_CMPER and not record.part:
+            option = _beam_options(record.payload)
+            if option is not None:
+                out.append(option)
+                break
     for record in records:
         if (
             record.tag == TAG_GRACE_SLASH_OPTIONS
@@ -889,6 +901,24 @@ def _grace_slash_options(payload: bytes, order: ByteOrder = "little") -> Record 
     if int.from_bytes(payload[8:10], order):
         fields["slashFlaggedGraceNotes"] = ""
     return Record(tag="graceNoteOptions", attrs={}, text="", fields=fields)
+
+
+def _beam_options(payload: bytes, order: ByteOrder = "little") -> Record | None:
+    """Preference ^41 word1, in one or three complete twelve-byte incidences."""
+    if len(payload) not in {12, 36}:
+        return None
+    flags = _u16(payload, 2, order)
+    fields = {
+        name: ""
+        for mask, name in (
+            (0x0001, "incEdgeRestsInBeamGroups"),
+            (0x0002, "incRestsInClassicBeams"),
+            (0x0040, "doStemStubs"),
+            (0x0100, "extendSecBeamsOverRests"),
+        )
+        if flags & mask
+    }
+    return Record("beamOptions", {}, "", fields)
 
 
 def _clef_def(entry: bytes, stride: int, order: ByteOrder = "little") -> Record:

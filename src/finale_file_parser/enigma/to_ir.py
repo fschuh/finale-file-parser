@@ -17,7 +17,8 @@ from finale_file_parser.enigma.arpeggios import EventPosition, arpeggios_by_entr
 from finale_file_parser.enigma.articulation_playback import articulation_playback_by_entry
 from finale_file_parser.enigma.articulations import articulations_by_entry
 from finale_file_parser.enigma.barlines import barline_styles
-from finale_file_parser.enigma.beams import BeamedNote, beams_for
+from finale_file_parser.enigma.beam_options import rest_beams
+from finale_file_parser.enigma.beams import BeamedNote, RestBeams, beams_for
 from finale_file_parser.enigma.clef import (
     Clef,
     ClefPosition,
@@ -230,8 +231,9 @@ def build_score(document: EnigmaDocument) -> Score:
             events[endpoint.event_index] = replace(
                 event, written_duration=written, tuplet_ratio=event.duration / written, beams=()
             )
+    rest_options = rest_beams(document)
     for cell in cells.values():
-        _apply_beams(cell)
+        _apply_beams(cell, rest_options)
         for layer, events in cell.events_by_layer.items():
             cell.events_by_layer[layer] = [
                 replace(event, grace_slash=grace_slash(event, always_slash))
@@ -628,7 +630,7 @@ def _groups(document: EnigmaDocument, part_ids: list[str]) -> tuple[PartGroup, .
     return tuple(out)
 
 
-def _apply_beams(cell: _Cell) -> None:
+def _apply_beams(cell: _Cell, rest_options: RestBeams | None = None) -> None:
     """Replace each layer's events with the same events carrying their beams.
 
     Beaming is a property of a run of notes, not of one note, so it can only be
@@ -649,7 +651,9 @@ def _apply_beams(cell: _Cell) -> None:
         ]
         cell.events_by_layer[layer] = [
             replace(event, beams=tuple(beams)) if beams else event
-            for event, beams in zip(events, beams_for(notes), strict=True)
+            for event, beams in zip(
+                events, beams_for(notes, rest_options=rest_options), strict=True
+            )
         ]
 
 

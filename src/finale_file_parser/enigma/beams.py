@@ -32,9 +32,17 @@ from fractions import Fraction
 
 from finale_file_parser.ir import Beam
 
-__all__ = ["BeamedNote", "beams_for"]
+__all__ = ["BeamedNote", "RestBeams", "beams_for"]
 
 _EIGHTH = Fraction(1, 8)
+
+
+@dataclass(frozen=True)
+class RestBeams:
+    """Known rest-beam settings; group-start bits still define explicit breaks."""
+
+    extend_edges: bool = False
+    extend_secondary: bool = False
 
 
 @dataclass(frozen=True)
@@ -53,7 +61,9 @@ class BeamedNote:
     """Grace beams join consecutive graces, separately from ordinary beams."""
 
 
-def beams_for(notes: Sequence[BeamedNote]) -> list[tuple[Beam, ...]]:
+def beams_for(
+    notes: Sequence[BeamedNote], *, rest_options: RestBeams | None = None
+) -> list[tuple[Beam, ...]]:
     """Beams for each note of one (staff, measure, layer), in playing order.
 
     Returns one tuple per input note, empty where the note carries no beam --
@@ -61,17 +71,34 @@ def beams_for(notes: Sequence[BeamedNote]) -> list[tuple[Beam, ...]]:
     nothing.
     """
     out: list[tuple[Beam, ...]] = [() for _ in notes]
-    for group in _groups(notes):
+    for group in _groups(notes, include_rests=rest_options is not None):
+        if rest_options is not None and not rest_options.extend_edges:
+            first = next((i for i, at in enumerate(group) if not notes[at].is_rest), len(group))
+            last = next(
+                (i for i in range(len(group) - 1, -1, -1) if not notes[group[i]].is_rest), -1
+            )
+            group = group[first : last + 1]
         if len(group) < 2:
             continue
-        levels = [_levels(notes[index]) for index in group]
+        if not any(not notes[index].is_rest for index in group):
+            continue
+        levels = [
+            1
+            if notes[index].is_rest
+            and rest_options is not None
+            and not rest_options.extend_secondary
+            else _levels(notes[index])
+            for index in group
+        ]
         for level in range(1, max(levels) + 1):
             for start, end in _runs(levels, level):
+                if start == end and notes[group[start]].is_rest:
+                    continue
                 _assign(out, group, levels, level, start, end)
     return out
 
 
-def _groups(notes: Sequence[BeamedNote]) -> list[list[int]]:
+def _groups(notes: Sequence[BeamedNote], *, include_rests: bool = False) -> list[list[int]]:
     """Indices of the notes in each beam group, in order."""
     groups: list[list[int]] = []
     current: list[int] = []
@@ -89,7 +116,7 @@ def _groups(notes: Sequence[BeamedNote]) -> list[list[int]]:
         # An ordinary beam can span intervening graces, but the grace run ends
         # at the next ordinary entry. Neither group includes the other's notes.
         graces = []
-        if not _beamable(note):
+        if not _beamable(note, include_rests=include_rests):
             current = []
             continue
         if note.starts_group or not current:
@@ -99,14 +126,13 @@ def _groups(notes: Sequence[BeamedNote]) -> list[list[int]]:
     return groups
 
 
-def _beamable(note: BeamedNote) -> bool:
-    """A rest breaks a group here.
-
-    MusicXML can beam over a rest and Finale can draw one, but Enigma's bit
-    says where groups *start*, not where they survive a rest -- so treating a
-    rest as a break is the reading the data supports.
-    """
-    return not note.is_rest and note.written_duration <= _EIGHTH * 2 and _levels(note) >= 1
+def _beamable(note: BeamedNote, *, include_rests: bool = False) -> bool:
+    """Unknown rest settings keep the conservative original grouping behavior."""
+    return (
+        (not note.is_rest or include_rests)
+        and note.written_duration <= _EIGHTH * 2
+        and _levels(note) >= 1
+    )
 
 
 def _levels(note: BeamedNote) -> int:

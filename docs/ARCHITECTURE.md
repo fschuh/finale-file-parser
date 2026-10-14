@@ -2005,6 +2005,47 @@ written-note projection after this correction; nine scores contain cross-staff
 notation. Corridors separately passes schema/native import and keeps all1188
 source/MIDI attacks matched. The final105 native/MIDI integration remains due.
 
+#### Stored beams through rests (2026-10-14, PDF review P06)
+
+The previous resolver broke every group at a rest. Actual BEATBIT boundaries
+can instead define a continuous group containing interior rests. Recover these
+when source beam settings are present; unknown settings retain the prior
+conservative behavior. The automatic group-of-four preference does not override
+already stored/manual group-start bits. Separate edge and secondary settings
+still apply, rather than beaming every rest or synthesizing new groups.
+
+Numeric preference55 (`^41`), score comparator65534, incidence0 word1 (+2)
+stores the beam flags. The evidenced complete payloads are12 and36 bytes;
+unsupported lengths place no guessed setting. DCL uses the same `41` preference
+in its file byte order. RGP FCMiscDocPrefs vtable0x6E6688 gives Allocate0x33A102
+(base+0x3A) and Tag0x4FDBEE (`pfMI`). Primary getter0x545442 reads object+0x4C,
+bit1; secondary getter0x545520 reads+0x4D, bit1. Subtracting the independently
+anchored base gives MI-map offset18. MapPrefStruct's MI table (binary file
+0x708A90) maps this to `41`, incidence0, word1, size2, conversion0.
+These are unrelated to the similarly named `pfMS` measure-spacing table.
+
+Published [PDK settings](https://pdk.finalelua.com/class_f_c_misc_doc_prefs.html)
+and [Finale beam options](https://usermanuals.finalemusic.com/Finale2012Win/Content/Finale/IDD_BEAMOPTIONS.htm)
+identify masks0x1 edge-rest primary beams,0x2 automatic rest inclusion,
+0x40 half-stems and0x100 secondary beams over rests. Normalize the established
+EnigmaXML field names as `beamOptions`: incEdgeRestsInBeamGroups,
+incRestsInClassicBeams,doStemStubs,extendSecBeamsOverRests, as independently
+described by [musxdom's options](https://github.com/rpatters1/musxdom/blob/main/src/musx/dom/Options.h).
+The reviewed Spider/MEGAL/MAP7/Spear/Spring/Slider sources store0x1A;
+Death Mountain stores0x9A. Their edge and secondary extensions are off.
+
+Keep interior rests on the primary beam, remove leading/trailing rest coverage
+when edge extensions are off, and cap rest beam levels at1 when secondary
+extension is off. Emit no lone rest hooks or all-rest beams. Explicit group
+breaks, longer rests and grace/ordinary separation remain intact. The canonical
+events' pitch/rhythm/rest/visibility stay unchanged. Authored tests cover both
+orders/layouts, unknown/part settings, continuous/broken/edge groups, hooks and
+graces. Seven targeted exports pass projection/XSD/isolated MuseScore4.7.5;
+attack counts and the existing navigation exceptions remain unchanged. Rendered
+MEGAL14, Spider35/39 and Slider2 were checked for the recovered primary beams.
+Half-stem display controls are retained in the source options; arbitrary manual
+stem geometry is outside this beam-group change.
+
 Tuplet number style is flag low-nibble at serialized+18; bracket style uses
 0x3000 there. RGP GetSymbolicNumber0x796E0 anchors base0x40 to existing+0,
 GetNumberStyle0x4DF7F6 and GetShapeStyle0x4DF80E read base+18. Zero/zero explicitly

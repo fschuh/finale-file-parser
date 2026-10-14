@@ -12,7 +12,7 @@ from fractions import Fraction
 
 import pytest
 
-from finale_file_parser.enigma.beams import BeamedNote, beams_for
+from finale_file_parser.enigma.beams import BeamedNote, RestBeams, beams_for
 from finale_file_parser.ir import Beam
 
 EIGHTH = Fraction(1, 8)
@@ -65,6 +65,71 @@ def test_an_unbeamable_note_breaks_the_group() -> None:
 def test_a_rest_breaks_the_group() -> None:
     notes = [note(EIGHTH, starts=True), note(EIGHTH, rest=True), note(EIGHTH), note(EIGHTH)]
     assert types(beams_for(notes)) == [None, None, "begin", "end"]
+
+
+def test_known_settings_preserve_an_explicit_group_through_an_interior_rest() -> None:
+    """Original rhythm, authored for this project under MIT."""
+    notes = [note(EIGHTH, starts=True), note(EIGHTH, rest=True), note(EIGHTH), note(EIGHTH)]
+    assert types(beams_for(notes, rest_options=RestBeams())) == [
+        "begin",
+        "continue",
+        "continue",
+        "end",
+    ]
+
+
+@pytest.mark.parametrize("edges", [False, True])
+def test_edge_rests_require_their_separate_setting(edges: bool) -> None:
+    notes = [
+        note(EIGHTH, rest=True, starts=True),
+        note(EIGHTH),
+        note(EIGHTH),
+        note(EIGHTH, rest=True),
+    ]
+    expected = ["begin", "continue", "continue", "end"] if edges else [None, "begin", "end", None]
+    assert types(beams_for(notes, rest_options=RestBeams(extend_edges=edges))) == expected
+
+
+@pytest.mark.parametrize("secondary", [False, True])
+def test_secondary_beams_over_rests_keep_their_separate_setting(secondary: bool) -> None:
+    notes = [note(SIXTEENTH, starts=True), note(SIXTEENTH, rest=True), note(SIXTEENTH)]
+    result = beams_for(notes, rest_options=RestBeams(extend_secondary=secondary))
+    assert types(result) == ["begin", "continue", "end"]
+    assert types(result, 2) == (
+        ["begin", "continue", "end"] if secondary else ["forward hook", None, "backward hook"]
+    )
+
+
+def test_explicit_group_start_after_a_rest_still_breaks_the_beam() -> None:
+    notes = [
+        note(EIGHTH, starts=True),
+        note(EIGHTH, rest=True),
+        note(EIGHTH, starts=True),
+        note(EIGHTH),
+    ]
+    assert types(beams_for(notes, rest_options=RestBeams())) == [None, None, "begin", "end"]
+
+
+def test_no_beams_for_all_rest_groups_or_rest_hooks() -> None:
+    notes = [note(SIXTEENTH, rest=True, starts=True), note(SIXTEENTH, rest=True)]
+    assert beams_for(notes, rest_options=RestBeams(True, True)) == [(), ()]
+
+
+def test_known_rest_groups_preserve_grace_and_ordinary_separation() -> None:
+    notes = [
+        note(EIGHTH, starts=True),
+        BeamedNote(EIGHTH, 0, False, True, is_grace=True),
+        BeamedNote(EIGHTH, 0, False, False, is_grace=True),
+        note(EIGHTH, rest=True),
+        note(EIGHTH),
+    ]
+    assert types(beams_for(notes, rest_options=RestBeams())) == [
+        "begin",
+        "begin",
+        "end",
+        "continue",
+        "end",
+    ]
 
 
 def test_sixteenths_carry_a_second_beam() -> None:
