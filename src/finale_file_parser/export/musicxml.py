@@ -498,6 +498,10 @@ def _staff_bundles(score: Score) -> tuple[tuple[Part, ...], ...]:
                     ):
                         raise ExportError("duplicate cross-staff note attachment")
                     for placement in event.cross_staff:
+                        if placement.part_id is None:
+                            if not 0 <= placement.pitch_index < len(event.pitches):
+                                raise ExportError("invalid cross-staff note attachment")
+                            continue
                         if (
                             placement.part_id not in positions
                             or not 0 <= placement.pitch_index < len(event.pitches)
@@ -1767,7 +1771,7 @@ def _append_event(
                 (
                     (display_staves or {}).get(mark.part_id)
                     for mark in event.cross_staff
-                    if mark.pitch_index == index
+                    if mark.pitch_index == index and mark.part_id is not None
                 ),
                 None,
             ),

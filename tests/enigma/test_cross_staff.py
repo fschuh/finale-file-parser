@@ -100,9 +100,19 @@ def test_missing_note_attachment_is_not_guessed_from_chord_index(note_id: int) -
         build_score(_document(note_id=note_id))
 
 
-def test_flagged_note_without_a_score_modification_is_a_clear_error() -> None:
-    with pytest.raises(CorruptScoreError, match="missing or ambiguous"):
-        build_score(_document(mods=""))
+def test_flagged_note_without_a_destination_stays_unresolved_on_its_source_staff() -> None:
+    score = build_score(_document(mods=""))
+    event = score.parts[1].measures[0].voices[0].events[1]
+    assert event.cross_staff == (CrossStaff(0, None),)
+    assert score.diagnostics[0].code == "cross-staff-destination"
+    root = ET.fromstring(to_musicxml(score))
+    assert len(root.findall("part")) == 2
+    assert [n.findtext("pitch/step") for n in root.findall("part")[1].findall(".//note")] == [
+        "C",
+        "C",
+        "E",
+        "C",
+    ]
 
 
 def test_packed_cross_staff_records_keep_note_ids_destinations_and_scope() -> None:

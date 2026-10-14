@@ -257,7 +257,12 @@ def build_score(document: EnigmaDocument) -> Score:
     ):
         note_marks = tuple(replace(mark, offset=offset) for mark in note_dynamics[entry])
         expressions[staff, measure] = expressions.get((staff, measure), ()) + note_marks
-    display_staves = {int(mark.part_id[1:]) for marks in cross_staff.values() for mark in marks}
+    display_staves = {
+        int(mark.part_id[1:])
+        for marks in cross_staff.values()
+        for mark in marks
+        if mark.part_id is not None
+    }
     staves = _ordered_staves(document, {staff for staff, _ in cells} | display_staves)
     keys = effective_keys(document)
     numbers = _measure_numbers(keys, cells)
@@ -272,6 +277,18 @@ def build_score(document: EnigmaDocument) -> Score:
     diagnostics += line_diagnostics
     diagnostics += articulation_diagnostics
     placed_entries = {entry for _, _, entry in slur_positions}
+    diagnostics += tuple(
+        ScoreDiagnostic(
+            "cross-staff-destination",
+            f"Entry {entry} note {mark.pitch_index} has an active cross-staff flag "
+            "without a destination detail; its source staff placement is retained.",
+            f"crossStaff:{entry}",
+        )
+        for entry, marks in cross_staff.items()
+        if entry in placed_entries
+        for mark in marks
+        if mark.part_id is None
+    )
     diagnostics += tuple(
         ScoreDiagnostic(
             "notehead-glyph",

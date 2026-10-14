@@ -22,11 +22,16 @@ def cross_staff_by_entry(document: EnigmaDocument) -> dict[int, tuple[CrossStaff
         entnum = field_int(record.attrs.get("entnum"))
         if entnum is None:
             raise CorruptScoreError("cross-staff modification has an invalid entry")
-        if document.entries.get(entnum) is None:
+        source_entry = document.entries.get(entnum)
+        if source_entry is None:
             continue
         note_id = field_int(record.fields.get("noteID"))
         staff = field_int(record.fields.get("staff"))
-        if note_id is None or note_id <= 0:
+        if (
+            note_id is None
+            or note_id <= 0
+            or note_id not in {n.note_id for n in read_entry(source_entry).notes}
+        ):
             raise CorruptScoreError("cross-staff modification has an invalid note ID")
         if staff is None or staff <= 0 or staff not in staves:
             raise CorruptScoreError("cross-staff modification names a missing score staff")
@@ -43,9 +48,9 @@ def cross_staff_by_entry(document: EnigmaDocument) -> dict[int, tuple[CrossStaff
             if not note.cross_staff:
                 continue
             staff = assigned.get(note.note_id)
-            if staff is None or sum(n.note_id == note.note_id for n in entry.notes) != 1:
-                raise CorruptScoreError("cross-staff note has a missing or ambiguous attachment")
-            marks.append(CrossStaff(index, f"P{staff}"))
+            if note.note_id <= 0 or sum(n.note_id == note.note_id for n in entry.notes) != 1:
+                raise CorruptScoreError("cross-staff note has an invalid or ambiguous note ID")
+            marks.append(CrossStaff(index, f"P{staff}" if staff is not None else None))
         if marks:
             result[entry.entnum] = tuple(marks)
     return result

@@ -1975,7 +1975,8 @@ this as the note's connected staff, separately from its stable noteID.
 `eeppd.txt` independently documents the per-note CROSSBIT0x10000000.
 Require that active flag and an unambiguous detail/note-ID join; unflagged
 retained modifications do not move notes. Missing/reserved destination staves,
-conflicting modifications and missing active attachments fail clearly.
+conflicting modifications and ambiguous note IDs fail clearly. Active flags
+without a destination retain an unresolved attachment as described below.
 
 Steel Samurai has28 assigned bass-to-upper notes in21-24; Title Screen has
 two upper-to-lower notes107/108 in2. Their raw note flags agree with these
@@ -1991,6 +1992,18 @@ Steel beam bridges and Title's changed staff destinations were visually checked.
 Their source attack comparisons remain unchanged. This native inspection also
 caught the separate P01 default-clef regression on Title's literal0 switch;
 that correction is tracked independently. Auxiliary rests remain P12 work.
+
+The subsequent105-source build/export check found Corridors of Time has29
+active note cross-staff flags with no1036 destination, alongside96 valid
+assignments. A flag alone supplies no destination. Retain these as
+`CrossStaff(part_id=None)` with an explicit `cross-staff-destination` diagnostic,
+leaving their source part/voice/printed placement intact. This is incomplete
+semantic source data, not a truncated record or permission to infer a staff.
+Explicit invalid destination references and ambiguous IDs still fail clearly.
+An authored missing-detail control pins this behavior. All105 build and pass
+written-note projection after this correction; nine scores contain cross-staff
+notation. Corridors separately passes schema/native import and keeps all1188
+source/MIDI attacks matched. The final105 native/MIDI integration remains due.
 
 Tuplet number style is flag low-nibble at serialized+18; bracket style uses
 0x3000 there. RGP GetSymbolicNumber0x796E0 anchors base0x40 to existing+0,

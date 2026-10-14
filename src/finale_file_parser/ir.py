@@ -214,7 +214,8 @@ class CrossStaff:
     """Draw one chord member on another staff, retaining its source voice/pitch."""
 
     pitch_index: int
-    part_id: str
+    part_id: str | None
+    """None retains an active source flag whose destination detail is absent."""
 
 
 @dataclass(frozen=True)
