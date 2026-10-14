@@ -164,3 +164,19 @@ def test_octave_cursor_excursion_returns_to_zero_before_each_original_voice() ->
             onsets.append((element.findtext("voice"), cursor))
             cursor += duration
     assert onsets == [(v, Fraction(i)) for v in ("1", "2") for i in range(4)]
+
+
+def test_partial_octave_span_does_not_transpose_a_note_sustained_from_before_it() -> None:
+    held = replace(NOTE, duration=Fraction(1), written_duration=Fraction(1))
+    measure = Measure(1, (Voice(1, (held,)), Voice(2, (NOTE, NOTE), Fraction(1, 2))))
+    part = Part(
+        "P1",
+        "Authored",
+        (measure,),
+        octave_shifts=(OctaveShift(1, 1, Fraction(1, 2), 1, Fraction(3, 4)),),
+    )
+    root = DET.fromstring(to_musicxml(Score(parts=(part,))))
+    assert _octave_positions(root) == [Fraction(2), Fraction(4)]
+    assert [n.text for n in root.findall(".//note/pitch/octave")] == ["4", "4", "5", "5", "5", "5"]
+    assert root.findtext(".//note/duration") == "4"
+    assert root.findtext(".//note/voice") == "1"

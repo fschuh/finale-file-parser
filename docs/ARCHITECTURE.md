@@ -2461,6 +2461,16 @@ negative two-octave spans (C4 written, C6/C2 sounding) correctly. All105 source
 builds/projections and the authored check suite pass. This is standard export
 ordering compatibility; no register-only respelling or tempo substitution.
 
+**P19 partial-bar verification:** Crash32 now renders the8va only over the
+source latter-half run,2q..4q; the earlier half note stays outside it. This is
+resolved by the same cursor-timed serialization, independently checked against
+native page2 and paired native span data. A separate original regression keeps
+a whole note sustained from0q unshifted while a second voice's attacks at2q/3q
+shift. Three original native examples play60,60,72,72 for an upward latter-half
+span,60,60,48,48 downward, and retain60 at0q under the sustained-note case.
+Source projection/schema/native checks pass. Crash's separately unresolved
+literal navigation cycle remains unchanged; no full-route MIDI match is claimed.
+
 The Finale PDK `FCSmartShape` enum identifies type 4 as octave down, 5 as
 octave up, 20 as two octaves down and 21 as two octaves up. These types use the
 same measure/staff/EDU termination segments as hairpins, with 4096 EDU per whole
