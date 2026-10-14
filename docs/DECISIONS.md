@@ -1,5 +1,15 @@
 # Decisions
 
+## 2026-10-14 — DECIDED: retain Uncover Secret's genuine empty final measure
+
+The P15 investigation finds two active score measure records. Score/linked-part
+system-layout candidates have different extents, and the supplied PDF has only
+the musical first bar. No complete print-selection join proves that the full
+source score should end at bar1. Keep canonical/source XML bar2 and the resting
+bass restored by P02; do not derive the printed boundary from MIDI silence or
+playback stop settings. Record the reference/print-configuration difference and
+the incomplete layout/selection join. No additional code is justified by P15.
+
 ## 2026-10-14 — DECIDED: staff repeat printing does not disable navigation
 
 Honor proved staffSpec.hideRepeats by hiding each staff's canonical ending and

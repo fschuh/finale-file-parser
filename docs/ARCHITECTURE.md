@@ -1105,6 +1105,22 @@ offsets out per record or era.
 
 #### Active resting staves (2026-10-14, PDF review P02)
 
+**P15 final-measure reassessment:** Uncover Secret has real score measSpec1
+and2, both2/4; bar2 is empty, not an inactive database slot. Preserve both.
+Its raw36-byte tag223 system-layout candidate has first/next measure1/3 in
+the score row and1/2 in the linked-part1 row, at+8/+12. The independently
+published [FCStaffSystem API](https://pdk.finalelua.com/class_f_c_staff_system.html)
+and read-only getters0x280170/0x2831EC identify first/next-system measure at
+these offsets; next is exclusive. The differing score/part candidates support
+a print-configuration/version distinction, but a complete numeric tag and
+selected-print-part join is not established here and is not implemented.
+The [print-settings API](https://pdk.finalelua.com/class_f_c_print_settings.html)
+uses page ranges and selected parts, independently of measure playback stop
+preferences. There is no proved source print selection authorizing a one-bar
+canonical score. Native regeneration keeps the restored resting bass staff
+and both genuine bars; all8 reference attacks still match. The one-bar supplied
+PDF remains a reference/print-selection difference, not a deletion fix.
+
 The active score `instUsed` list establishes staff membership as well as
 ordering. Uncover's score list explicitly contains staves1/2 and its piano
 brace joins both, but only staff1 has a musical `gfhold`. Selecting parts
