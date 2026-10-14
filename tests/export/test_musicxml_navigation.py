@@ -13,8 +13,10 @@ from finale_file_parser.ir import (
     Pitch,
     RepeatPlayback,
     Score,
+    TimeSignature,
     Voice,
 )
+from finale_file_parser.playback import measure_route
 
 
 def _score(*measures: Measure) -> Score:
@@ -148,3 +150,51 @@ def test_two_real_targets_reusing_a_definition_keep_distinct_musicxml_labels() -
     assert labels == ["shared-measure-2", "shared-measure-3"]
     jumps = [s.get("dalsegno") for s in root.findall(".//sound") if s.get("dalsegno")]
     assert jumps == labels
+
+
+def _to_coda_score() -> Score:
+    """Four original MIT bars: D.C., then To Coda on its second encounter."""
+    measures = []
+    for number, step in enumerate(("C", "D", "E", "F"), 1):
+        navigation: tuple[Navigation, ...] = ()
+        if number == 2:
+            navigation = (
+                Navigation("To Coda", playback=RepeatPlayback("jumpAbsolute", "onPass", 4, 2)),
+            )
+        elif number == 3:
+            navigation = (
+                Navigation("D.C. al Coda", playback=RepeatPlayback("jumpAbsolute", "onPass", 1, 1)),
+            )
+        elif number == 4:
+            navigation = (Navigation("", "coda", "authored-coda"),)
+        event = Event(Fraction(1), Fraction(1), (Pitch(step, 4, 0),))
+        measures.append(
+            Measure(
+                number,
+                (Voice(1, (event,)),),
+                navigation=navigation,
+                time=TimeSignature(4, 4) if number == 1 else None,
+                clef_sign="G" if number == 1 else None,
+                clef_line=2 if number == 1 else None,
+            )
+        )
+    return _score(*measures)
+
+
+def test_to_coda_keeps_words_only_pass_condition_and_real_destination() -> None:
+    score = _to_coda_score()
+    assert measure_route(score) == (1, 2, 3, 1, 2, 4)
+    root = DET.fromstring(to_musicxml(score))
+    measure = root.find("part/measure[@number='2']")
+    assert measure is not None
+    assert measure.findtext("direction/direction-type/words") == "To Coda"
+    assert measure.find(".//coda") is None
+    direction = measure.find("direction")
+    assert direction is not None
+    assert direction.findtext("offset") == "4"
+    sound = direction.find("sound")
+    assert sound is not None and sound.attrib == {"tocoda": "authored-coda", "time-only": "2"}
+    marker = root.find("part/measure[@number='4']/direction")
+    assert marker is not None and marker.find("direction-type/coda") is not None
+    marker_sound = marker.find("sound")
+    assert marker_sound is not None and marker_sound.attrib == {"coda": "authored-coda"}

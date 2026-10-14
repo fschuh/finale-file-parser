@@ -1315,6 +1315,38 @@ binary hash), [Maestro chart](https://usermanuals.finalemusic.com/FinaleWin/Cont
 the source records and the user's isolated MuseScore 4.7.5 runtime. Local check
 artifacts are retained outside git; authored records exercise parser bounds.
 
+#### Words-only To Coda and native inference (2026-10-14, PDF-review P22)
+
+Crash16 stores a visible text assignment to definition7 with jumpAbsolute,
+onPass2, target33. Its XML contains words `To Coda` and sound tocoda/time-only,
+with no printed coda element in16; the real coda destination remains33. The
+source32→9 /16→33 /40→9 literal cycle remains a separate unproved execution
+policy. Do not change it to repair an imported symbol.
+
+Five original native fixtures compare embedded sound, independent measure
+sound before/after the words, a separate hidden sound direction, and a
+words-only inference counterexample. The counterexample deliberately drops the
+sound only for diagnosis and is not an accepted export. All schema/projection/
+imports pass and all five PNGs are identical (78ab3c642ccf6b24...). Each adds
+the same native `To Coda<br/><sym>coda</sym>` marker. The authored native note
+route also stays C,D,E,C,D,F; this does not prove general time-only support.
+
+The actual4.7.5 primary direction importer explains both observations:
+handleRepeats first checks embedded sound, then matchRepeat recognizes the
+literal words; addSymbolsToCoda appends a coda symbol whenever one is absent.
+Independent measure-level sound reads only tempo in that import path. Moving
+tocoda out of the words therefore cannot prevent the inferred extra symbol.
+Disabling global text inference would also disable that repeat handler, so it
+is not a source-faithful parser fix. No hidden Unicode character, changed label,
+deleted sound instruction or artificial source coda is shipped.
+
+Retain the current standard text/rule/destination serialization and this explicit
+native display limit. Added authored regression independently checks source
+route1,2,3,1,2,4, second-pass condition, bar-end sound timing, words only at2 and
+the sole printed coda at4. Source target schema/projection/native check passes;
+its existing literal-cycle diagnostic is unchanged. Private evidence P22-source.txt,
+P22/results.json and P22-fixture/run-92u66fjt remains outside git.
+
 ### Known format facts — three things that are not invariants
 
 Found by auditing the exported documents rather than any one feature. Each looks like a defect and
