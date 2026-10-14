@@ -10,6 +10,14 @@ and resolved ones **DECIDED**.
 
 ---
 
+## 2026-10-14 — DECIDED: recover literal staff default-clef selectors
+
+The approved initial/default-clef recovery also consumes the already evidenced
+stored default index in staffSpec. Preserve its low-byte index independently
+from the adjacent transposition selector. This restores the bass clef of
+Uncover's resting staff without guessing from its name, pitches or PDF. A
+stored zero retains the existing unresolved instrument-default limitation.
+
 ## 2026-10-14 — DECIDED: active score layout retains resting staves
 
 The approved P02 task keeps staves explicitly present in the source score

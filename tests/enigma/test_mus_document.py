@@ -39,6 +39,7 @@ from finale_file_parser.enigma.mus_others import (
     TAG_TEXT_BLOCK,
     MusOther,
 )
+from finale_file_parser.enigma.mus_payload import ByteOrder
 from finale_file_parser.enigma.pitch import read_transposition
 from finale_file_parser.enigma.to_ir import build_score
 from finale_file_parser.enigma.tuplet import tuplets_by_entry
@@ -486,6 +487,33 @@ def test_a_concert_staff_gets_no_transposition_record(pools: Callable[..., None]
     record = read_mus_document(PATH).others.get("staffSpec", 1)
     assert record is not None
     assert "transposition" not in record.fields
+
+
+@pytest.mark.parametrize("order", ["little", "big"])
+def test_stored_default_clef_is_separate_from_the_transposition_clef(order: ByteOrder) -> None:
+    """Original scalar fields; no source music or external file bytes."""
+    payload = bytearray(84)
+    payload[12:14] = (0x8003).to_bytes(2, order)
+    fields = adapter._staff_spec(bytes(payload), order)
+    assert fields["defaultClef"] == "3"
+    payload[12:14] = (0x8000).to_bytes(2, order)
+    assert "defaultClef" not in adapter._staff_spec(bytes(payload), order)
+
+
+def test_gfhold_default_clef_resolves_the_stored_staff_default(
+    pools: Callable[..., None],
+) -> None:
+    from finale_file_parser.enigma.clef import clefs_by_measure, default_clefs
+
+    payload = bytearray(staff_spec_payload(0))
+    payload[12:14] = (0x0303).to_bytes(2, "little")
+    pools(
+        others=(MusOther(TAG_STAFF_SPEC, 2, 0, bytes(payload)),),
+        details=(MusDetailRecord(GFHOLD, 2, 1, 0, gfhold_payload(0, 0)),),
+    )
+    doc = read_mus_document(PATH)
+    assert default_clefs(doc) == {2: 3}
+    assert clefs_by_measure(doc) == {(2, 1): 3}
 
 
 def lyric_payload(*groups: tuple[int, int, bool]) -> bytes:

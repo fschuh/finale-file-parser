@@ -263,6 +263,20 @@ unmatched flags, as noted under "three things that are not invariants" below.
 
 #### NotePad clef tables (2026-10-14, PDF review P01)
 
+The related default-clef path now preserves a nonzero stored index from
+`staffSpec`'s packed word at payload+12, using its low byte. Its high byte is
+independent transposition-clef data. The existing paired-container evidence
+in `formats/mus-binary-notes.md` establishes defaultClef at+12 for little-endian
+payloads; the word is read in the container's byte order. Uncover's staff2
+stores0x0303, but has no musical gfhold, so recovering only the table still
+left its restored empty staff in treble. Read the stored3 and let the existing
+default/carried-clef logic select the source F clef. A stored zero remains
+zero/omitted; unresolved instrument-derived defaults are not invented.
+Literal legacy gfhold reference0 is normalized as an absent clefID so the
+existing reader uses that stored staff default, as established by the paired
+gfhold/default evidence below. Explicit clef0 in EnigmaXML or a timed clef list
+keeps its literal selection; it is not converted into a default request.
+
 An unrecognized application banner does not mean the score lacks its clef
 definitions. NotePad 2006's Simone file stores numeric tag109, cmper65534,
 score part0, with eighteen 18-byte definitions (324 bytes). NotePad's

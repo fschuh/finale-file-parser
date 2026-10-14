@@ -1539,7 +1539,7 @@ def _repeat_back(payload: bytes) -> dict[str, str | tuple[str, ...] | Record | t
 def _staff_spec(
     payload: bytes, order: ByteOrder = "little"
 ) -> dict[str, str | tuple[str, ...] | Record | tuple[Record, ...]]:
-    """Staff name references and the transposition's key alteration.
+    """Staff names, the stored default clef and transposition key alteration.
 
     `transpose_key` uses `adjust` alone; `interval` is accepted "for symmetry
     with transpose_pitch and does not affect the key". So recovering `adjust`
@@ -1554,6 +1554,12 @@ def _staff_spec(
     magnitude = raw & _ALTERATION_MAGNITUDE
     adjust = -magnitude if raw & _ALTERATION_SIGN else magnitude
     fields: dict[str, str | tuple[str, ...] | Record | tuple[Record, ...]] = {}
+    # The low byte is the stored default index; the high byte names the
+    # transposition clef and does not enlarge the default index. Preserve
+    # omission of zero, including instrument-derived defaults not in the file.
+    default_clef = _u16(payload, 12, order) & 0xFF
+    if default_clef:
+        fields["defaultClef"] = str(default_clef)
     if adjust:
         keysig = Record(tag="keysig", attrs={}, text="", fields={"adjust": str(adjust)})
         fields["transposition"] = Record(
@@ -1655,7 +1661,10 @@ def _gfhold_clef(
     if len(payload) < 4:
         raise CorruptScoreError("gfhold: truncated clef/flag fields")
     name = "clefListID" if _u16(payload, 2, order) & 0x0400 else "clefID"
-    return {name: str(_u16(payload, 0, order))}
+    reference = _u16(payload, 0, order)
+    # The legacy literal zero means use the staff default, unlike an
+    # explicitly selected zero in a timed clef list or an EnigmaXML gfhold.
+    return {} if name == "clefID" and reference == 0 else {name: str(reference)}
 
 
 def _clef_enums(payload: bytes, attrs: dict[str, str], order: ByteOrder = "little") -> list[Record]:

@@ -135,6 +135,14 @@ def test_gfhold_without_a_clef_falls_back_to_the_staff_default() -> None:
     assert clefs_by_measure(_document(others=[staff], details=[gfhold])) == {(2, 7): 16}
 
 
+def test_explicit_enigmaxml_clef_zero_is_not_a_legacy_default_request() -> None:
+    staff = Record(tag="staffSpec", attrs={"cmper": "2"}, text="", fields={"defaultClef": "3"})
+    gfhold = Record(
+        tag="gfhold", attrs={"cmper1": "2", "cmper2": "7"}, text="", fields={"clefID": "0"}
+    )
+    assert clefs_by_measure(_document(others=[staff], details=[gfhold])) == {(2, 7): 0}
+
+
 def test_non_numeric_definition_field_raises() -> None:
     document = _document(options=[_clef_options({"clefChar": "treble"})])
     with pytest.raises(CorruptScoreError, match="not an integer"):
