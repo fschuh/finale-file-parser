@@ -2136,6 +2136,21 @@ symbol placement is independent of identifying this symbol's components.
 
 #### Auxiliary ornament accidentals (2026-10-12, F16)
 
+**P17 native compatibility check (2026-10-14):** The standard auxiliary flat
+is present with trill-step=half and the unchanged principal G5. This MuseScore
+importer skips accidental-mark in its ornaments/notations path. Three original
+schema-valid native variants (ordinary ornament accidental, explicit verified
+SMuFL accidentalFlat, standalone notation accidental) produce identical printed
+output without the flat; all play G5/A5/G5, rather than the source half-step
+G5/Ab5/G5. The native realization is a separate playback limitation.
+The [MusicXML element](https://www.w3.org/2021/06/musicxml40/musicxml-reference/elements/accidental-mark/)
+permits placement/position/font/SMuFL and both parents, but has no print-object
+attribute. A supplementary visible flat would duplicate it in importers that
+already honor the standard mark; adding an unsupported hide attribute would
+invalidate the XML. Preserve the typed auxiliary mark and original pitches;
+no universal duplicate-free supplementary glyph export was established. P17
+therefore closes with this specific native limit, not a recovered parser bug.
+
 Maestro's small accidental characters105/73/233 mean flat/sharp/natural (official
 chart). Resolve a visible score assignment only when it accompanies exactly one
 ornament on the same entry and its signed `vertOff` places it above that ornament.
