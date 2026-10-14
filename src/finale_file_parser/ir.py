@@ -18,6 +18,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from fractions import Fraction
+from typing import Literal
 
 __all__ = [
     "Arpeggio",
@@ -738,6 +739,11 @@ class Part:
     instrument_id: str | None = None
     """Shared playback identity when every used layer routes to the same source instrument."""
     lines: tuple[LineSpan, ...] = ()
+    staff_hide_mode: Literal["score", "score-parts", "cutaway"] | None = None
+    """Explicit source staff print policy; music and playback remain present.
+
+    Cutaway requires source measure/system geometry and is not global hiding.
+    """
 
 
 @dataclass(frozen=True)

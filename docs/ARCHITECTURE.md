@@ -261,6 +261,44 @@ unmatched flags, as noted under "three things that are not invariants" below.
 
 ### Known format facts — clefs
 
+#### Explicit staff hiding (2026-10-14, PDF review P08)
+
+The numeric staffSpec (231) 84/96-byte layouts carry `moreFlags` at +44.
+Mask 0xC000 is independent of line/staff-element flags: 0 is normal, 0x4000
+is hide in score, 0x8000 is hide in score and parts, and 0xC000 is cutaway.
+The independent [FCStaff API](https://pdk.finalelua.com/class_f_c_staff.html)
+defines these four policies. RGP's read-only `__FCStaffBase::GetHideMode`
+disassembly (0x4BF132) masks that word and returns the corresponding enum;
+FCStaff vtable0x6E4218+0x128 selects getter0x10CE70, which adds0x2C to
+version-specific serialized storage. Its older pre-2011 path uses a different
+flag, so neither older/unknown sizes nor DCL payloads receive this interpretation.
+Normalized XML `hideMode` values (`score`, `scoreParts`, `cutaway`) are also
+independently established by [musxdom's staff factory](https://github.com/openmusx/musxdom/blob/main/src/musx/factory/FieldPopulatorsOthers.cpp).
+
+Air Man's staves3-6 and Crash Man's staff3 store0x641F versus the visible
+staves1/2's0x241F. Their score-system instUsed lists independently select only
+staves1/2, matching the source's hide-in-score policy. Score and linked-part
+definitions remain separate. Canonical `Part.staff_hide_mode` retains the
+explicit policy without removing music, measure rests, voices or playback.
+Cutaway is retained with a diagnostic: system/style geometry is not yet
+decoded, and cutaway must not be treated as permanent hiding.
+
+MusicXML emits standard staff-details print-object=no/print-spacing=no.
+Bundled staves keep their numbered details after clefs in schema order.
+The unchanged persistent policy is reaffirmed after the first pitched measure's
+notes: MuseScore4.7.5 otherwise interprets a hidden initially resting staff
+as global hide-empty-staves and shows it when its music begins. Reaffirming
+does not change the musical clock or add notes. Both target scores now render
+two staves and retain their source attack/projection data. Uncover's visible
+resting bass remains present. Authored musical/empty/linked-part/bundled tests
+cover the independent print/playback policies and unsupported layouts.
+
+**Native limit:** a permanently hidden staff containing only rests can still
+enable MuseScore's global hide-empty-staves style. An authored visible-empty
+counterexample also produces a blank native first system with this importer;
+the standard XML still retains the visible staff and its rest. No fake voices,
+notes, cutaway flags or deletion are used to bypass that native heuristic.
+
 #### NotePad clef tables (2026-10-14, PDF review P01)
 
 The related default-clef path now preserves a nonzero stored index from

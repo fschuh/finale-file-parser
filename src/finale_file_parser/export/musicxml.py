@@ -442,6 +442,8 @@ def _append_part(
     if line_directions is None:
         line_directions = _line_directions((part,))
     first = True
+    hidden = part.staff_hide_mode in {"score", "score-parts"}
+    reaffirmed = False
     tremolos = _tremolo_notations(part)
     glissandi = (
         _glissando_notations((part,)) if glissando_notations is None else glissando_notations
@@ -463,7 +465,31 @@ def _append_part(
             lines=line_directions.get((part.id, measure.number), ()),
             display_staves=display_staves,
         )
+        if first and hidden:
+            attributes = _initial_attributes(element[-1])
+            assert attributes is not None  # the first measure emits divisions
+            _append_hidden_staff_details(attributes)
+        if (
+            hidden
+            and not reaffirmed
+            and any(not event.is_rest for voice in measure.voices for event in voice.events)
+        ):
+            # Reaffirm the persistent print policy after the first written
+            # notes. MuseScore mistakes an initial hidden resting staff for
+            # hide-empty-staves, but honors the same policy after voiced music.
+            attributes = ET.Element("attributes")
+            _append_hidden_staff_details(attributes)
+            current = element[-1]
+            right = current.find("barline[@location='right']")
+            current.insert(
+                list(current).index(right) if right is not None else len(current), attributes
+            )
+            reaffirmed = True
         first = False
+
+
+def _append_hidden_staff_details(attributes: ET.Element) -> None:
+    ET.SubElement(attributes, "staff-details", {"print-object": "no", "print-spacing": "no"})
 
 
 def _staff_bundles(score: Score) -> tuple[tuple[Part, ...], ...]:
@@ -662,6 +688,8 @@ def _assign_staff(part: ET.Element, staff: int, voices: dict[str, str]) -> None:
             elif element.tag == "attributes":
                 for clef in element.findall("clef"):
                     clef.set("number", str(staff))
+                for details in element.findall("staff-details"):
+                    details.set("number", str(staff))
 
 
 def _merged_attributes(
@@ -691,6 +719,11 @@ def _merged_attributes(
         if source is not None and (clef := source.find("clef")) is not None:
             clef.set("number", str(staff))
             result.append(clef)
+    for staff, source in enumerate(sources, start=1):
+        if source is not None:
+            for details in source.findall("staff-details"):
+                details.set("number", str(staff))
+                result.append(details)
     return result
 
 

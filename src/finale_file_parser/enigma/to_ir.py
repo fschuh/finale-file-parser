@@ -61,6 +61,7 @@ from finale_file_parser.enigma.repeats import Repeats, repeats_for
 from finale_file_parser.enigma.slurs import slurs_by_staff
 from finale_file_parser.enigma.smart_shapes import stale_smart_shapes
 from finale_file_parser.enigma.staff_playback import with_playback_scopes
+from finale_file_parser.enigma.staff_visibility import staff_hide_modes
 from finale_file_parser.enigma.text import file_info, staff_names
 from finale_file_parser.enigma.timesig import TimeSignature as EnigmaTimeSignature
 from finale_file_parser.enigma.timesig import time_signatures
@@ -342,6 +343,17 @@ def build_score(document: EnigmaDocument) -> Score:
         events[endpoint.event_index] = replace(event, arpeggios=event.arpeggios + marks)
     clef_at = _carried_clefs(document, staves, numbers, clef_at, clef_changes)
     expressions = _place_score_wide(expressions, staves)
+    hide_modes = staff_hide_modes(document)
+    diagnostics += tuple(
+        ScoreDiagnostic(
+            "staff-cutaway-geometry",
+            f"Staff {staff} retains its cutaway print policy; its system geometry "
+            "has not been resolved and is not interpreted as global hiding.",
+            f"staffSpec:{staff}",
+        )
+        for staff in staves
+        if hide_modes.get(staff) == "cutaway"
+    )
     parts = [
         Part(
             id=f"P{staff}",
@@ -377,6 +389,7 @@ def build_score(document: EnigmaDocument) -> Score:
             tremolos=tremolos.get(staff, ()),
             glissandi=glissandi.get(staff, ()),
             lines=lines.get(staff, ()),
+            staff_hide_mode=hide_modes.get(staff),
         )
         for staff in staves
     ]

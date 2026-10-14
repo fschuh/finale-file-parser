@@ -1375,7 +1375,12 @@ def _others_records(
                 )
         elif record.tag == TAG_STAFF_SPEC and len(record.payload) >= _STAFF_TRANSPOSITION + 2:
             out.append(
-                Record(tag="staffSpec", attrs=attrs, text="", fields=_staff_spec(record.payload))
+                Record(
+                    tag="staffSpec",
+                    attrs=attrs,
+                    text="",
+                    fields=_staff_spec(record.payload, decode_hide_mode=True),
+                )
             )
         elif record.tag == TAG_REPEAT_BACK and len(record.payload) >= 4:
             out.append(
@@ -1567,7 +1572,7 @@ def _repeat_back(payload: bytes) -> dict[str, str | tuple[str, ...] | Record | t
 
 
 def _staff_spec(
-    payload: bytes, order: ByteOrder = "little"
+    payload: bytes, order: ByteOrder = "little", *, decode_hide_mode: bool = False
 ) -> dict[str, str | tuple[str, ...] | Record | tuple[Record, ...]]:
     """Staff names, the stored default clef and transposition key alteration.
 
@@ -1590,6 +1595,14 @@ def _staff_spec(
     default_clef = _u16(payload, 12, order) & 0xFF
     if default_clef:
         fields["defaultClef"] = str(default_clef)
+    # FCStaff::GetHideMode uses moreFlags+44 in the independently evidenced
+    # numeric 2011/2012 layouts. Older/DCL storage has different semantics.
+    if decode_hide_mode and len(payload) in {84, 96}:
+        mode = {0x4000: "score", 0x8000: "scoreParts", 0xC000: "cutaway"}.get(
+            _u16(payload, 44, order) & 0xC000
+        )
+        if mode is not None:
+            fields["hideMode"] = mode
     if adjust:
         keysig = Record(tag="keysig", attrs={}, text="", fields={"adjust": str(adjust)})
         fields["transposition"] = Record(

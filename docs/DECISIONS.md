@@ -10,6 +10,17 @@ and resolved ones **DECIDED**.
 
 ---
 
+## 2026-10-14 — DECIDED: explicit staff hiding is separate from retained music
+
+P08 establishes the score-hidden staff flag independently in the numeric
+84/96-byte staffSpec layouts and source system lists. Retain that policy on
+canonical Part, including hidden musical and resting staves, and export the
+standard display control without muting/removing their notes. Reaffirm the
+unchanged control after the first notes to handle MuseScore's initial-rest
+heuristic. Do not apply the newer mask to unproved older/DCL layouts or
+interpret cutaway as global hiding. Per-system/style geometry and the native
+hidden-empty-staff heuristic remain explicit limits.
+
 ## 2026-10-14 — DECIDED: retain navigation geometry without changing jump time
 
 The approved P07 source investigation recovers assignment drawing coordinates
