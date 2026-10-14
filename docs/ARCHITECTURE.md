@@ -272,10 +272,14 @@ stores0x0303, but has no musical gfhold, so recovering only the table still
 left its restored empty staff in treble. Read the stored3 and let the existing
 default/carried-clef logic select the source F clef. A stored zero remains
 zero/omitted; unresolved instrument-derived defaults are not invented.
-Literal legacy gfhold reference0 is normalized as an absent clefID so the
-existing reader uses that stored staff default, as established by the paired
-gfhold/default evidence below. Explicit clef0 in EnigmaXML or a timed clef list
-keeps its literal selection; it is not converted into a default request.
+Literal legacy gfhold reference0 keeps its real clef-table selection. A first
+P01 follow-up incorrectly normalized every0 as a default request; Title Screen
+provides a direct counterexample, with bass holds3,0,3 in bars1,2,3 and a
+printed treble switch in2. Its stored default remains3. The
+[PDK frame-hold getter](https://pdk.finalelua.com/class_f_c_cell_frame_hold.html)
+independently identifies a zero-based index. Staff defaults still apply to
+missing holders, including Uncover's resting staff. The original clef-table
+fixes for Simone/Spring use explicit3 and are unaffected by this correction.
 
 An unrecognized application banner does not mean the score lacks its clef
 definitions. NotePad 2006's Simone file stores numeric tag109, cmper65534,
@@ -668,11 +672,15 @@ pairs, all of which are same-content pairs carrying `gfhold`:
 | `gfhold` key sequence | every document — the `.musx` sequence restricted to the keys `.mus` holds |
 | `clefPercent` at payload +4 | over 8,000 compared, every record exact |
 | `frame1` at payload +6 | over 8,000 compared, one dangling-reference difference |
-| `clefID` at payload +0 | 9,736 exact, 272 defaulted (below), **0 unexplained** |
+| `clefID` at payload +0 | Historical9,736 exact;272 differed as described below |
 
-**`.mus` writes `clefID` 0 for "use the staff's `defaultClef`"**, and a `.musx` export materialises
-the resolved clef into the record. This refines the earlier note that every `gfhold` carries a
-`clefID` with no inheritance — true of `.musx`, not of `.mus`.
+**Correction2026-10-14:** the272 historical pairs had legacy0 versus a
+materialized default in MUSX. That observation does not establish a universal
+zero sentinel. Title Screen's explicit3→0→3 and the PDK zero-based getter
+disprove that inference. Retain stored indices, including0; the context behind
+those old materialized defaults remains an instrument/version investigation.
+The licensed paired corpus is unavailable in this workspace, so its historical
+counts are not a new validation run.
 
 **The header's earlier incidence hypothesis is retracted (2026-10-11).** The
 all-zero paired corpus could not determine the word's meaning. Nonzero groups,

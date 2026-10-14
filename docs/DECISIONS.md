@@ -10,6 +10,15 @@ and resolved ones **DECIDED**.
 
 ---
 
+## 2026-10-14 — DECIDED: explicit cell clef zero stays a real index
+
+Title Screen's stored3→0→3 with default3 and its printed treble switch reject
+the blanket legacy-zero normalization introduced during P01. Retain all cell
+indices, while still using separately recovered staff defaults for absent
+holders. The old paired materialization observation remains documented as
+context-specific evidence, not a universal decoding rule. Native counterchecks
+are required alongside the original three restored-clef cases.
+
 ## 2026-10-14 — DECIDED: recover literal staff default-clef selectors
 
 The approved initial/default-clef recovery also consumes the already evidenced

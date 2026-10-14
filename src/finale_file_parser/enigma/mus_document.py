@@ -1662,9 +1662,9 @@ def _gfhold_clef(
         raise CorruptScoreError("gfhold: truncated clef/flag fields")
     name = "clefListID" if _u16(payload, 2, order) & 0x0400 else "clefID"
     reference = _u16(payload, 0, order)
-    # The legacy literal zero means use the staff default, unlike an
-    # explicitly selected zero in a timed clef list or an EnigmaXML gfhold.
-    return {} if name == "clefID" and reference == 0 else {name: str(reference)}
+    # Zero is a real clef-table index (e.g. a bass-to-treble switch).
+    # Staff defaults apply to absent holders, not every stored zero.
+    return {name: str(reference)}
 
 
 def _clef_enums(payload: bytes, attrs: dict[str, str], order: ByteOrder = "little") -> list[Record]:

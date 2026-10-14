@@ -126,10 +126,13 @@ year can, and does.**
 ### Effect
 
 Clef differences in the `.mus` → IR sweep fall from **327 measures to 22**. Every one of the 22 is
-the same case: the `gfhold` stores `clefID` 0, meaning "use the staff's `defaultClef`", and the
+the same historical case: the `gfhold` stores `clefID`0, and the
 `.mus` `staffSpec` stores 0 there too while the `.musx` materialises clef 3. That is the
-instrument-derived gap already documented below, not a decode error — so 22 is a floor until an
-instrument table is found.
+instrument-derived gap already documented below. Correction2026-10-14: this
+paired observation does not make every literal0 a default sentinel. Title
+Screen's3→0→3 bass/treble/bass switch and the published zero-based frame-hold
+getter establish a literal0 counterexample. Preserve the stored index; the
+old materialization context remains unproved without that licensed corpus.
 
 ## ✅ SOLVED: tag 158, and both pools now read 91 of 91 documents
 
@@ -453,10 +456,11 @@ restricted to the keys `.mus` holds in **80 of 80** documents, `clefPercent` and
 `gfhold` the second payload-confirmed record type after `frameSpec`/`measSpec`, and it is the link
 from a (staff, measure) to the entry frames that fill it.
 
-**`.mus` writes `clefID` 0 to mean "use the staff's `defaultClef`";** a `.musx` export materialises
-the resolved value. All 272 non-matching records are exactly that case, none unexplained. This
-refines the earlier finding that every `gfhold` carries a `clefID` with no inheritance — true of
-`.musx`, not of `.mus`.
+**Correction2026-10-14:** all272 historical differences resembled materialized
+defaults, but the universal `clefID`0 sentinel inferred from them is false.
+The zero-based frame-hold selector can explicitly switch to clef0, as Title
+Screen2 demonstrates between3 in1/3. Do not discard stored0 or invent its
+meaning from a staff name/pitch. See ARCHITECTURE for the counterexample.
 
 **`inci` at +6 is named by position, not evidence.** Zero in all 77,384 corpus records examined, and
 no corpus document repeats a `(tag, cmper1, cmper2)` key, so nothing distinguishes an incidence

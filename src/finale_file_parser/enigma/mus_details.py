@@ -19,8 +19,8 @@ so one record occupies `16 + length` bytes, against the `others` pool's
 on a staff to the entry frames that fill it. Its 20-byte payload:
 
     +0   clefID       or clefListID when the +2 word has GF_CLEFISLIST (0x0400)
-                      Literal 0 means "the staff's `defaultClef`", which a `.musx`
-                      export materialises into the record
+                      Literal 0 remains a real clef-table index; defaults
+                      apply separately when a cell has no holder
     +2   flags
     +4   clefPercent
     +6   frame1
@@ -28,8 +28,9 @@ on a staff to the entry frames that fill it. Its 20-byte payload:
 Verified against paired `.musx` files across 80 documents: the `gfhold` key
 sequence is the `.musx` sequence restricted to the keys `.mus` holds in 80 of
 80, `clefPercent` matches in 8,382 of 8,382 records, `frame1` in 8,372 of
-8,372, and `clefID` in 8,255 of 8,527 -- with every one of the other 272 being
-the `defaultClef` case above, so none are unexplained.
+8,372, and `clefID` in 8,255 of 8,527. The other272 historically resembled
+materialized defaults, but do not establish a universal zero sentinel:
+Title Screen's explicit 3 -> 0 -> 3 switch is a counterexample. See ARCHITECTURE.
 
 Scope: the 2011/2012 era, as with `enigma.mus_others` -- and for the same
 reason. A 2001-2005 file's `details` pool is reachable now but holds fixed

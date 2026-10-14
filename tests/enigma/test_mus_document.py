@@ -500,7 +500,7 @@ def test_stored_default_clef_is_separate_from_the_transposition_clef(order: Byte
     assert "defaultClef" not in adapter._staff_spec(bytes(payload), order)
 
 
-def test_gfhold_default_clef_resolves_the_stored_staff_default(
+def test_literal_gfhold_zero_overrides_the_staff_default_and_can_switch_back(
     pools: Callable[..., None],
 ) -> None:
     from finale_file_parser.enigma.clef import clefs_by_measure, default_clefs
@@ -509,11 +509,14 @@ def test_gfhold_default_clef_resolves_the_stored_staff_default(
     payload[12:14] = (0x0303).to_bytes(2, "little")
     pools(
         others=(MusOther(TAG_STAFF_SPEC, 2, 0, bytes(payload)),),
-        details=(MusDetailRecord(GFHOLD, 2, 1, 0, gfhold_payload(0, 0)),),
+        details=tuple(
+            MusDetailRecord(GFHOLD, 2, measure, 0, gfhold_payload(clef, 0))
+            for measure, clef in ((1, 3), (2, 0), (3, 3))
+        ),
     )
     doc = read_mus_document(PATH)
     assert default_clefs(doc) == {2: 3}
-    assert clefs_by_measure(doc) == {(2, 1): 3}
+    assert clefs_by_measure(doc) == {(2, 1): 3, (2, 2): 0, (2, 3): 3}
 
 
 def lyric_payload(*groups: tuple[int, int, bool]) -> bytes:
