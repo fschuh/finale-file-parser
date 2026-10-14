@@ -2835,6 +2835,18 @@ outside signed 32-bit Enigma EVPU bounds raise a clear error.
 A fresh read of score shape 94 has left X/Y **0 / -175** and right X/Y
 **-41 / -175**. Its musical end remains **staff 1, m51, EDU 4096**; the
 negative X adjustment pulls the printed end left independently of that time.
+
+**P20 independent native recheck (2026-10-14):** Three original two-bar native
+fixtures compare a plain bar-end hairpin, an active one-space end inset and
+the same inset serialized at the actual cursor time with forward/backup.
+All pass schema/projection/import, have identical rendered PNGs and preserve
+the same note onsets/pitches. This differs from the octave timing case: physical
+cursor placement does not recover hairpin X geometry. The native wedge importer
+reads type/niente/color/style/spread and endpoints, not the wedge X adjustment.
+Scars remains0 source-missing attacks with the same26 contextual MIDI extras;
+its valid stop still ends51 at4096EDU with source-41EVPU retained. The printed
+inset remains a native layout limit, not an extension of source timing into52.
+No changed clock endpoint, artificial fragment or alternate spread is shipped.
 Shape 36 in m58 has left/right X **-1 / +1** and Y **-183** at both ends.
 Finale's official [measurement equivalents](https://usermanuals.finalemusic.com/FinaleMac/Content/Finale/def-equivalents.htm)
 define **24 EVPUs per space**. MusicXML
