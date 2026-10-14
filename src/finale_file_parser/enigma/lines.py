@@ -7,9 +7,10 @@ from finale_file_parser.enigma.document import EnigmaDocument, Record, field_int
 from finale_file_parser.enigma.fonts import font_names
 from finale_file_parser.enigma.hairpins import _endpoint
 from finale_file_parser.enigma.models import CorruptScoreError
+from finale_file_parser.enigma.shape_graphics import resolve_shape_graphic
 from finale_file_parser.enigma.slurs import _drawing_adjustment
 from finale_file_parser.enigma.text import plain_text
-from finale_file_parser.ir import LineSpan, ScoreDiagnostic
+from finale_file_parser.ir import LineSpan, ScoreDiagnostic, ShapeGraphic
 
 _PRESETS = {
     "10": ("dashed", "none", "none"),
@@ -54,6 +55,7 @@ def lines_by_staff(
     } - set(ignored_shapes)
     fonts = font_names(document)
     result: dict[int, list[LineSpan]] = {}
+    graphic_cache: dict[int, tuple[ShapeGraphic | None, str]] = {}
     diagnostics = []
     for record in document.others.of_tag("smartShape"):
         number = field_int(record.attrs.get("cmper"))
@@ -140,6 +142,19 @@ def lines_by_staff(
             raise CorruptScoreError(f"{ref}: reversed line span")
         sx, sy = _drawing_adjustment(record, "startTermSeg")
         ex, ey = _drawing_adjustment(record, "endTermSeg")
+        graphics = []
+        for symbol in (start_symbol, end_symbol):
+            graphic = None
+            if symbol.startswith("shape:"):
+                identity = field_int(symbol.removeprefix("shape:"))
+                if identity is None or identity < 0:
+                    raise CorruptScoreError(f"{ref}: invalid custom endpoint shape ID")
+                if identity not in graphic_cache:
+                    graphic_cache[identity] = resolve_shape_graphic(document, identity)
+                graphic, reason = graphic_cache[identity]
+                if reason:
+                    diagnostics.append(ScoreDiagnostic("line-graphic-resource", reason, ref))
+            graphics.append(graphic)
         result.setdefault(staff, []).append(
             LineSpan(
                 start_measure=sm,
@@ -161,6 +176,8 @@ def lines_by_staff(
                 source_ref=ref,
                 start_cap_length=start_cap_length,
                 end_cap_length=end_cap_length,
+                start_graphic=graphics[0],
+                end_graphic=graphics[1],
             )
         )
         if (sm, so) == (em, eo):
@@ -176,8 +193,8 @@ def lines_by_staff(
             diagnostics.append(
                 ScoreDiagnostic(
                     "line-endpoint-graphic",
-                    "Custom line endpoint graphics retain their resource references; "
-                    "standard MusicXML exports the line without those graphics.",
+                    "Custom line endpoint graphics retain their references and available "
+                    "drawing programs; standard MusicXML exports the line without those graphics.",
                     ref,
                 )
             )

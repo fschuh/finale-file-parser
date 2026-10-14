@@ -94,6 +94,11 @@ TAG_SMART_SHAPE_MEAS_MARK = 218
 TAG_SMART_SHAPE_CUSTOM_LINE = 222
 """72-byte custom line definitions; Unicode-era fields differ within the same size."""
 
+TAG_SHAPE_DATA = 213
+TAG_SHAPE_DEF = 214
+TAG_SHAPE_LIST = 215
+"""Shape Designer data, resource joins and instructions; see ARCHITECTURE P21."""
+
 TAG_STAFF_SPEC = 231
 """`staffSpec` — confirmed by payload (rest offsets, staff lines, repeat-dot
 offsets), not by key sequence."""

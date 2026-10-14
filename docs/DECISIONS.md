@@ -1331,7 +1331,9 @@ The complete user-corpus audit records initial MIDI programs/banks and CC7/10,
 but the legacy field joins/function flags for those controls are not independently
 established. Numeric136 is an executable-shape palette and149 is fretInst;
 neither supplies a program merely because a small payload word matches a MIDI
-number. Numeric21412-byte records and channelPlayData124 remain research leads.
+number. Numeric21412-byte records are now identified as Shape Designer resource
+headers (P21, 2026-10-14), not instrument bank/program data. channelPlayData124
+remains a research lead.
 Released InstrumentDef getters prove virtual-channel/perc-map fields in their
 API structure, not an unsupported bank/program interpretation of another word.
 Do not emit MIDI-derived programs, pan, volume or per-note velocities as source.
@@ -1351,4 +1353,21 @@ appearance only; it does not erase its encoded pitch or imply percussion.
 Unknown mappings remain unresolved data with diagnostics. Keep ordinary notes
 free of inferred overrides, and append defaulted fields to preserve positional
 constructor compatibility. Parentheses and head shape share one XML element.
+
+# 2026-10-14: retain source drawing programs on canonical line endpoints
+
+Append immutable GraphicInstruction/ShapeGraphic on existing LineSpan rather
+than building another score model or limiting the IR to MusicXML's cap shapes.
+Retain source integers for mixed-unit transforms/precision and unknown commands;
+interpret only independently evidenced command names, counts and pool joins.
+These are bounded inert data. No graphics program, external resource or inferred
+pedal/controller is executed. Missing resources remain explicit references and
+diagnostics. Cache shared definitions rather than copying a large program for
+every assigned line.
+
+MusicXML brackets retain the line's source timing and geometry, with explicit
+custom-path export limits. The native4.7.5 bracket/image experiments do not
+provide a faithful standard-path rendering, so ship no importer-specific glyph,
+screenshot or artificial timing workaround. An exact source program retained
+in IR does not imply a PDF-perfect MusicXML render.
 

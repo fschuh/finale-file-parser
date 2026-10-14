@@ -3362,9 +3362,10 @@ pairing, number reuse/overflow and custom-resource diagnostics. Actual
 MuseScore4.7.5 imports on seven representative scores retain ordinary text
 lines and hooks, but the importer does not read bracket relative-x/y. Thus
 same-time hand brackets and other drawn geometry need manual layout. A custom
-endpoint such as shape107 in Opening/Terra stays an opaque source reference
-with line-endpoint-graphic diagnostics; the exported bracket omits the custom
-change-pedal spike. Center/continuation labels, when present, also have an
+endpoint such as shape107 in Opening/Terra was initially an opaque source
+reference. Its program is now recovered by P21 below; the exported bracket
+still omits the arbitrary endpoint path with line-endpoint-graphic diagnostics.
+Center/continuation labels, when present, also have an
 explicit placement diagnostic. Unused pedal-text libraries place nothing.
 
 MuseScore's primary bracket importer maps line-type=wavy to a Trill spanner
@@ -3373,6 +3374,70 @@ ornament meaning; Dreadful Fight's same-time slanted flourish needs manual
 layout. These interchange limits do not justify fabricated playback controls.
 Local evidence is r02-line-check.json and the original/native opening renders
 in the generated validation directory, outside git.
+
+#### Custom endpoint drawing programs (2026-10-14, PDF-review P21)
+
+Numeric others213/214/215 are respectively `shapeData`, `shapeDef` and
+`shapeList`. A 12-byte shapeDef header contains u16 instruction-list ID at+0,
+data-list ID at+2 and shape type at+4. The published PDK FCShapeDef `_LoadType`
+reads the third short of raw edSD; primary
+[musxdom ShapeDesigner](https://github.com/openmusx/musxdom/blob/main/src/musx/dom/ShapeDesigner.h)
+and its
+[field mappings](https://github.com/openmusx/musxdom/blob/main/src/musx/factory/FieldPopulatorsOthers.cpp)
+independently identify `instList`, `dataList`, the repeated `instruct/tag/numData`
+and signed `shapeData/data` fields. Type7 is arrowhead. These are graphic
+resources, not MIDI bank/program controls.
+
+In the evidenced numeric instruction form, each four-byte row contains u16
+opcode at+0, parameter count byte+2 and a source format byte+3 equal to2.
+The latter byte's wider meaning is unproved: retain it and decline other forms.
+Trailing all-zero rows are storage padding. Data is a signed little-endian
+32-bit array. FCShapeDefInstruction::GetTagAsString in the read-only RGP binary
+(VM26abc8, jump table26ada8) independently names 736f=startObject,
+6c77=lineWidth, 726d=rMoveTo, 7364=setDash, 726c=rLineTo and7374=stroke.
+The public ShapeDesigner declarations corroborate respective arities11/1/2/2/2/0.
+Positions/dashes use EVPU (24 per staff space), line width Efix (64 per EVPU).
+startObject retains origin, bounds, scale thousandths, packed rotation and two
+undocumented words. Do not guess a transform for an unknown rotation encoding.
+
+Opening/Terra header107 explicitly joins lists200, not lists107. Their command
+sequence consumes22 words: startObject(-12,0,-14,26,14,-2,1000,1000,0,0,0),
+lineWidth102, rMoveTo(0,0), setDash(18,0), rLineTo(0,0), rLineTo(12,24),
+rLineTo(12,-24), stroke. This retains the triangular notch and its stroke
+precision. The remaining data words24/12 are outside the consumed prefix and
+must not be treated as another path. The primary iterator also consumes only
+the count-declared prefix. The header/list/data joins, rather than appearance
+or an ID shared by unrelated pools, establish this interpretation.
+
+Append optional LineSpan.start_graphic/end_graphic with immutable canonical
+ShapeGraphic/GraphicInstruction. Retain exact source integers and resource
+references, including unknown opcodes and their parameters with diagnostics;
+do not execute any instruction, follow external graphics or infer pedal events.
+Resolve only eligible visible score assignments, honor linked-part isolation
+and cache shared immutable resources. Before expanding arrays cap instructions
+at8192 and data at65536 signed words; validate complete rows, source integer
+ranges, cumulative counts and known arities. Missing resources and unproved
+forms remain explicit references/diagnostics. Empty definitions and omitted
+typed zero counts remain valid defaults. No older DCL layout is inferred.
+
+Maya19's dashed diagonal already retains start/end staff-space Y25/24 and155/24
+at whole-note offsets3/16..3/8. Terra57..58's endpoint now additionally carries
+the resolved shape107 program; its separate59..60 hooked line remains intact.
+Four original native fixtures test horizontal/diagonal brackets and standard
+inline/external SVG image directions. All validate/project/import, but actual
+MuseScore4.7.5 renders identical PNGs (062704623a7a8ea4...) and identical notes.
+Its direction parser skips image elements and bracket endpoint X/Y. Keep the
+standard line and explicit custom-path interchange diagnostic; do not replace
+drawings with screenshots or claim exact native rendering.
+
+Opening's extra dashed13..19 span is a native GradualTempoChange inferred from
+the legitimate accel. words. It is not an assigned source16..19 line and cannot
+be removed by deleting source drawings. Three target source/projection/schema/
+native checks retain their attack counts and existing navigation exception;
+all105 scores build/project. Private evidence P21-programs.txt, P21-opcodes.txt,
+P21/results.json and P21-fixture/run-5_ffwhb8 remains outside git. Authored MIT
+regressions cover resource joins, typed/binary parity, visibility/part gates,
+unknown commands, blank/default handling, hostile counts and allocation caps.
 
 #### Green Hill's written tie gap versus held MIDI (2026-10-12, R03)
 

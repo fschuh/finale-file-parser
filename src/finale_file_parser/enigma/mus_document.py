@@ -97,6 +97,9 @@ from finale_file_parser.enigma.mus_others import (
     TAG_REPEAT_ENDING_START,
     TAG_REPEAT_ENDING_TEXT,
     TAG_REPEAT_PASS_LIST,
+    TAG_SHAPE_DATA,
+    TAG_SHAPE_DEF,
+    TAG_SHAPE_LIST,
     TAG_SMART_SHAPE,
     TAG_SMART_SHAPE_CUSTOM_LINE,
     TAG_SMART_SHAPE_MEAS_MARK,
@@ -112,6 +115,7 @@ from finale_file_parser.enigma.mus_others import (
 from finale_file_parser.enigma.mus_payload import ByteOrder, read_mus_pools, read_mus_streams
 from finale_file_parser.enigma.mus_rows import MusRows, read_mus_rows
 from finale_file_parser.enigma.mus_text import decode_mus_text
+from finale_file_parser.enigma.shape_graphics import normalize_shape_record
 from finale_file_parser.version import mus as mus_header
 
 __all__ = ["UNTRANSLATED", "read_mus_document"]
@@ -1249,6 +1253,8 @@ def _others_records(
             out.append(Record("fontName", attrs, "", {"name": name}))
         elif record.tag == TAG_TEXT_BLOCK:
             out.append(Record("textBlock", attrs, "", _text_block(record.payload)))
+        elif record.tag in {TAG_SHAPE_DATA, TAG_SHAPE_DEF, TAG_SHAPE_LIST}:
+            out.append(normalize_shape_record(record.tag, record.payload, attrs))
         elif record.tag == TAG_SMART_SHAPE_CUSTOM_LINE:
             translated = _custom_line(record.payload, modern=line_layout)
             out.append(

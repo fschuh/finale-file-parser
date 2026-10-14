@@ -31,6 +31,7 @@ __all__ = [
     "ExpressionPlayback",
     "Fermata",
     "Glissando",
+    "GraphicInstruction",
     "Hairpin",
     "Lyric",
     "Measure",
@@ -47,6 +48,7 @@ __all__ = [
     "PlaybackPreferences",
     "RepeatPlayback",
     "Score",
+    "ShapeGraphic",
     "Slur",
     "SlurEndpoint",
     "Tempo",
@@ -653,11 +655,42 @@ class SlurEndpoint:
 
 
 @dataclass(frozen=True)
+class GraphicInstruction:
+    """One inert source drawing command, never executable code.
+
+    Parameters retain source integers to avoid losing transform or precision
+    information. For the supported Shape Designer subset, positions use EVPU
+    (24 per staff space), line width uses Efix (64 per EVPU), and startObject
+    includes scales in thousandths and an opaque packed rotation value.
+    Unknown commands retain their source tag instead of inferred geometry.
+    """
+
+    kind: str
+    parameters: tuple[int, ...] = ()
+    source_tag: int | None = None
+
+
+@dataclass(frozen=True)
+class ShapeGraphic:
+    """A referenced custom endpoint's bounded, inert drawing program.
+
+    This is drawing data on the canonical score, without inferred musical or
+    playback meaning. Source references identify the separately joined pools.
+    """
+
+    instructions: tuple[GraphicInstruction, ...]
+    source_ref: str = ""
+    instruction_ref: str = ""
+    data_ref: str = ""
+    kind: str = "other"
+
+
+@dataclass(frozen=True)
 class LineSpan:
     """An assigned visible line, with timing separate from drawing geometry.
 
     This carries no inferred pedal, octave, glissando or playback meaning.
-    Custom endpoint resource IDs survive for renderers that can resolve them.
+    Custom endpoint IDs and resolved drawing programs survive independently.
     Offsets/lengths use staff spaces; musical offsets use whole-note units.
     """
 
@@ -680,6 +713,8 @@ class LineSpan:
     source_ref: str = ""
     start_cap_length: Fraction | None = None
     end_cap_length: Fraction | None = None
+    start_graphic: ShapeGraphic | None = None
+    end_graphic: ShapeGraphic | None = None
 
 
 @dataclass(frozen=True)
