@@ -278,6 +278,20 @@ def build_score(document: EnigmaDocument) -> Score:
     lines, line_diagnostics = lines_by_staff(document, ignored_shapes=ignored_shapes)
     diagnostics += line_diagnostics
     diagnostics += articulation_diagnostics
+    diagnostics += tuple(
+        ScoreDiagnostic(
+            "navigation-word-position",
+            f"Text repeat in measure {number} retains its source measure-origin X "
+            "in the IR. Its bar-boundary export anchor stays exact; a layout-aware "
+            "horizontal transform is not established for this word alignment.",
+            f"textRepeatAssign:{number}:{index}",
+        )
+        for number, marks in navigation.items()
+        for index, mark in enumerate(marks)
+        if mark.kind == "words"
+        and mark.x_offset not in {None, Fraction(0)}
+        and mark.justification != "right"
+    )
     placed_entries = {entry for _, _, entry in slur_positions}
     diagnostics += tuple(
         ScoreDiagnostic(

@@ -1,6 +1,7 @@
 """Independently authored navigation records: placements, fonts and hostile bounds."""
 
 import struct
+from fractions import Fraction
 
 import pytest
 
@@ -9,6 +10,7 @@ from finale_file_parser.enigma.jumps import navigation_by_measure
 from finale_file_parser.enigma.models import CorruptScoreError
 from finale_file_parser.enigma.mus_document import _others_records
 from finale_file_parser.enigma.mus_others import MusOther
+from finale_file_parser.enigma.to_ir import build_score
 
 
 def _assignment(flags: int, *, target: int = 1, passes: int = 2) -> bytes:
@@ -23,6 +25,51 @@ def test_numeric_assignment_retains_signed_fields_and_independent_flags() -> Non
     assert fields["repnum"] == "3"
     assert (fields["action"], fields["trigger"]) == ("jumpRelative", "onPass")
     assert "hidden" in fields and "clrOnChange" in fields
+
+
+def test_navigation_retains_source_positions_and_definition_alignment_without_timing_guesses() -> (
+    None
+):
+    """Original numeric/text fields authored here under MIT."""
+    doc = parse_enigma(b"""<finale><others>
+      <textRepeatDef cmper="3"><justify>left</justify></textRepeatDef>
+      <textRepeatText cmper="3"><rptText>Repeat from</rptText></textRepeatText>
+      <textRepeatAssign cmper="4"><repnum>3</repnum><horzPos>485</horzPos>
+        <vertPos>109</vertPos><action>jumpAbsolute</action><target>2</target>
+      </textRepeatAssign></others></finale>""")
+    mark = navigation_by_measure(doc)[4][0]
+    assert mark.x_offset == Fraction(485, 24) and mark.y_offset == Fraction(109, 24)
+    assert mark.justification == "left"
+    assert mark.playback is not None and mark.playback.target == 2
+
+
+@pytest.mark.parametrize("value", ["invalid", "2147483648", "-2147483649"])
+def test_invalid_navigation_drawing_position_is_a_clear_score_error(value: str) -> None:
+    doc = parse_enigma(
+        f"""<finale><others>
+      <textRepeatText cmper="3"><rptText>Fine</rptText></textRepeatText>
+      <textRepeatAssign cmper="1"><repnum>3</repnum><horzPos>{value}</horzPos>
+      </textRepeatAssign></others></finale>""".encode()
+    )
+    with pytest.raises(CorruptScoreError, match="drawing position"):
+        navigation_by_measure(doc)
+
+
+def test_unestablished_word_origin_transform_has_an_explicit_score_diagnostic() -> None:
+    doc = parse_enigma(b"""<finale><others>
+      <staffSpec cmper="1"/>
+      <measSpec cmper="1"><beats>4</beats><divbeat>1024</divbeat></measSpec>
+      <frameSpec cmper="1"><startEntry>1</startEntry><endEntry>1</endEntry></frameSpec>
+      <textRepeatDef cmper="3"><justify>left</justify></textRepeatDef>
+      <textRepeatText cmper="3"><rptText>Fine</rptText></textRepeatText>
+      <textRepeatAssign cmper="1"><repnum>3</repnum><horzPos>24</horzPos>
+      </textRepeatAssign></others>
+      <details><gfhold cmper1="1" cmper2="1"><frame1>1</frame1></gfhold></details>
+      <entries><entry entnum="1" prev="0" next="0"><dura>4096</dura><numNotes>1</numNotes>
+        <note><harmLev>0</harmLev><harmAlt>0</harmAlt></note></entry></entries></finale>""")
+    score = build_score(doc)
+    assert score.diagnostics[0].code == "navigation-word-position"
+    assert score.parts[0].measures[0].navigation[0].x_offset == 1
 
 
 def test_font_definition_and_utf16_text_are_resolved_in_their_own_id_space() -> None:

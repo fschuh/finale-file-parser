@@ -9,8 +9,11 @@ The legacy words-only helper remains available for existing consumers.
 
 from __future__ import annotations
 
+from fractions import Fraction
+
 from finale_file_parser.enigma.document import EnigmaDocument, field_int
 from finale_file_parser.enigma.fonts import text_runs
+from finale_file_parser.enigma.models import CorruptScoreError
 from finale_file_parser.enigma.text import plain_text
 from finale_file_parser.ir import Navigation, RepeatPlayback
 
@@ -77,9 +80,29 @@ def navigation_by_measure(document: EnigmaDocument) -> dict[int, tuple[Navigatio
             )
         if text or playback is not None:
             result.setdefault(number, []).append(
-                Navigation(text, kind, f"repeat-{repnum}", playback, "hidden" not in record.fields)
+                Navigation(
+                    text,
+                    kind,
+                    f"repeat-{repnum}",
+                    playback,
+                    "hidden" not in record.fields,
+                    _position(record.fields.get("horzPos")),
+                    _position(record.fields.get("vertPos")),
+                    str(definition.fields["justify"])
+                    if definition is not None and "justify" in definition.fields
+                    else None,
+                )
             )
     return {number: tuple(marks) for number, marks in result.items()}
+
+
+def _position(value: object) -> Fraction | None:
+    if value is None:
+        return None
+    number = field_int(value)
+    if number is None or not -(2**31) <= number < 2**31:
+        raise CorruptScoreError("text repeat has an invalid drawing position")
+    return Fraction(number, 24)
 
 
 def jumps_by_measure(document: EnigmaDocument) -> dict[int, tuple[str, ...]]:

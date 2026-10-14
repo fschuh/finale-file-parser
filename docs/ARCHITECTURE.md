@@ -2046,6 +2046,44 @@ MEGAL14, Spider35/39 and Slider2 were checked for the recovered primary beams.
 Half-stem display controls are retained in the source options; arbitrary manual
 stem geometry is outside this beam-group change.
 
+#### Navigation drawing positions and reused signs (2026-10-14, P07)
+
+`textRepeatAssign.horzPos/vertPos` were already correctly decoded but were
+discarded at the IR boundary. Retain both as exact staff-space coordinates
+(EVPU/24), plus the definition's justification. The
+[PDK assignment](https://pdk.finalelua.com/class_f_c_text_repeat.html) independently
+identifies the horizontal measure-origin/justification relation and the vertical
+top-line reference. These graphical values do not supply a metric note offset
+or authorize changing a jump's encounter/pass rules. Bounds-check typed values
+as signed32-bit EVPUs; missing values remain unknown.
+
+Crash40 stores left-origin words485/109 and a reference segno649/95, reusing
+definition9 from the actual sign in9. Emit standard graphical coordinates on
+signs and applicable right-origin words; retain an unresolved left/center word
+horizontal transform explicitly in IR/diagnostics. Words keep their existing
+bar-end export anchor. A start-anchor experiment with raw word X was valid
+XML but regressed MuseScore, which ignored the X and printed words at the bar
+start; that serialization was withdrawn. No metric endpoint was moved to fit
+a screenshot. Coordinates remain independently recoverable source data.
+
+Repeated glyph-definition IDs are not unique playback-marker identities.
+Give actual XML marker placements distinct labels, and resolve each explicit
+source jump to its measure's label. A passive duplicate on another measure is
+a printed reference only when existing source targets identify exactly one
+actual destination for that repeated definition. Emit that reference as the
+standard [inline symbol](https://www.w3.org/2021/06/musicxml40/musicxml-reference/elements/symbol/),
+without an added sound marker. Ambiguous/multiple real destinations keep their
+markers; no new target is inferred from appearance or drawing position.
+
+Authored cases cover signed positions, malformed bounds, independent jump
+timing, references and two real targets sharing one definition. Five affected
+sources pass projection/XSD and isolated MuseScore4.7.5 imports with the same
+literal-route exceptions. This build's importer ignores horizontal coordinates
+on signs and can infer a marker even from an inline symbol when text inference
+is enabled. Crash40's sign therefore still renders at the start; this is an
+explicit remaining native/layout limit, not a completed visual match. The
+original right-side words placement is preserved after the rejected experiment.
+
 Tuplet number style is flag low-nibble at serialized+18; bracket style uses
 0x3000 there. RGP GetSymbolicNumber0x796E0 anchors base0x40 to existing+0,
 GetNumberStyle0x4DF7F6 and GetShapeStyle0x4DF80E read base+18. Zero/zero explicitly

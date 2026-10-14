@@ -69,3 +69,82 @@ def test_hidden_control_uses_a_schema_supported_hidden_direction() -> None:
     hidden = root.find(".//other-direction")
     assert hidden is not None and hidden.get("print-object") == "no"
     assert root.find(".//sound") is not None
+
+
+def test_positioned_marker_keeps_graphical_coordinates_separate_from_jump_time() -> None:
+    """Original positions and navigation authored here; MIT."""
+    marker = Navigation(
+        "%", "segno", "source", x_offset=Fraction(5, 2), y_offset=Fraction(4), justification="left"
+    )
+    jump = Navigation(
+        "Repeat from",
+        playback=RepeatPlayback("jumpAbsolute", target=2),
+        x_offset=Fraction(20),
+        y_offset=Fraction(5),
+        justification="left",
+    )
+    root = DET.fromstring(
+        to_musicxml(
+            _score(
+                Measure(1, (Voice(1, (NOTE,)),)),
+                Measure(2, (Voice(1, (NOTE,)),), navigation=(marker,)),
+                Measure(3, (Voice(1, (NOTE,)),), navigation=(jump,)),
+            )
+        )
+    )
+    sign = root.find(".//segno")
+    assert (
+        sign is not None
+        and sign.get("default-x") == "25.00000"
+        and sign.get("default-y") == "40.00000"
+    )
+    direction = root.find("part/measure[@number='3']/direction")
+    assert direction is not None and direction.findtext("offset") == "4"
+    sound = direction.find("sound")
+    assert sound is not None and sound.get("dalsegno") == "source"
+    words = direction.find("direction-type/words")
+    assert words is not None and words.get("default-y") == "50.00000"
+    assert words.get("default-x") is None  # source-left origin needs independent layout
+
+
+def test_reused_reference_sign_does_not_create_a_second_playback_destination() -> None:
+    marker = Navigation("%", "segno", "shared")
+    cue = Navigation("%", "segno", "shared", RepeatPlayback("noJump"), x_offset=Fraction(26))
+    jump = Navigation("Repeat from", playback=RepeatPlayback("jumpAbsolute", target=2))
+    root = DET.fromstring(
+        to_musicxml(
+            _score(
+                Measure(1, (Voice(1, (NOTE,)),)),
+                Measure(2, (Voice(1, (NOTE,)),), navigation=(marker,)),
+                Measure(3, (Voice(1, (NOTE,)),), navigation=(jump, cue)),
+            )
+        )
+    )
+    assert len(root.findall(".//segno")) == 1 and root.findtext(".//symbol") == "segno"
+    assert [s.get("segno") for s in root.findall(".//sound") if s.get("segno")] == [
+        "shared-measure-2"
+    ]
+    sound = root.find("part/measure[@number='3']/direction/sound")
+    assert sound is not None and sound.get("dalsegno") == "shared-measure-2"
+
+
+def test_two_real_targets_reusing_a_definition_keep_distinct_musicxml_labels() -> None:
+    marker = Navigation("%", "segno", "shared")
+    first = Navigation("Jump one", playback=RepeatPlayback("jumpAbsolute", target=2))
+    second = Navigation("Jump two", playback=RepeatPlayback("jumpAbsolute", target=3))
+    root = DET.fromstring(
+        to_musicxml(
+            _score(
+                Measure(1),
+                Measure(2, navigation=(marker,)),
+                Measure(3, navigation=(marker,)),
+                Measure(4, navigation=(first,)),
+                Measure(5, navigation=(second,)),
+            )
+        )
+    )
+    assert root.find(".//symbol") is None
+    labels = [s.get("segno") for s in root.findall(".//sound") if s.get("segno")]
+    assert labels == ["shared-measure-2", "shared-measure-3"]
+    jumps = [s.get("dalsegno") for s in root.findall(".//sound") if s.get("dalsegno")]
+    assert jumps == labels

@@ -10,6 +10,15 @@ and resolved ones **DECIDED**.
 
 ---
 
+## 2026-10-14 — DECIDED: retain navigation geometry without changing jump time
+
+The approved P07 source investigation recovers assignment drawing coordinates
+and definition alignment in canonical Navigation. Keep source pass/target/time
+independent, and distinguish passive reused reference signs only when explicit
+source destinations establish the distinction. Retain an unresolved word-origin
+transform as a diagnostic, because its first serialization regressed MuseScore.
+Do not move playback endpoints or claim the native sign placement is fixed.
+
 ## 2026-10-14 — DECIDED: explicit cell clef zero stays a real index
 
 Title Screen's stored3→0→3 with default3 and its printed treble switch reject

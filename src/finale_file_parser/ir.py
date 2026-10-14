@@ -507,6 +507,12 @@ class Navigation:
     visible: bool = True
     """Hiding a printed sign does not disable its source playback rule."""
 
+    x_offset: Fraction | None = None
+    y_offset: Fraction | None = None
+    """Source drawing positions in staff spaces, independent of playback time."""
+    justification: str | None = None
+    """The definition's left/right/center/full drawing origin/alignment."""
+
 
 @dataclass(frozen=True)
 class Pedal:
