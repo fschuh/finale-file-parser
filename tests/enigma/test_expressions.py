@@ -604,3 +604,22 @@ def test_a_textless_dynamic_is_not_emitted_as_words() -> None:
     )
     (found,) = expressions_by_measure(doc)[(1, 5)]
     assert prints_as_words(found) is False
+
+
+def test_a_legacy_rehearsal_insert_named_by_its_description_prints_its_measure() -> None:
+    """A .mus spells ^rehearsal() as insert 0xA7 and stores no decoded style."""
+    marker = Record(
+        tag="textExprDef",
+        attrs={"cmper": "71"},
+        text="",
+        fields={"descStr": "Auto-Sequencing Measure Number Rehearsal Markers"},
+    )
+    doc = document(
+        *library(),
+        marker,
+        text(71, "^legacycmd(A4,0101010a)^legacycmd(A7,)"),
+        assignment(7, 71),
+    )
+    (found,) = expressions_by_measure(doc)[(1, 7)]
+    assert found.is_rehearsal is True
+    assert found.text == "7"

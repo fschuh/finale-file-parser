@@ -154,8 +154,9 @@ _DEF = "textExprDef"
 _CATEGORY = "markingsCategory"
 _TEXT = "expression"
 
-_REHEARSAL = re.compile(r"\^rehearsal\(\)")
-"""The insert that stands where a rehearsal mark's label would be.
+_REHEARSAL = re.compile(r"\^rehearsal\(\)|\^legacycmd\(A7,\)")
+"""The insert that stands where a rehearsal mark's label would be (legacy 0xA7 in a
+`.mus`, which SMB Ground Theme's boxed bar numbers 7, 15, 23, 27, 35, 43 use).
 
 The label is not in the file. The expression text is this command and nothing
 else, so `plain_text` yields `""` -- correctly, since it has no literal text --
@@ -165,6 +166,7 @@ label out. See `_rehearsal_labels`.
 """
 
 _MEASURE_NUMBER_STYLE = "measNum"
+_MEASURE_NUMBER_MARKERS = re.compile(r"measure number rehearsal", re.IGNORECASE)
 _LETTER_STYLE = "letters"
 _NUMBER_STYLE = "numbers"
 
@@ -478,6 +480,14 @@ def _rehearsal_labels(
             continue
         definition = definitions.get(expr_id)
         style = str(definition.fields.get("rehearsalMarkStyle")) if definition else ""
+        if (
+            style == "None"
+            and definition is not None
+            and _MEASURE_NUMBER_MARKERS.search(str(definition.fields.get("descStr") or ""))
+        ):
+            # A .mus definition carries no decoded style, but Finale's shipped
+            # "Auto-Sequencing Measure Number Rehearsal Markers" names it.
+            style = _MEASURE_NUMBER_STYLE
         if style in (_MEASURE_NUMBER_STYLE, _LETTER_STYLE, _NUMBER_STYLE):
             styles.setdefault(measure, style)
 
