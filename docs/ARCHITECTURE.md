@@ -2238,6 +2238,20 @@ GetUseCustomFont0x5BB3A anchor the fields. Tremolo recovery uses only establishe
 inherited Maestro half-heads, excluding custom fonts. Packed note IDs can repeat
 in retained source records; do not let one erase its neighboring modification.
 
+#### Note glyphs in text (2026-10-16, audit T13)
+
+Tempo and swing marks set note glyphs in text fonts: MaestroTimes uses Œ quarter,
+Ó half, ‰ eighth, "ŒÂ" a beamed pair and Ç the small triplet 3 (MAP 2's
+"ŒÂ = Œ Ç‰" prints a swing equation); EngraverTextT/H/NCS and Maestro beside other
+text use q/h/e/w/x, with EngraverText's `d` as the dot. `fonts.readable_text`
+renders such runs with Unicode note symbols (♩ ♪ ♫ 𝅗𝅥 ³), keeping each run's
+spacing, and tempo parsing reads the same text, so words such as "Swing ♪'s" and
+"♫ = ♩ ³♪" survive beside the `<metronome>`. A run standing alone in a music font
+stays a glyph (a dynamic). Engraver Font Set shares Maestro's character map: its
+"S" is sf (Dreadful Fight bar 47 prints sf) and its `"` the caesura "//". SMB2 Title
+bar 5 draws "(//)" as an empty "(   )" frame plus a separately placed caesura; a bar
+holding exactly one such frame and one lone caesura folds them into one word.
+
 #### Title block from page one (2026-10-16, audit T12)
 
 File Info kinds 6 and 7 are the arranger and subtitle: page one prints them

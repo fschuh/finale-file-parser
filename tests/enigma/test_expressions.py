@@ -314,7 +314,8 @@ def test_an_unidentified_glyph_is_still_carried() -> None:
         ("Maestro", "sf"),
         ("Times New Roman", None),
         ("Unestablished Music Font", None),
-        ("EngraverFontSet", None),
+        # Maestro's character layout; Dreadful Fight bar 47 prints it as sf.
+        ("EngraverFontSet", "sf"),
     ],
 )
 def test_sforzando_s_requires_its_established_maestro_glyph_context(

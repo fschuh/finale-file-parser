@@ -126,7 +126,7 @@ from dataclasses import dataclass, replace
 from fractions import Fraction
 
 from finale_file_parser.enigma.document import EnigmaDocument, Record, field_int
-from finale_file_parser.enigma.fonts import FontRun, text_runs
+from finale_file_parser.enigma.fonts import FontRun, readable_text, text_runs
 from finale_file_parser.enigma.models import CorruptScoreError
 from finale_file_parser.enigma.text import plain_text, text_block
 from finale_file_parser.enigma.timesig import time_signatures
@@ -200,7 +200,9 @@ _TEMPO_UNITS = {
 
 
 def _tempo(text: str, *, runs: tuple[FontRun, ...] = ()) -> Tempo | None:
-    if runs:
+    # Text already read through `readable_text` spells its beats as note symbols,
+    # which the pattern accepts; the run translation below is for raw text.
+    if runs and not any(symbol in text for symbol in _READABLE_NOTES):
         translated = []
         for run in runs:
             literal = run.text
@@ -291,7 +293,7 @@ def expressions_by_measure(
             description=str(definition.fields.get("descStr") or ""),
             in_maestro_font=any(
                 run.name is not None
-                and run.name.casefold() == "maestro"
+                and run.name.casefold() in _MAESTRO_LAYOUT
                 and run.text.strip() == printed
                 for run in found.runs
             )
@@ -328,7 +330,27 @@ def expressions_by_measure(
                 and record.fields.get("showStaffList") != "scoreOnly",
             )
         )
-    return {where: tuple(items) for where, items in out.items()}
+    return {where: _framed(tuple(items)) for where, items in out.items()}
+
+
+_EMPTY_FRAME = re.compile(r"\(\s+\)")
+
+
+def _framed(items: tuple[Expression, ...]) -> tuple[Expression, ...]:
+    """Fold an empty parenthesis frame around the lone glyph it was drawn for.
+
+    SMB2 Title bar 5 prints "(//)" as two expressions: "(   )" with only spaces
+    inside, and the caesura glyph placed between the parentheses. Exported apart
+    they read "(      )" and "//"; joined they read as printed.
+    """
+    frames = [e for e in items if _EMPTY_FRAME.fullmatch(e.text) and e.visible]
+    glyphs = [e for e in items if e.text == _CAESURA and e.visible]
+    if len(frames) != 1 or len(glyphs) != 1:
+        return items
+    frame, glyph = frames[0], glyphs[0]
+    return tuple(
+        replace(glyph, text=f"({glyph.text})") if e is glyph else e for e in items if e is not frame
+    )
 
 
 def first_page_tempos(document: EnigmaDocument) -> tuple[Expression, ...]:
@@ -353,6 +375,9 @@ def first_page_tempos(document: EnigmaDocument) -> tuple[Expression, ...]:
             continue
         printed = plain_text(markup)
         runs = text_runs(document, markup)
+        if any((run.name or "").casefold() in _NOTE_TEXT_FONTS for run in runs):
+            spaced = text_runs(document, markup, keep_spaces=True)
+            printed = re.sub(r"\s+", " ", readable_text(spaced)).strip() or printed
         explicit_unit = bool(re.search(r"\b(?:quarter|half|eighth|whole)\b|[♩♪𝅘𝅥𝅗𝅥𝅝]", printed))
         known_beat_font = any(
             run.name is not None
@@ -551,6 +576,17 @@ def _definitions(document: EnigmaDocument) -> dict[int, Record]:
     return out
 
 
+_MAESTRO_LAYOUT = frozenset({"maestro", "engraverfontset", "engraver font set"})
+"""Fonts laid out on Maestro's character map: Engraver Font Set's "S" prints the
+same sf (Dreadful Fight bar 47)."""
+
+_CAESURA = "//"
+
+_READABLE_NOTES = ("\u2669", "\u266a", "\u266b", "\U0001d15e", "\U0001d15d")
+
+_NOTE_TEXT_FONTS = frozenset({"maestrotimes", "engravertextt", "engravertexth", "engravertextncs"})
+
+
 def _marking(
     text: str,
     *,
@@ -635,8 +671,18 @@ def _texts(document: EnigmaDocument) -> dict[int, _Text]:
 def _as_text(document: EnigmaDocument, markup: str) -> _Text:
     all_runs = text_runs(document, markup)
     runs = tuple(run for run in all_runs if run.text.strip())
+    printed = plain_text(markup)
+    if printed == '"' and all((run.name or "").casefold() in _MAESTRO_LAYOUT for run in runs):
+        # Maestro's caesura; written as the two strokes it draws.
+        printed = _CAESURA
+    elif any(
+        (run.name or "").casefold() in _NOTE_TEXT_FONTS or (run.is_music and len(runs) > 1)
+        for run in runs
+    ):
+        spaced = text_runs(document, markup, keep_spaces=True)
+        printed = re.sub(r"\s+", " ", readable_text(spaced)).strip() or printed
     return _Text(
-        printed=plain_text(markup),
+        printed=printed,
         in_music_font=bool(runs) and all(run.is_music for run in runs),
         is_rehearsal=bool(_REHEARSAL.search(markup)),
         runs=all_runs,
