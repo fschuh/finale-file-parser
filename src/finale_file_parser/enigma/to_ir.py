@@ -296,6 +296,11 @@ def build_score(document: EnigmaDocument) -> Score:
     staves = _ordered_staves(document, {staff for staff, _ in cells} | display_staves)
     keys = effective_keys(document)
     numbers = _measure_numbers(keys, cells)
+    if numbers and numbers[-1] not in barlines and not repeats.get(numbers[-1]).backward:
+        # Finale's "Final Barline at End of Piece" (Document Options > Barlines) is
+        # on by default and in every corpus PDF; its option bit is not decoded, and
+        # a .mus never stores a final barline on the measure itself.
+        barlines = {**barlines, numbers[-1]: "light-heavy"}
     if len(staves) * len(numbers) > _MAX_SCORE_MEASURE_CELLS:
         raise CorruptScoreError("score staff/measure expansion exceeds the cell limit")
     headers = first_page_tempos(document)

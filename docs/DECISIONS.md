@@ -1396,3 +1396,17 @@ still written. The corpus-audit projection compares against the same matching.
 
 **Consequence.** A lone stop on an authored event no longer reaches MusicXML;
 tests that exercised stop emission now tie from a preceding note.
+
+## 2026-10-16 — DECIDED: apply Finale's default final barline to the last bar
+
+**Context.** A `.mus` measure never stores a final barline (see `enigma.barlines`);
+Finale draws one from Document Options > Barlines > "Final Barline at End of Piece",
+on by default. All 45 corpus scores that do not end on a repeat print one, and the
+export wrote a plain barline for every one of them.
+
+**Decision.** The score's last measure gets a final (light-heavy) barline unless it
+has its own style or closes a repeat. The option's bit is not decoded: no corpus file
+turns it off, so there is no negative example to identify it by.
+
+**Consequence.** A document that switched the option off would gain a final barline
+it does not print. Decode the option when such a file appears.
