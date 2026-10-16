@@ -9,6 +9,9 @@ from finale_file_parser.enigma.music import read_entry
 from finale_file_parser.ir import Notehead
 
 _CROSS_FONTS = frozenset({"maestro", "engraverfontset", "engraver font set"})
+_TRIANGLE = 209
+"""The filled up-triangle head: Wood Man's clap part prints it (Engraver Font Set,
+Maestro's character map)."""
 
 
 def noteheads_by_entry(document: EnigmaDocument) -> dict[int, tuple[Notehead, ...]]:
@@ -45,6 +48,8 @@ def noteheads_by_entry(document: EnigmaDocument) -> dict[int, tuple[Notehead, ..
                 shape = "x"
             elif character == 250:
                 shape, filled = "normal", False
+            elif character == _TRIANGLE:
+                shape = "triangle"
         index = indices[0]
         head = Notehead(index, shape, filled, source_character=character, source_font=font)
         previous = result[entnum].get(index)

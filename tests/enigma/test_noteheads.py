@@ -171,3 +171,12 @@ def test_invalid_ir_heads_raise_export_errors(heads: tuple[Notehead, ...]) -> No
     part = replace(part, measures=(replace(measure, voices=(replace(voice, events=(event,)),)),))
     with pytest.raises(ExportError, match="notehead"):
         to_musicxml(replace(score, parts=(part,)))
+
+
+@pytest.mark.parametrize("font", ["Maestro", "EngraverFontSet"])
+def test_character_209_is_the_filled_triangle_head(font: str) -> None:
+    score = build_score(_document(_mod(character=209), font))
+    head = score.parts[0].measures[0].voices[0].events[0].noteheads[0]
+    assert head.shape == "triangle"
+    assert ET.fromstring(to_musicxml(score)).findtext(".//notehead") == "triangle"
+    assert not score.diagnostics

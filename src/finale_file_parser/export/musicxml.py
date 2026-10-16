@@ -2215,7 +2215,8 @@ def _append_event(
     if event.note_ties and len(event.note_ties) != len(event.pitches):
         raise ExportError("per-note tie flags must match the number of pitches")
     if any(
-        not 0 <= head.pitch_index < len(event.pitches) or head.shape not in {None, "normal", "x"}
+        not 0 <= head.pitch_index < len(event.pitches)
+        or head.shape not in {None, "normal", "x", "triangle"}
         for head in event.noteheads
     ) or len({head.pitch_index for head in event.noteheads}) != len(event.noteheads):
         raise ExportError("invalid or duplicate notehead override")
