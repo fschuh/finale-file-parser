@@ -30,6 +30,7 @@ from finale_file_parser.enigma.clef import (
 )
 from finale_file_parser.enigma.cross_staff import cross_staff_by_entry
 from finale_file_parser.enigma.document import EnigmaDocument, Record, field_int
+from finale_file_parser.enigma.enharmonic import enharmonic_notes_by_entry, flip_enharmonic
 from finale_file_parser.enigma.expressions import (
     SCORE_WIDE_STAFF,
     expressions_by_measure,
@@ -167,6 +168,7 @@ def build_score(document: EnigmaDocument) -> Score:
     arpeggios = arpeggios_by_entry(document)
     parentheses = parentheses_by_entry(document)
     noteheads = noteheads_by_entry(document)
+    enharmonic = enharmonic_notes_by_entry(document)
     cross_staff = cross_staff_by_entry(document)
     assigned_entries: dict[EventPosition, int] = {}
     slur_positions: dict[tuple[int, int, int], list[SlurEndpoint]] = defaultdict(list)
@@ -219,6 +221,7 @@ def build_score(document: EnigmaDocument) -> Score:
                     articulation_playback=articulation_playback.get(entnum, ()),
                     noteheads=noteheads.get(entnum, ()),
                     cross_staff=cross_staff.get(entnum, ()),
+                    enharmonic=enharmonic.get(entnum, frozenset()),
                 )
             )
 
@@ -747,16 +750,17 @@ def _event(
     articulation_playback: tuple[ArticulationPlayback, ...] = (),
     noteheads: tuple[Notehead, ...] = (),
     cross_staff: tuple[CrossStaff, ...] = (),
+    enharmonic: frozenset[int] = frozenset(),
 ) -> Event:
     entry = read_entry(record)
     key = decode_key(key_raw)
+    written_pitches = [spell_note(note, key, transposition).written for note in entry.notes]
     pitches = tuple(
-        Pitch(
-            step=spelled.written.letter,
-            octave=spelled.written.octave,
-            alteration=spelled.written.alteration,
+        Pitch(step=spelled.letter, octave=spelled.octave, alteration=spelled.alteration)
+        for spelled in (
+            flip_enharmonic(written) if index in enharmonic else written
+            for index, written in enumerate(written_pitches)
         )
-        for spelled in (spell_note(note, key, transposition) for note in entry.notes)
     )
     written = Fraction(written_edu, _WHOLE_EDU)
     duration = Fraction(sounded_edu) / _WHOLE_EDU

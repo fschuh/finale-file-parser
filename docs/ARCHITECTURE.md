@@ -2230,12 +2230,27 @@ sixteenth,32nd. These are extension fields, not primary beam-mode or stem fields
 
 Numeric detail1058 has packed20-byte notehead modifications (20/40/60-byte
 payloads in this corpus); split every complete group, retaining source scope
-and noteID at+0. Legacy customChar is u16+6, Unicode-era getter uses32bits at+6;
+and noteID at+0. Legacy customChar is u16+6, Unicode-era getter uses32bits at+6 (but see
+Enharmonic flip below: the upper half is a flag);
 custom-font flag is bit0 at+8/+10 respectively. RGP Allocate0x4DEC22 gives
 bases0x40/0x54 and DataSizeLoad0x4DEC0A gives20; GetCustomChar0x5B576 and
 GetUseCustomFont0x5BB3A anchor the fields. Tremolo recovery uses only established
 inherited Maestro half-heads, excluding custom fonts. Packed note IDs can repeat
 in retained source records; do not let one erase its neighboring modification.
+
+#### Enharmonic flip (2026-10-16, audit T1)
+
+Byte +8 bit **0x04** of each 1058 group is the per-note enharmonic flip
+(`FCNoteheadMod.EnharmonicFlip`), in 2011 and 2012 layouts alike. The entry keeps
+its default `harmLev`/`harmAlt`; Finale draws the other spelling. Evidence: in the
+105-score NinSheetMusic corpus 333 notes in 16 files carry it, and the flagged notes
+are printed respelled in the PDFs checked (Chocobo, SMB Underground, SMB2 and SMB3
+Ground, Hammer Bros, Zelda Overworld m17 bass F♭4), while unflagged groups are
+not. Bytes +8/+9 hold nothing else in any corpus record, so although the
+Unicode-era getter reads 32 bits at +6, the character is read as +6's u16 in both
+layouts; reading 32 bits turned the flag into a bogus character 0x40000.
+`enigma/enharmonic.py` moves a sharp up a letter, a flat down a letter, and a
+natural to the letter a semitone away (E→F♭, F→E♯, B→C♭, C→B♯).
 
 #### Assigned cross noteheads (2026-10-14, PDF review P04)
 

@@ -2019,13 +2019,15 @@ def _details_records(
                 display_incidence[identity] = incidence + 1
                 fields: dict[str, str | tuple[str, ...] | Record | tuple[Record, ...]]
                 if record.tag == 1058:
+                    # Byte +8 bit 0x04 is the per-note enharmonic flip in every
+                    # version (FCNoteheadMod.EnharmonicFlip). The Unicode-era
+                    # getter reads 32 bits at +6, but in every corpus record the
+                    # upper half holds only that flag, so the character is +6's
+                    # u16 throughout; see ARCHITECTURE "Enharmonic flip".
                     fields = {
                         "noteID": str(_u16(record.payload, at)),
-                        "customChar": str(
-                            _u32(record.payload, at + 6)
-                            if year is not None and year >= 2012
-                            else _u16(record.payload, at + 6)
-                        ),
+                        "customChar": str(_u16(record.payload, at + 6)),
+                        **({"enharmonic": ""} if record.payload[at + 8] & 0x04 else {}),
                         **(
                             {
                                 "useCustomFont": "",
