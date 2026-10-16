@@ -59,6 +59,14 @@ A batch does not stop at the first bad file: what fails is reported and skipped,
 converted, and the exit status is non-zero if anything was skipped. Existing output is never
 overwritten unless you pass `--force`.
 
+**Opening the MusicXML in MuseScore.** Segno, D.S., D.C., To Coda and Fine are written as
+standard MusicXML `<sound>` jumps, but MuseScore 4's default import turns their text into
+plain staff text that does not play. Turn on *Preferences → Import → MusicXML → "Infer text
+type based on content where possible"* before importing, and MuseScore builds real jumps
+from them. MusicXML cannot say that repeats are taken again after a jump: where a score's
+endings are numbered for it (FF4 Battle 2's "1, 3" and "2, 4"), tick *Play repeats* on the
+D.S. after importing.
+
 ### Printing a score
 
 ```bash
