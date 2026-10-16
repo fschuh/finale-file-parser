@@ -240,3 +240,28 @@ def test_forward_jump_to_an_unmarked_bar_gets_a_hidden_coda() -> None:
     assert marker is not None and marker.attrib == {"coda": "jump-target-3"}
     sound = root.find("part/measure[@number='1']//sound[@tocoda]")
     assert sound is not None and sound.get("tocoda") == "jump-target-3"
+
+
+def test_right_justified_words_without_a_jump_start_at_their_bar() -> None:
+    words = Navigation(
+        "(Optional) Go To Measure 1",
+        playback=RepeatPlayback("noJump", target=1),
+        justification="right",
+    )
+    root = DET.fromstring(
+        to_musicxml(_score(Measure(1, (Voice(1, (NOTE,)),), navigation=(words,))))
+    )
+    offset = root.find(".//direction/offset")
+    assert offset is not None and offset.text == "0" and offset.get("sound") is None
+
+
+def test_right_justified_jumps_stay_at_the_barline() -> None:
+    jump = Navigation(
+        "D.C. after 2nd repeat",
+        playback=RepeatPlayback("jumpAbsolute", "onPass", 1, 2),
+        justification="right",
+    )
+    root = DET.fromstring(to_musicxml(_score(Measure(1, (Voice(1, (NOTE,)),), navigation=(jump,)))))
+    assert root.findtext(".//direction/offset") == "4"
+    sound = root.find(".//direction/sound")
+    assert sound is not None and sound.get("dacapo") == "yes"

@@ -2238,6 +2238,22 @@ GetUseCustomFont0x5BB3A anchor the fields. Tremolo recovery uses only establishe
 inherited Maestro half-heads, excluding custom fonts. Packed note IDs can repeat
 in retained source records; do not let one erase its neighboring modification.
 
+#### Line slopes and right-justified text (2026-10-16, audit T19/T20)
+
+Diagonal lines (Opening bar 6 runs from -6.1 to -8.7 staff spaces) already export
+both endpoints as `relative-y` on the bracket start and stop. MuseScore 4.7.5 keeps
+no position at all when it imports a bracket or dashes line, so the slope is lost in
+that reader; the MusicXML is unchanged.
+
+Finale draws right-justified text repeats ending at the barline. MuseScore ignores
+`justify` and starts the text where it is placed, so words placed at the bar end ran
+off the page (Dire Dire Docks' "(Optional) Go To Measure 1"). Right-justified words
+that carry no jump now start at their bar. Words carrying a jump stay at the barline:
+with text-type inference MuseScore builds the jump where its words sit, and moving
+them changed playback (SM64's "D.S. al Fine" landed a beat early; Scrap Brain's
+"D.C. after 2nd repeat" was lost when its sound moved to a separate element). Those
+texts, and FF4 Battle 1's late-placed expression, still overflow in MuseScore.
+
 #### Memories of Green's ossia (2026-10-16, audit T18)
 
 Staff 3 holds the two-bar echo pattern the PDF prints as a small ossia under system

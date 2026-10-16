@@ -3,7 +3,7 @@
 from fractions import Fraction
 from xml.etree import ElementTree as ET
 
-from finale_file_parser.ir import Navigation, Part, Score
+from finale_file_parser.ir import Measure, Navigation, Part, Score
 from finale_file_parser.playback import PlaybackError, navigation_target
 
 
@@ -58,9 +58,21 @@ def append_navigation(root: ET.Element, score: Score) -> None:
                     ),
                     default=Fraction(),
                 )
-                ET.SubElement(direction, "offset", sound="yes").text = str(
-                    int(extent * 4 * divisions)
-                )
+                # Only words without a jump move: MuseScore's text-type inference
+                # attaches a jump to where its words sit, so moving them would move
+                # the jump (SM64's "D.S. al Fine" lands a beat early).
+                anchored = _right_aligned_anchor(measure, mark) if not attrs else None
+                if anchored is None:
+                    ET.SubElement(direction, "offset", sound="yes").text = str(
+                        int(extent * 4 * divisions)
+                    )
+                else:
+                    # Right-justified words end at the barline in Finale; placed
+                    # at the barline, MuseScore runs "(Optional) Go To Measure 1"
+                    # off the page.
+                    ET.SubElement(direction, "offset").text = str(int(anchored * 4 * divisions))
+            else:
+                anchored = None
             if attrs:
                 if mark.kind not in {"segno", "coda"} and (
                     "al fine" in mark.text.casefold() or "al coda" in mark.text.casefold()
@@ -131,6 +143,19 @@ def _sound(
     elif rule.trigger == "untilPass" and rule.passes > 1:
         attrs["time-only"] = ",".join(str(p) for p in range(1, min(rule.passes, 32768)))
     return attrs
+
+
+def _right_aligned_anchor(measure: Measure, mark: Navigation) -> Fraction | None:
+    """Where visible right-justified words start: the beginning of their bar.
+
+    Finale ends them at the barline, so they span the bar's closing stretch.
+    Readers that ignore `justify` start text where it is placed; placed at the bar
+    start it covers the bar much as printed, where placed at the barline it runs
+    on past it.
+    """
+    if mark.kind != "words" or not mark.visible or mark.justification != "right":
+        return None
+    return Fraction(0) if measure.voices else None
 
 
 def _unmarked_targets(part: Part) -> dict[int, tuple[str, str]]:
