@@ -2238,6 +2238,15 @@ GetUseCustomFont0x5BB3A anchor the fields. Tremolo recovery uses only establishe
 inherited Maestro half-heads, excluding custom fonts. Packed note IDs can repeat
 in retained source records; do not let one erase its neighboring modification.
 
+#### Chords split across staves (2026-10-16, audit T4)
+
+Koopa Kid Battle bars 0-1 (entries 3013/3021) and SMW Title Screen bar 24 (entry
+691) are bass chords with one member crossed to the treble by a 1036 detail. The
+export is already exact: each chord `<note>` carries its own `<staff>`. MuseScore
+4.7.5 cannot import a split chord: in every note order and stem direction tried it
+writes one chord-level `staffMove`, drawing all members on one staff with ledger
+lines. That is a reader limitation; the MusicXML is not changed to work around it.
+
 #### Stem directions (2026-10-16, audit T3)
 
 Entry flag **FREEZSTEM 0x100** with **UPSTEMBIT 0x1** (eeppd.txt) is a hand-set
