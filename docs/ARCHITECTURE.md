@@ -2238,6 +2238,17 @@ GetUseCustomFont0x5BB3A anchor the fields. Tremolo recovery uses only establishe
 inherited Maestro half-heads, excluding custom fonts. Packed note IDs can repeat
 in retained source records; do not let one erase its neighboring modification.
 
+#### Fixed accidentals (2026-10-16, audit T8)
+
+The `.mus` note flag now surfaces eeppd.txt's ACCIBIT 0x01000000 (`showAcci`),
+PARENACCI 0x00800000 (`parenAcci`) and FREEZEACCI 0x2 (`freezeAcci`). Across the
+corpus 3,504 notes carry a computed ACCIBIT, 147 a frozen shown one, 29 a frozen
+hidden one and 21 parentheses (FF4 Battle 2 bars 9/32, Decisive Battle). Computed
+accidentals are left to the reader, which applies the same rules. Frozen or
+parenthesized ones become `AccidentalMark`s and export as `<accidental>`, with
+`parentheses="yes"` where set; a frozen hidden accidental is kept in the IR but has
+no MusicXML 4.0 form, since `<accidental>` takes no `print-object`.
+
 #### Tuplet notation (2026-10-16, audit T7)
 
 Events now carry their source tuplets (`TupletMark`) unreduced: FF4 Battle 1's

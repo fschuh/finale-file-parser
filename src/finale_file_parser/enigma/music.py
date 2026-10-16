@@ -78,6 +78,12 @@ class Note:
     note_id: int = 0
     """Stable source identity within an entry; zero means absent, not a pitch index."""
     cross_staff: bool = False
+    show_accidental: bool = False
+    """ACCIBIT: an accidental is drawn. Computed by Finale unless frozen."""
+    freeze_accidental: bool = False
+    """FREEZEACCI: `show_accidental` was set by hand."""
+    paren_accidental: bool = False
+    """PARENACCI: the accidental is parenthesized."""
 
     @property
     def diatonic_step(self) -> int:
@@ -196,6 +202,9 @@ def _note(record: Record) -> Note:
         tie_end="tieEnd" in record.fields,
         note_id=_int(record.attrs.get("id", "0"), "note id"),
         cross_staff="crossStaff" in record.fields,
+        show_accidental="showAcci" in record.fields,
+        freeze_accidental="freezeAcci" in record.fields,
+        paren_accidental="parenAcci" in record.fields,
     )
 
 

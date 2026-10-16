@@ -21,6 +21,7 @@ from fractions import Fraction
 from typing import Literal
 
 __all__ = [
+    "AccidentalMark",
     "Arpeggio",
     "Beam",
     "ClefChange",
@@ -134,6 +135,19 @@ class TimeSignature:
 
     beats: int
     beat_type: int
+
+
+@dataclass(frozen=True)
+class AccidentalMark:
+    """An accidental the source fixes rather than leaving to the usual rules.
+
+    Its sign follows the pitch's alteration. `shown` False hides one the rules
+    would draw; True draws one they might omit, such as a courtesy natural.
+    """
+
+    pitch_index: int
+    shown: bool = True
+    parentheses: bool = False
 
 
 @dataclass(frozen=True)
@@ -282,6 +296,9 @@ class Event:
     tuplets: tuple[TupletMark, ...] = ()
     """The tuplets this event belongs to, outermost first, where the source
     defines them; their ratios multiply to `tuplet_ratio`."""
+
+    accidentals: tuple[AccidentalMark, ...] = ()
+    """Per-pitch accidentals fixed by the source; others follow the usual rules."""
 
     lyrics: tuple[Lyric, ...] = ()
     """Syllables sung on this event, one per verse, in verse order."""

@@ -584,6 +584,8 @@ def _duration_in_divisions(duration: Fraction, divisions: int) -> int:
     return int(value)
 
 
+_ACCIDENTALS = {-2: "flat-flat", -1: "flat", 0: "natural", 1: "sharp", 2: "double-sharp"}
+
 _TupletNotation = tuple[str, int, bool, str]
 """(start or stop, nesting level, bracket, show-number) for one `<tuplet>`."""
 
@@ -2128,6 +2130,8 @@ def _append_event(
         raise ExportError("arpeggio coverage contains an invalid chord pitch")
     if any(not 0 <= mark.pitch_index < len(event.pitches) for mark in event.ornaments):
         raise ExportError("ornament principal note is outside the event's pitches")
+    if any(not 0 <= mark.pitch_index < len(event.pitches) for mark in event.accidentals):
+        raise ExportError("accidental note is outside the event's pitches")
     if any(
         m.side not in {"left", "right"}
         or (m.pitch_index is not None and not 0 <= m.pitch_index < len(event.pitches))
@@ -2256,6 +2260,13 @@ def _append_note(
             type_element.set("size", "full")
     for _ in range(event.dots):
         ET.SubElement(note, "dot")
+    fixed = next((m for m in event.accidentals if m.pitch_index == pitch_index), None)
+    # A hidden accidental has no MusicXML form (<accidental> takes no
+    # print-object), so only drawn ones are written. Schema order: <accidental>
+    # after <dot>, before <time-modification>.
+    if pitch is not None and fixed is not None and fixed.shown and pitch.alteration in _ACCIDENTALS:
+        attributes = {"parentheses": "yes"} if fixed.parentheses else {}
+        ET.SubElement(note, "accidental", attributes).text = _ACCIDENTALS[pitch.alteration]
     if event.tuplet_ratio is not None:
         modification = ET.SubElement(note, "time-modification")
         actual, normal, normal_type = _time_modification(event)

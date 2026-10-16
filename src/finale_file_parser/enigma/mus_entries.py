@@ -110,6 +110,13 @@ _TIE_START = 0x40000000
 _TIE_END = 0x20000000
 _CROSS_STAFF = 0x10000000
 """Documented per-note CROSSBIT; an assigned detail supplies its destination."""
+_SHOW_ACCIDENTAL = 0x01000000
+"""Documented ACCIBIT: the note shows an accidental. Finale recomputes it while
+editing, so it holds what was drawn when the file was saved."""
+_PAREN_ACCIDENTAL = 0x00800000
+"""Documented PARENACCI: the accidental is parenthesized."""
+_FREEZE_ACCIDENTAL = 0x00000002
+"""Documented FREEZEACCI: ACCIBIT was fixed by hand rather than computed."""
 _NOTE_ID = 0x001F0000
 """Documented TGFNID in eeppd.txt; identity is independent of pitch/chord order."""
 
@@ -389,6 +396,12 @@ def _note_record(stream: bytes, offset: int, order: ByteOrder) -> Record:
         fields["tieEnd"] = ""
     if flag & _CROSS_STAFF:
         fields["crossStaff"] = ""
+    if flag & _SHOW_ACCIDENTAL:
+        fields["showAcci"] = ""
+    if flag & _PAREN_ACCIDENTAL:
+        fields["parenAcci"] = ""
+    if flag & _FREEZE_ACCIDENTAL:
+        fields["freezeAcci"] = ""
     identity = (flag & _NOTE_ID) >> 16
     return Record(
         tag="note", attrs={"id": str(identity)} if identity else {}, text="", fields=fields

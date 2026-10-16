@@ -81,6 +81,7 @@ from finale_file_parser.enigma.tuplet import (
     tuplets_by_entry,
 )
 from finale_file_parser.ir import (
+    AccidentalMark,
     Arpeggio,
     ArticulationPlayback,
     ClefChange,
@@ -810,6 +811,11 @@ def _event(
         note_ties=tuple(NoteTies(note.tie_start, note.tie_end) for note in entry.notes),
         tuplet_ratio=ratio,
         tuplets=tuplets if ratio is not None and _ratio_of(tuplets) == ratio else (),
+        accidentals=tuple(
+            AccidentalMark(index, note.show_accidental, note.paren_accidental)
+            for index, note in enumerate(entry.notes)
+            if note.freeze_accidental or note.paren_accidental
+        ),
         is_grace="graceNote" in record.fields,
         playback=entry.playback,
         visible=entry.visible,
