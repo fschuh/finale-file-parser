@@ -21,3 +21,8 @@ def test_a_parenthesized_dynamic_keeps_its_parentheses() -> None:
 
 def test_a_plain_dynamic_stays_a_standard_element() -> None:
     assert _dynamics("F", "mf") == [("mf", None)]
+
+
+def test_words_before_a_dynamic_glyph_stay_with_it() -> None:
+    assert _dynamics("sub. F", "mf") == [("other-dynamics", "sub. mf")]
+    assert _dynamics("( f )", "f") == [("other-dynamics", "(f)")]

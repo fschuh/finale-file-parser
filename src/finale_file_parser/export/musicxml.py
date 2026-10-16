@@ -19,6 +19,7 @@ from fractions import Fraction
 
 from finale_file_parser.errors import FinaleFileError
 from finale_file_parser.export.navigation import append_navigation
+from finale_file_parser.formats.dynamics import DYNAMICS
 from finale_file_parser.ir import (
     Ending,
     Event,
@@ -659,7 +660,23 @@ def _duration_in_divisions(duration: Fraction, divisions: int) -> int:
     return int(value)
 
 
-_PARENTHESIZED = re.compile(r"\(\s*\S+\s*\)")
+_DYNAMIC_GLYPHS = {d.marking: d.glyph for d in DYNAMICS if d.marking}
+
+
+def _dressed_dynamic(text: str, marking: str) -> str | None:
+    """The printed text of a dynamic that carries more than its glyph.
+
+    "(F)" and "sub. F" print Maestro's mf glyph inside parentheses or after a
+    word; with the glyph spelled as its marking they read "(mf)" and "sub. mf".
+    None for a bare glyph, which a standard element expresses.
+    """
+    glyph = _DYNAMIC_GLYPHS.get(marking)
+    printed = re.sub(r"\(\s+", "(", re.sub(r"\s+\)", ")", " ".join(text.split())))
+    if glyph is None or printed == glyph or glyph not in printed:
+        return None
+    before, _, after = printed.rpartition(glyph)
+    return f"{before}{marking}{after}"
+
 
 _ACCIDENTALS = {-2: "flat-flat", -1: "flat", 0: "natural", 1: "sharp", 2: "double-sharp"}
 
@@ -1704,10 +1721,11 @@ def _append_expressions(element: ET.Element, measure: Measure, divisions: int) -
         elif expression.marking:
             direction = ET.SubElement(element, "direction", placement=_DYNAMICS_PLACEMENT)
             dynamics = ET.SubElement(ET.SubElement(direction, "direction-type"), "dynamics")
-            if _PARENTHESIZED.fullmatch(expression.text):
-                # <dynamics> takes no parentheses; MuseScore reads this other-dynamics
-                # as the same dynamic drawn inside them.
-                ET.SubElement(dynamics, "other-dynamics").text = f"({expression.marking})"
+            dressed = _dressed_dynamic(expression.text, expression.marking)
+            if dressed is not None:
+                # <dynamics> takes no parentheses or words; MuseScore reads this
+                # other-dynamics as the same dynamic printed with them.
+                ET.SubElement(dynamics, "other-dynamics").text = dressed
             elif expression.marking in _MUSICXML_DYNAMICS:
                 ET.SubElement(dynamics, expression.marking)
             else:
