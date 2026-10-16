@@ -151,18 +151,33 @@ def to_musicxml(score: Score) -> bytes:
     score = matched_ties(_pickup_display(score))
     root = ET.Element("score-partwise", version=MUSICXML_VERSION)
     _append_identification(root, score)
-    if any(
+    cues = any(
         not (event.playback and voice.playback) and not event.is_rest
         for part in score.parts
         for measure in part.measures
         for voice in measure.voices
         for event in voice.events
-    ):
-        # Every silent cue emitted here retains ordinary source note size.
-        # MuseScore ignores type size=full on cues, but honors this standard
-        # default and therefore preserves full-size notation as well as silence.
-        appearance = ET.SubElement(ET.SubElement(root, "defaults"), "appearance")
-        ET.SubElement(appearance, "note-size", type="cue").text = "100"
+    )
+    credited = any(_credit_values(score).values())
+    if cues or credited:
+        defaults = ET.SubElement(root, "defaults")
+        if credited:
+            # Credits are placed on a page; MuseScore drops the whole header
+            # when a credit has no coordinates or the page has no size.
+            scaling = ET.SubElement(defaults, "scaling")
+            ET.SubElement(scaling, "millimeters").text = str(_STAFF_MILLIMETERS)
+            ET.SubElement(scaling, "tenths").text = "40"
+            layout = ET.SubElement(defaults, "page-layout")
+            ET.SubElement(layout, "page-height").text = str(_PAGE_HEIGHT)
+            ET.SubElement(layout, "page-width").text = str(_PAGE_WIDTH)
+        if cues:
+            # Every silent cue emitted here retains ordinary source note size.
+            # MuseScore ignores type size=full on cues, but honors this standard
+            # default and therefore preserves full-size notation as well as silence.
+            appearance = ET.SubElement(defaults, "appearance")
+            ET.SubElement(appearance, "note-size", type="cue").text = "100"
+    # Schema order: credits follow defaults and precede the part list.
+    _append_credits(root, score)
 
     bundles = _staff_bundles(score)
     labels = {
@@ -531,11 +546,70 @@ def _append_identification(root: ET.Element, score: Score) -> None:
     if score.title:
         work = ET.SubElement(root, "work")
         ET.SubElement(work, "work-title").text = score.title
-    if not score.composer:
+    creators = [("composer", score.composer), ("arranger", score.metadata.get("arranger", ""))]
+    rights = score.metadata.get("copyright", "")
+    if not any(text for _, text in creators) and not rights:
         return
     identification = ET.SubElement(root, "identification")
-    creator = ET.SubElement(identification, "creator", type="composer")
-    creator.text = score.composer
+    # Schema order: creator*, then rights*.
+    for kind, text in creators:
+        if text:
+            ET.SubElement(identification, "creator", type=kind).text = text
+    if rights:
+        ET.SubElement(identification, "rights").text = rights
+
+
+_STAFF_MILLIMETERS = 7
+_PAGE_WIDTH = 1234
+_PAGE_HEIGHT = 1597
+"""A US Letter page (215.9 x 279.4 mm) in tenths of a 7 mm staff, the paper
+NinSheetMusic engraves on."""
+
+_CREDITS = (
+    # keys, credit-types, x, y, justify, valign, font size
+    (("title",), ("title",), _PAGE_WIDTH // 2, _PAGE_HEIGHT - 100, "center", "top", 24),
+    (("subtitle",), ("subtitle",), _PAGE_WIDTH // 2, _PAGE_HEIGHT - 170, "center", "top", 14),
+    # One right-hand block, as printed: MuseScore stacks separate composer and
+    # arranger credits on the same spot.
+    (
+        ("composer", "arranger"),
+        ("composer", "arranger"),
+        _PAGE_WIDTH - 100,
+        _PAGE_HEIGHT - 220,
+        "right",
+        "top",
+        12,
+    ),
+    (("copyright",), ("rights",), _PAGE_WIDTH // 2, 100, "center", "bottom", 10),
+)
+
+
+def _credit_values(score: Score) -> dict[str, str]:
+    values = {"title": score.title, "composer": score.composer, **score.metadata}
+    return {key: values.get(key, "") for keys, *_ in _CREDITS for key in keys}
+
+
+def _append_credits(root: ET.Element, score: Score) -> None:
+    """Page-one header text, typed and placed, so readers rebuild the title block."""
+    values = _credit_values(score)
+    for keys, kinds, x, y, justify, valign, size in _CREDITS:
+        present = [(key, kind) for key, kind in zip(keys, kinds, strict=True) if values[key]]
+        if not present:
+            continue
+        credit = ET.SubElement(root, "credit", page="1")
+        for _, kind in present:
+            ET.SubElement(credit, "credit-type").text = kind
+        ET.SubElement(
+            credit,
+            "credit-words",
+            {
+                "default-x": str(x),
+                "default-y": str(y),
+                "font-size": str(size),
+                "justify": justify,
+                "valign": valign,
+            },
+        ).text = "\n".join(values[key] for key, _ in present)
 
 
 def _divisions_for(part: Part) -> int:

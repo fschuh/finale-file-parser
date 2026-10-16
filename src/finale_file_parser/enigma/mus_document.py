@@ -297,11 +297,19 @@ _TEXT_SECTION = re.compile(
 _TEXT_BLOCK_TAGS = {2004: "block", 2006: "expression"}
 """On-wire text tags. They select distinct text pools, not block IDs."""
 
-_FILE_INFO_TYPES = {b"1": "title", b"2": "composer", b"3": "copyright"}
+_FILE_INFO_TYPES = {
+    b"1": "title",
+    b"2": "composer",
+    b"3": "copyright",
+    b"6": "arranger",
+    b"7": "subtitle",
+}
 """The bibliographic kinds confirmed by exact text matches to paired `.musx`.
 
-Kinds 6 and 7 each have one exact match to arranger and subtitle, respectively,
-which is not enough evidence to ship either mapping. Kind 4 appears widely but
+Kinds 6 and 7 each have one exact match to arranger and subtitle in the paired
+files; the NinSheetMusic PDFs settle them (audit T12): page one prints kind 6
+verbatim in 79 of 96 scores and kind 7 in 83 of 97, and every miss is a template
+placeholder ("Arranged by ...", "Game") that the page overrides. Kind 4 appears widely but
 does not match the paired text exactly. Unknown kinds are omitted rather than
 given plausible-looking names.
 """

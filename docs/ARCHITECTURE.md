@@ -2238,6 +2238,23 @@ GetUseCustomFont0x5BB3A anchor the fields. Tremolo recovery uses only establishe
 inherited Maestro half-heads, excluding custom fonts. Packed note IDs can repeat
 in retained source records; do not let one erase its neighboring modification.
 
+#### Title block from page one (2026-10-16, audit T12)
+
+File Info kinds 6 and 7 are the arranger and subtitle: page one prints them
+verbatim in 79/96 and 83/97 corpus scores, and every miss is a template
+placeholder. `.mus` page texts call File Info through legacy inserts 0x99 title,
+0xA3 subtitle, 0x8A composer, 0xA2 arranger and 0x8B copyright (placed by where
+each sits on the page and matched to the PDFs), often spliced with literal words
+(Spring Yard's closing quote and "Masato Nakamura" around inserts). `enigma/header.py`
+renders each page-one block as printed and classifies its lines (insert role, then
+copyright/composer/arranger wording, then the title block and centred top blocks
+for the subtitle), falling back to File Info. Fillmore ("Title"/"Composition by
+Composer" in File Info) and Death Mountain ("Black Mist") now carry the printed
+title and credits. The exporter writes work-title, composer and arranger creators,
+rights, and typed `<credit>`s with coordinates and a Letter page layout: MuseScore
+4.7.5 drops every credit when a page size or coordinates are missing, and stacks
+separate composer and arranger credits, so those two share one credit.
+
 #### Piano braces make one part (2026-10-16, audit T11)
 
 etfspec.pdf names bracket 3 the piano brace, and all 132 corpus braces span exactly

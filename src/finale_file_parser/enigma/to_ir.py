@@ -42,6 +42,7 @@ from finale_file_parser.enigma.glissandi import glissandi_by_staff
 from finale_file_parser.enigma.graces import grace_slash, slash_flagged_grace_notes
 from finale_file_parser.enigma.groups import staff_groups, staff_order
 from finale_file_parser.enigma.hairpins import hairpins_by_staff
+from finale_file_parser.enigma.header import page_header
 from finale_file_parser.enigma.jumps import jumps_by_measure, navigation_by_measure
 from finale_file_parser.enigma.key import KeySignature, Mode, decode_key
 from finale_file_parser.enigma.lines import lines_by_staff
@@ -276,6 +277,7 @@ def build_score(document: EnigmaDocument) -> Score:
     clef_changes = clef_changes_by_measure(document)
     names = staff_names(document)
     info = file_info(document)
+    header = page_header(document)
     repeats = repeats_for(document)
     directions = jumps_by_measure(document)
     navigation = navigation_by_measure(document)
@@ -440,9 +442,12 @@ def build_score(document: EnigmaDocument) -> Score:
     return Score(
         parts=connect_arpeggios(document, scoped_parts, groups, assigned_entries),
         groups=groups,
-        title=info.get("title", ""),
-        composer=info.get("composer", ""),
-        metadata={k: v for k, v in info.items() if k not in {"title", "composer"}},
+        title=header.get("title", ""),
+        composer=header.get("composer", ""),
+        metadata={
+            **{k: v for k, v in info.items() if k not in {"title", "composer"}},
+            **{k: header[k] for k in ("subtitle", "arranger", "copyright") if k in header},
+        },
         diagnostics=diagnostics
         + _playback_diagnostics(tuple(parts))
         + _navigation_diagnostics(tuple(parts)),
