@@ -454,6 +454,7 @@ def build_score(document: EnigmaDocument) -> Score:
         )
         for staff in staves
     ]
+    parts = [_with_falls(part) for part in parts]
     groups = _groups(document, [part.id for part in parts])
     scoped_parts = with_playback_scopes(document, tuple(parts))
     return Score(
@@ -655,6 +656,63 @@ def _measure_rest(signature: EnigmaTimeSignature | None) -> Event:
         pitches=(),
         is_measure_rest=True,
     )
+
+
+_FALL_DROP = Fraction(1)
+"""Staff spaces a wavy line must descend to read as a fall rather than a trill line."""
+
+
+def _with_falls(part: Part) -> Part:
+    """Turn a short descending wavy line after a note into that note's fall.
+
+    Dreadful Fight bar 48 draws a fall from its last bass note as a wavy smart
+    shape running down to the barline. A line attached to no note is not drawn by
+    readers that ignore line positions, so the gesture is given to the note it
+    leaves: the last sounding event that starts at or before the line.
+    """
+    falls: dict[tuple[int, int, int], None] = {}
+    kept = []
+    for line in part.lines:
+        descends = line.start_y - line.end_y >= _FALL_DROP
+        if line.line_type != "wavy" or line.start_measure != line.end_measure or not descends:
+            kept.append(line)
+            continue
+        target = _event_before(part, line.start_measure, line.start_offset)
+        if target is None:
+            kept.append(line)
+            continue
+        falls[target] = None
+    if not falls:
+        return part
+    measures = []
+    for measure in part.measures:
+        voices = []
+        for voice in measure.voices:
+            events = tuple(
+                replace(event, articulations=event.articulations + ("falloff",))
+                if (measure.number, voice.number, index) in falls
+                else event
+                for index, event in enumerate(voice.events)
+            )
+            voices.append(replace(voice, events=events))
+        measures.append(replace(measure, voices=tuple(voices)))
+    return replace(part, measures=tuple(measures), lines=tuple(kept))
+
+
+def _event_before(part: Part, number: int, offset: Fraction) -> tuple[int, int, int] | None:
+    best: tuple[Fraction, tuple[int, int, int]] | None = None
+    for measure in part.measures:
+        if measure.number != number:
+            continue
+        for voice in measure.voices:
+            onset = voice.start_offset
+            for index, event in enumerate(voice.events):
+                if event.pitches and not event.is_grace and onset <= offset:
+                    if best is None or onset >= best[0]:
+                        best = (onset, (number, voice.number, index))
+                if not event.is_grace:
+                    onset += event.duration
+    return best[1] if best is not None else None
 
 
 def _drawn_clef_changes(
