@@ -37,6 +37,7 @@ from finale_file_parser.ir import (
     Slur,
     SlurEndpoint,
     Tempo,
+    TimeSignature,
     Voice,
 )
 
@@ -556,12 +557,14 @@ def _append_part(
     glissandi = (
         _glissando_notations((part,)) if glissando_notations is None else glissando_notations
     )
-    for measure in part.measures:
+    printed = _printed_times(part)
+    for index, measure in enumerate(part.measures):
         _append_measure(
             element,
             measure,
             divisions,
             emit_divisions=first,
+            printed=printed[index] if printed is not None else None,
             part_id=part.id,
             arpeggio_numbers=arpeggio_numbers,
             wedges=hairpin_directions.get((part.id, measure.number), ()),
@@ -594,6 +597,28 @@ def _append_part(
             )
             reaffirmed = True
         first = False
+
+
+def _printed_times(part: Part) -> list[tuple[TimeSignature | None, str | None]] | None:
+    """The `<time>` each measure writes, where the part carries printed signatures.
+
+    A printed signature is written where what the page shows changes, not where
+    the time in force does: a pickup held as 1/4 but shown as 4/4 prints 4/4 once,
+    and a hidden split of a final bar prints nothing. None for a part with no
+    display signature or symbol, which keeps `measure.time` as the `<time>`.
+    """
+    if not any(m.display_time or m.time_symbol for m in part.measures):
+        return None
+    result: list[tuple[TimeSignature | None, str | None]] = []
+    in_force: TimeSignature | None = None
+    last: tuple[TimeSignature | None, str | None] | None = None
+    for measure in part.measures:
+        if measure.time is not None:
+            in_force = measure.time
+        shown = (measure.display_time or in_force, measure.time_symbol)
+        result.append(shown if shown != last else (None, None))
+        last = shown
+    return result
 
 
 def _append_hidden_staff_details(attributes: ET.Element) -> None:
@@ -1697,10 +1722,11 @@ def _append_measure(
     glissando_notations: _GlissandoNotations | None = None,
     lines: tuple[_LineDirection, ...] = (),
     display_staves: dict[str, int] | None = None,
+    printed: tuple[TimeSignature | None, str | None] | None = None,
 ) -> None:
     element = ET.SubElement(parent, "measure", number=str(measure.number))
     _append_barline(element, measure, "left")
-    _append_attributes(element, measure, divisions, emit_divisions=emit_divisions)
+    _append_attributes(element, measure, divisions, emit_divisions=emit_divisions, printed=printed)
     for words in measure.directions:
         if any(mark.text == words for mark in measure.navigation):
             continue
@@ -1908,12 +1934,20 @@ def _ending_text(ending: Ending) -> str:
 
 
 def _append_attributes(
-    element: ET.Element, measure: Measure, divisions: int, *, emit_divisions: bool
+    element: ET.Element,
+    measure: Measure,
+    divisions: int,
+    *,
+    emit_divisions: bool,
+    printed: tuple[TimeSignature | None, str | None] | None = None,
 ) -> None:
+    """`printed`, where given, replaces `measure.time` as the `<time>` to write."""
+    time = measure.time if printed is None else printed[0]
+    symbol = None if printed is None else printed[1]
     needed = (
         emit_divisions
         or measure.key_fifths is not None
-        or measure.time is not None
+        or time is not None
         or measure.clef_sign is not None
     )
     if not needed:
@@ -1926,10 +1960,10 @@ def _append_attributes(
         key = ET.SubElement(attributes, "key")
         ET.SubElement(key, "fifths").text = str(measure.key_fifths)
         ET.SubElement(key, "mode").text = "minor" if measure.is_minor else "major"
-    if measure.time is not None:
-        time = ET.SubElement(attributes, "time")
-        ET.SubElement(time, "beats").text = str(measure.time.beats)
-        ET.SubElement(time, "beat-type").text = str(measure.time.beat_type)
+    if time is not None:
+        element_time = ET.SubElement(attributes, "time", {"symbol": symbol} if symbol else {})
+        ET.SubElement(element_time, "beats").text = str(time.beats)
+        ET.SubElement(element_time, "beat-type").text = str(time.beat_type)
     if measure.clef_sign is not None:
         clef = ET.SubElement(attributes, "clef")
         ET.SubElement(clef, "sign").text = measure.clef_sign

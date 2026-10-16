@@ -558,6 +558,15 @@ class Measure:
 
     is_minor: bool = False
     time: TimeSignature | None = None
+    display_time: TimeSignature | None = None
+    """The signature printed instead of the one in force -- a pickup bar shown
+    as 4/4, or 4/4 shown as 2/2 -- on every measure where it applies. Durations
+    still follow `time`."""
+
+    time_symbol: str | None = None
+    """``common`` or ``cut`` on every measure whose printed 4/4 or 2/2 is drawn
+    as C or a struck C."""
+
     clef_sign: str | None = None
     """``G``, ``F``, ``C``, or ``percussion``."""
 

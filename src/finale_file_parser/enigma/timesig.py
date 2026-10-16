@@ -22,8 +22,10 @@ from finale_file_parser.enigma.document import EnigmaDocument, Record
 from finale_file_parser.enigma.models import CorruptScoreError
 
 __all__ = [
+    "PrintedTimeSignature",
     "TimeSignature",
     "display_time_signature",
+    "printed_time_signatures",
     "read_time_signature",
     "time_signatures",
 ]
@@ -139,4 +141,44 @@ def time_signatures(document: EnigmaDocument) -> dict[int, TimeSignature]:
         if raw is None:
             raise CorruptScoreError("measSpec has no cmper")
         out[int(raw)] = read_time_signature(record)
+    return out
+
+
+@dataclass(frozen=True)
+class PrintedTimeSignature:
+    """What a measure's time signature looks like on the page."""
+
+    signature: TimeSignature
+    display: bool
+    """True where a display signature replaces the one the measure holds."""
+    symbol: str | None = None
+    """``common`` or ``cut`` where a printed 4/4 or 2/2 is abbreviated."""
+
+
+def printed_time_signatures(document: EnigmaDocument) -> dict[int, PrintedTimeSignature]:
+    """Every measure's printed time signature, keyed by measure number.
+
+    A measure using a display signature abbreviates it by its own `abbrvTime`;
+    any other measure follows Document Options > Time Signatures, which abbreviates
+    common and cut time separately. See ARCHITECTURE "Printed time signatures".
+    """
+    options = document.options.get("timeSignatureOptions")
+    common = options is not None and "timeSigDoAbrvCommon" in options.fields
+    cut = options is not None and "timeSigDoAbrvCut" in options.fields
+    out: dict[int, PrintedTimeSignature] = {}
+    for record in document.others.of_tag(_MEASURE_SPEC):
+        if "part" in record.attrs:
+            continue
+        raw = record.attrs.get("cmper")
+        if raw is None:
+            raise CorruptScoreError("measSpec has no cmper")
+        shown = display_time_signature(record)
+        signature = shown or read_time_signature(record)
+        pair = (signature.numerator, signature.denominator)
+        if shown is not None:
+            abbreviated = "abbrvTime" in record.fields
+        else:
+            abbreviated = (pair == (4, 4) and common) or (pair == (2, 2) and cut)
+        symbol = {(4, 4): "common", (2, 2): "cut"}.get(pair) if abbreviated else None
+        out[int(raw)] = PrintedTimeSignature(signature, shown is not None, symbol)
     return out

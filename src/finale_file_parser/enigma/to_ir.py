@@ -66,8 +66,12 @@ from finale_file_parser.enigma.staff_playback import with_playback_scopes
 from finale_file_parser.enigma.staff_visibility import staff_hide_modes, staves_hiding_text_repeats
 from finale_file_parser.enigma.stems import assign_stems, frozen_stem, layer_stems
 from finale_file_parser.enigma.text import file_info, staff_names
+from finale_file_parser.enigma.timesig import (
+    PrintedTimeSignature,
+    printed_time_signatures,
+    time_signatures,
+)
 from finale_file_parser.enigma.timesig import TimeSignature as EnigmaTimeSignature
-from finale_file_parser.enigma.timesig import time_signatures
 from finale_file_parser.enigma.tremolos import recover_tremolos
 from finale_file_parser.enigma.tuplet import entry_chain, sounded_durations, tuplets_by_entry
 from finale_file_parser.ir import (
@@ -251,6 +255,7 @@ def build_score(document: EnigmaDocument) -> Score:
             ]
 
     signatures = time_signatures(document)
+    printed = printed_time_signatures(document)
     clef_table = clef_definitions(document)
     clef_at = clefs_by_measure(document)
     clef_changes = clef_changes_by_measure(document)
@@ -382,6 +387,7 @@ def build_score(document: EnigmaDocument) -> Score:
                         cells=cells,
                         keys=keys,
                         signatures=signatures,
+                        printed=printed,
                         clef_table=clef_table,
                         clef_at=clef_at,
                         clef_changes=clef_changes,
@@ -909,8 +915,10 @@ def _measure(
     pedals: dict[tuple[int, int], tuple[Pedal, ...]] | None = None,
     clef_changes: dict[tuple[int, int], tuple[ClefPosition, ...]] | None = None,
     show_text_repeats: bool = True,
+    printed: dict[int, PrintedTimeSignature] | None = None,
 ) -> Measure:
     cell = cells.get((staff, number))
+    shown = (printed or {}).get(number)
 
     signature = signatures.get(number)
     previous_signature = signatures.get(previous) if previous is not None else None
@@ -952,6 +960,12 @@ def _measure(
             if signature is not None and signature != previous_signature
             else None
         ),
+        display_time=TimeSignature(
+            beats=shown.signature.numerator, beat_type=shown.signature.denominator
+        )
+        if shown is not None and shown.display and shown.signature != signature
+        else None,
+        time_symbol=shown.symbol if shown is not None else None,
         clef_sign=_MUSICXML_SIGNS.get(clef.sign)
         if clef_changed and clef and not (clef_changes or {}).get((staff, number))
         else None,

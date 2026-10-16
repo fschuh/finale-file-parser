@@ -132,7 +132,6 @@ UNTRANSLATED = (
     "the .musx materialises a real clef. Those measures come out treble. Same "
     "root cause as the transposition gap above -- the value lives with the "
     "instrument, not in the file.",
-    "measSpec display time signatures (useDisplayTimesig, dispBeats, dispDivbeat).",
     "Expressions in a 2001-2005 document. The 2011 era IS read -- others 241 is "
     "the definition and 177 the assignment, giving 3,022 markings across 186 "
     "documents that agree with the paired .musx on 1,464 of 1,476 "
@@ -333,8 +332,13 @@ only exact candidate. One negative example is thin on its own, but
 style)`, and 0x0400 is the bit that example sets."""
 
 _MEAS_FLAGS = 10
-_MEAS_BARLINE_STYLES = {1: "normal", 2: "double"}
+_MEAS_DISPLAY = 12
+_MEAS_BARLINE_STYLES = {0: "none", 1: "normal", 2: "double"}
 """The flags byte's **high nibble** is the barline style, as `.musx` names it.
+
+Nibble 0 is FCMeasure's BARLINE_NONE: its one corpus measure, SM64 Main Theme
+bar 62, is the 3/4 front of a final bar Finale splits 3/4 + 1/4, and the PDF
+draws no line between the halves (audit T5).
 
 Paired documents agree on 3,960 ordinary measures and all 11 double bars, with
 no counterexample. **`final` is deliberately absent**: nibble 3 would be the
@@ -815,6 +819,9 @@ def _banner_year(path: str | os.PathLike[str]) -> int | None:
         return mus_header.parse(handle.read(mus_header.MUS_METADATA_SIZE)).year
 
 
+_TAG_TIME_SIG_OPTIONS = 33
+
+
 def _options_records(records: tuple[MusOther, ...], year: int | None) -> list[Record]:
     """Evidenced clef, rest-beam, grace and playback options for the zlib era."""
     out: list[Record] = []
@@ -837,6 +844,22 @@ def _options_records(records: tuple[MusOther, ...], year: int | None) -> list[Re
     playback = _playback_options(records)
     if playback is not None:
         out.append(playback)
+    for record in records:
+        if (
+            record.tag == _TAG_TIME_SIG_OPTIONS
+            and record.cmper == OPTIONS_CMPER
+            and not record.part
+            and len(record.payload) >= 8
+        ):
+            # Document Options > Time Signatures > Abbreviate: the low bit of the
+            # u16 at +4 (common time) and at +6 (cut time).
+            fields: dict[str, str | tuple[str, ...] | Record | tuple[Record, ...]] = {}
+            if _u16(record.payload, 4) & 1:
+                fields["timeSigDoAbrvCommon"] = ""
+            if _u16(record.payload, 6) & 1:
+                fields["timeSigDoAbrvCut"] = ""
+            out.append(Record("timeSignatureOptions", {}, "", fields))
+            break
     for record in records:
         if record.tag != TAG_CLEF_OPTIONS or record.cmper != OPTIONS_CMPER or record.part:
             continue
@@ -1261,6 +1284,29 @@ def _others_records(
                         "offset": str(_s16(record.payload, 150)),
                         "numberFlags": str(_u16(record.payload, 344)),
                         "hasAffixes": str(int(any(record.payload[152:344]))),
+                    },
+                )
+            )
+        elif record.tag == 164 and len(record.payload) == 204:
+            # The 2011 region body: the same scalars as the 360-byte layout,
+            # eight bytes earlier. Its flag word does not match the later one
+            # (Prelude 0x80, Hyrule 0x00 at +130) yet both count alike -- Hyrule's
+            # region from measure 2 prints measure 6 as "5" -- so the count is
+            # the supported one, and the bytes past +142 are uninitialised memory
+            # in four files, not affixes (audit T5).
+            out.append(
+                Record(
+                    "measNumbRegion",
+                    attrs,
+                    "",
+                    {
+                        "startMeas": str(_u16(record.payload, 132)),
+                        "endMeas": str(_u16(record.payload, 134)),
+                        "startChar": str(_u16(record.payload, 136)),
+                        "base": str(_u16(record.payload, 138)),
+                        "offset": str(_s16(record.payload, 140)),
+                        "numberFlags": "128",
+                        "hasAffixes": "0",
                     },
                 )
             )
@@ -1736,6 +1782,17 @@ def _meas_spec(
         style = _MEAS_BARLINE_STYLES.get(flags >> 4)
         if style is not None:
             fields["barline"] = style
+    if len(payload) >= _MEAS_DISPLAY + 6:
+        # The printed signature: beats/divbeat at +12/+14, and in the u16 at +16
+        # 0x04 = use it and 0x02 = abbreviate it. See ARCHITECTURE "Printed time
+        # signatures" for the corpus evidence.
+        fields["dispBeats"] = str(_u16(payload, _MEAS_DISPLAY, order))
+        fields["dispDivbeat"] = str(_u16(payload, _MEAS_DISPLAY + 2, order))
+        display = _u16(payload, _MEAS_DISPLAY + 4, order)
+        if display & 0x04:
+            fields["useDisplayTimesig"] = ""
+        if display & 0x02:
+            fields["abbrvTime"] = ""
     return fields
 
 

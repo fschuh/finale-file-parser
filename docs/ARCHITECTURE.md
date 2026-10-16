@@ -2238,6 +2238,33 @@ GetUseCustomFont0x5BB3A anchor the fields. Tremolo recovery uses only establishe
 inherited Maestro half-heads, excluding custom fonts. Packed note IDs can repeat
 in retained source records; do not let one erase its neighboring modification.
 
+#### Printed time signatures (2026-10-16, audit T5/T9)
+
+`measSpec` +12/+14 hold the display signature's beats/divbeat; in the u16 at +16,
+**0x04** is `useDisplayTimesig` and **0x02** `abbrvTime`. Evidence: Hikari and
+Player Down store bar 1 as 1/4 with 4/4 at +12 and 0x04 set, and both PDFs print 4/4
+over the one-beat pickup; DuckTales Title, SM64 Main Theme, SMB Castle and MAP 7
+store 4/4 shown as 2/2 with 0x06 and all four print a struck C. Options tag **33**
+(cmper 0xFFFE) is Document Options > Time Signatures: the low bit of the u16 at +4
+abbreviates common time and at +6 cut time. Across the 105 PDFs, a measure without
+a display signature prints C or a struck C exactly where that option is set (Simone,
+Green Hill: common; Invincibility, Dire Dire Docks: cut); a measure with one ignores
+the option and follows its own 0x02 (SMB Ground and Labyrinth have the options set,
+use a display signature without 0x02, and print 2/2 and 4/4 numerically).
+
+The IR keeps `Measure.time` as the time in force and adds `display_time` and
+`time_symbol`; the exporter writes `<time>` where the printed signature changes.
+SM64's final bar is two measures, 3/4 + 1/4, both shown as the running 2/2; with no
+printed change and barline nibble **0** (FCMeasure BARLINE_NONE, its only corpus
+occurrence) between them, the XML now shows one bar, as the PDF does.
+
+The 2011 `measNumbRegion` body is 204 bytes with the 360-byte layout's scalars eight
+bytes earlier (start +132, end +134, start char +136, base +138, offset +140).
+Hyrule Castle's region begins at measure 2, so its pickup is unnumbered and the next
+bar is 1, as printed. Uncover Secret's empty second bar is kept: Finale prints
+trailing empty bars (SMB Underground's PDF shows its empty bar 7), so its one-bar PDF
+is a print selection, as P15 above found.
+
 #### Chords split across staves (2026-10-16, audit T4)
 
 Koopa Kid Battle bars 0-1 (entries 3013/3021) and SMW Title Screen bar 24 (entry

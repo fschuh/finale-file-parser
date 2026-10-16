@@ -28,7 +28,7 @@ __all__ = ["BARLINE_STYLES", "barline_styles"]
 
 _MEASURE = "measSpec"
 
-BARLINE_STYLES = {"double": "light-light", "final": "light-heavy"}
+BARLINE_STYLES = {"double": "light-light", "final": "light-heavy", "none": "none"}
 """Finale barline name -> MusicXML `bar-style`.
 
 `normal` is deliberately absent: it is the default barline, and writing
