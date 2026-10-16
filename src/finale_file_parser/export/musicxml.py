@@ -1715,6 +1715,7 @@ def _append_measure(
     _append_octaves(element, octaves, divisions)
     _append_clef_changes(element, measure, divisions)
 
+    order = _voice_order(measure)
     for index, voice in enumerate(measure.voices):
         if index:
             # Voices are written in sequence, so the cursor must be rewound to the
@@ -1735,8 +1736,9 @@ def _append_measure(
             ET.SubElement(forward, "duration").text = str(
                 _duration_in_divisions(voice.start_offset, divisions)
             )
-            ET.SubElement(forward, "voice").text = str(voice.number)
+            ET.SubElement(forward, "voice").text = str(order.get(voice.number, voice.number))
         onset = voice.start_offset
+        written = replace(voice, number=order[voice.number]) if voice.number in order else voice
         for event_index, event in enumerate(voice.events):
             numbers = (
                 ()
@@ -1754,7 +1756,7 @@ def _append_measure(
             _append_event(
                 element,
                 event,
-                voice,
+                written,
                 divisions,
                 arpeggio_numbers=numbers,
                 slurs=slurs,
@@ -1777,6 +1779,48 @@ def _append_measure(
                 onset += event.duration
 
     _append_barline(element, measure, "right")
+
+
+def _voice_order(measure: Measure) -> dict[int, int]:
+    """Renumber a staff's sounding layers so the highest-pitched one is voice 1.
+
+    MusicXML readers treat voice 1 as the upper voice -- MuseScore places its rests
+    high and voice 2's low, measuring an explicit rest position from there -- but a
+    Finale layer number says nothing about register: an upper melody often sits in
+    layer 2. The numbers are only permuted among the layers that hold notes. A
+    measure whose renumbered layer carries a tie across either barline keeps its
+    numbers, since a tie must stay in one voice.
+    """
+    semitone = {"C": 0, "D": 2, "E": 4, "F": 5, "G": 7, "A": 9, "B": 11}
+    heights: list[tuple[Fraction, int]] = []
+    for voice in measure.voices:
+        pitches = [
+            12 * p.octave + semitone[p.step] + p.alteration
+            for e in voice.events
+            if not e.is_grace
+            for p in e.pitches
+        ]
+        if pitches:
+            heights.append((Fraction(sum(pitches), len(pitches)), voice.number))
+    if len(heights) < 2:
+        return {}
+    numbers = sorted(number for _, number in heights)
+    ranked = sorted(heights, key=lambda item: (-item[0], item[1]))
+    order = {voice: numbers[rank] for rank, (_, voice) in enumerate(ranked)}
+    if all(voice == number for voice, number in order.items()):
+        return {}
+    for voice in measure.voices:
+        if order.get(voice.number, voice.number) == voice.number:
+            continue
+        sounding = [e for e in voice.events if not e.is_grace and e.pitches]
+        if sounding and (
+            any(t.stop for t in sounding[0].note_ties)
+            or sounding[0].tie_end
+            or any(t.start for t in sounding[-1].note_ties)
+            or sounding[-1].tie_start
+        ):
+            return {}
+    return order
 
 
 def _append_clef_changes(element: ET.Element, measure: Measure, divisions: int) -> None:
@@ -2046,6 +2090,9 @@ def _append_note(
         # triplet sounds 2/3, and is 3 notes in the time of 2.
         ET.SubElement(modification, "actual-notes").text = str(event.tuplet_ratio.denominator)
         ET.SubElement(modification, "normal-notes").text = str(event.tuplet_ratio.numerator)
+    if pitch is not None and event.stem is not None:
+        # Schema order: <stem> after <time-modification>, before <notehead>.
+        ET.SubElement(note, "stem").text = event.stem
     if pitch is not None:
         enclosed = any(m.pitch_index == pitch_index for m in event.parentheses)
         head = next((h for h in event.noteheads if h.pitch_index == pitch_index), None)

@@ -64,6 +64,7 @@ from finale_file_parser.enigma.slurs import slurs_by_staff
 from finale_file_parser.enigma.smart_shapes import stale_smart_shapes
 from finale_file_parser.enigma.staff_playback import with_playback_scopes
 from finale_file_parser.enigma.staff_visibility import staff_hide_modes, staves_hiding_text_repeats
+from finale_file_parser.enigma.stems import assign_stems, frozen_stem, layer_stems
 from finale_file_parser.enigma.text import file_info, staff_names
 from finale_file_parser.enigma.timesig import TimeSignature as EnigmaTimeSignature
 from finale_file_parser.enigma.timesig import time_signatures
@@ -237,8 +238,10 @@ def build_score(document: EnigmaDocument) -> Score:
                 event, written_duration=written, tuplet_ratio=event.duration / written, beams=()
             )
     rest_options = rest_beams(document)
+    fixed_layers = layer_stems(document)
     for cell in cells.values():
         _apply_beams(cell, rest_options)
+        cell.events_by_layer.update(assign_stems(cell.events_by_layer, fixed_layers))
         for layer, events in cell.events_by_layer.items():
             cell.events_by_layer[layer] = [
                 replace(event, grace_slash=grace_slash(event, always_slash))
@@ -813,6 +816,7 @@ def _event(
         articulation_playback=articulation_playback,
         noteheads=noteheads,
         cross_staff=cross_staff,
+        stem=frozen_stem(record) if pitches else None,
     )
 
 

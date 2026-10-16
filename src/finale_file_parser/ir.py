@@ -324,6 +324,10 @@ class Event:
     cross_staff: tuple[CrossStaff, ...] = ()
     rest_display_pitch: Pitch | None = None
     """Explicit rest drawing position; it does not make the rest sound."""
+    stem: str | None = None
+    """"up" or "down" where the source fixes the stem direction: a frozen entry,
+    or a layer whose settings freeze its stems while another layer has notes.
+    None leaves the direction to the consumer's own rules."""
 
     @property
     def is_rest(self) -> bool:

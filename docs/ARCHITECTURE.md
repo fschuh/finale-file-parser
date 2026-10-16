@@ -2238,6 +2238,30 @@ GetUseCustomFont0x5BB3A anchor the fields. Tremolo recovery uses only establishe
 inherited Maestro half-heads, excluding custom fonts. Packed note IDs can repeat
 in retained source records; do not let one erase its neighboring modification.
 
+#### Stem directions (2026-10-16, audit T3)
+
+Entry flag **FREEZSTEM 0x100** with **UPSTEMBIT 0x1** (eeppd.txt) is a hand-set
+stem; the reader surfaces them as `freezeStem`/`upStem`. An unfrozen entry's
+UPSTEMBIT is not used: eeppd.txt says it is recomputed on the fly, and Mega Man 2
+Opening's up-stemmed melody stores it clear. Others tag **163** (`layerAtts`,
+12 bytes, cmper 0-3 = layers 1-4) holds Document Options > Layers: signed rest
+offset at +0 and a flag word at +10. 104 of 105 corpus files store exactly
+`06 00 .. 80 7f`, `fa ff .. 80 7b`, `.. 00 30`, `.. 00 30` (the other differs only in
+rest offsets 4/-4) -- Finale's factory settings, which freeze layer 1 up and layer 2
+down while another layer has notes and leave layers 3-4 free. Layers 1 and 2 differ
+only in **0x0400**, so it reads as stems-up; **0x4000** is present on layers 1-2 alone
+and reads as the freeze. The remaining bits are not decoded; "only while other
+layers have notes" is assumed, as the factory settings have it.
+
+`enigma/stems.py` applies, per staff and measure: a frozen entry's direction; then
+the first frozen direction in each beam group to its other members; then the frozen
+layer's direction when another layer holds notes. Anything else exports no `<stem>`.
+The exporter also renumbers a staff's sounding layers so the highest-pitched is
+MusicXML voice 1: MuseScore places voice 1 rests high and measures an explicit rest
+position from its voice default, so Opening's layer-2 melody rest otherwise lands
+on layer 1's whole note. A measure where a renumbered layer is tied across a
+barline keeps its numbers.
+
 #### Enharmonic flip (2026-10-16, audit T1)
 
 Byte +8 bit **0x04** of each 1058 group is the per-note enharmonic flip

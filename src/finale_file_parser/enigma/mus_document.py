@@ -1212,6 +1212,28 @@ def _custom_line(payload: bytes, *, modern: bool | None) -> Record:
     return Record("smartShapeCustomLine", {}, "", fields)
 
 
+_TAG_LAYER_ATTS = 163
+_LAYER_FREEZE = 0x4000
+_LAYER_UP_STEMS = 0x0400
+
+
+def _layer_atts(payload: bytes) -> dict[str, str | tuple[str, ...] | Record | tuple[Record, ...]]:
+    """Document Options > Layers: one 12-byte record per layer (cmper 0-3).
+
+    Signed rest offset at +0, flag word at +10. Every corpus file stores the
+    factory settings -- layers 1/2 0x7F80/0x7B80, layers 3/4 0x3000 -- so the only
+    bits read are the two those settings separate: 0x4000 present on the frozen
+    layers 1-2 alone, and 0x0400 on layer 1 (stems up) but not layer 2 (down).
+    See ARCHITECTURE "Stem directions".
+    """
+    flags = _u16(payload, 10)
+    return {
+        "restOffset": str(_s16(payload, 0)),
+        **({"freezeLayer": ""} if flags & _LAYER_FREEZE else {}),
+        **({"upStems": ""} if flags & _LAYER_UP_STEMS else {}),
+    }
+
+
 def _others_records(
     records: tuple[MusOther, ...], fallback: str, *, year: int | None = None
 ) -> list[Record]:
@@ -1242,6 +1264,8 @@ def _others_records(
                     },
                 )
             )
+        elif record.tag == _TAG_LAYER_ATTS and len(record.payload) == 12:
+            out.append(Record("layerAtts", attrs, "", _layer_atts(record.payload)))
         elif record.tag == TAG_CLEF_ENUM:
             out.extend(_clef_enums(record.payload, attrs))
         elif record.tag == TAG_FONT_NAME:
