@@ -96,11 +96,17 @@ def test_a_fractional_position_can_require_more_precision_than_any_note() -> Non
 
 
 def test_a_cross_measure_span_has_one_start_and_one_stop_at_the_barline() -> None:
-    root = _tree(_score(Hairpin("crescendo", 1, Fraction(1, 4), 2, Fraction(1))))
+    root = _tree(_score(Hairpin("crescendo", 1, Fraction(1, 4), 2, Fraction(1, 2))))
     assert _positions(root) == [
         ("1", None, Fraction(1, 4), "crescendo", "1"),
-        ("2", None, Fraction(1), "stop", "1"),
+        ("2", None, Fraction(1, 2), "stop", "1"),
     ]
+
+
+def test_a_stop_on_the_final_barline_ends_at_the_last_note() -> None:
+    # MuseScore draws a hairpin ending on the final barline as a stub.
+    root = _tree(_score(Hairpin("crescendo", 1, Fraction(1, 4), 2, Fraction(1))))
+    assert _positions(root)[-1] == ("2", None, Fraction(3, 4), "stop", "1")
 
 
 def test_overlapping_spans_pair_independently_even_when_the_shorter_one_closes_first() -> None:
@@ -157,7 +163,8 @@ def test_projected_staves_keep_their_offsets_after_the_cursor_rewinds() -> None:
     assert _positions(root) == [
         ("1", "1", Fraction(1, 8), "crescendo", "1"),
         ("1", "2", Fraction(1, 4), "diminuendo", "2"),
-        ("2", "1", Fraction(1), "stop", "1"),
+        # The crescendo ends on the final barline, so at the last note's onset.
+        ("2", "1", Fraction(3, 4), "stop", "1"),
         ("2", "2", Fraction(3, 4), "stop", "2"),
     ]
 

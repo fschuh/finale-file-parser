@@ -1478,6 +1478,8 @@ def _hairpin_directions(parts: tuple[Part, ...]) -> _HairpinDirections:
         else:
             number = active.pop(key)
         measure = span.start_measure if starting else span.end_measure
+        if not starting:
+            offset = _final_stop_offset(parts[staff], measure, offset)
         result.setdefault((parts[staff].id, measure), []).append(
             _Wedge(
                 offset,
@@ -1487,6 +1489,31 @@ def _hairpin_directions(parts: tuple[Part, ...]) -> _HairpinDirections:
             )
         )
     return {key: tuple(directions) for key, directions in result.items()}
+
+
+def _final_stop_offset(part: Part, number: int, offset: Fraction) -> Fraction:
+    """Pull a stop on the score's final barline back to the last note's onset.
+
+    MuseScore finds no segment to end a hairpin on at the final barline and draws
+    it as a stub at its start (Battle to the Death's closing crescendo); ending at
+    the last note's onset draws it across the bar as printed.
+    """
+    if not part.measures or part.measures[-1].number != number:
+        return offset
+    measure = part.measures[-1]
+    onsets = []
+    length = Fraction(0)
+    for voice in measure.voices:
+        cursor = voice.start_offset
+        for event in voice.events:
+            if event.is_grace:
+                continue
+            onsets.append(cursor)
+            cursor += event.duration
+        length = max(length, cursor)
+    if offset < length or not onsets:
+        return offset
+    return max(onsets)
 
 
 def _append_wedges(element: ET.Element, wedges: tuple[_Wedge, ...], divisions: int) -> None:
