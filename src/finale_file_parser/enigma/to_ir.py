@@ -42,7 +42,7 @@ from finale_file_parser.enigma.glissandi import glissandi_by_staff
 from finale_file_parser.enigma.graces import grace_slash, slash_flagged_grace_notes
 from finale_file_parser.enigma.groups import staff_groups, staff_order
 from finale_file_parser.enigma.hairpins import hairpins_by_staff
-from finale_file_parser.enigma.header import page_header
+from finale_file_parser.enigma.header import page_header, page_notes
 from finale_file_parser.enigma.jumps import jumps_by_measure, navigation_by_measure
 from finale_file_parser.enigma.key import KeySignature, Mode, decode_key
 from finale_file_parser.enigma.lines import lines_by_staff
@@ -309,6 +309,23 @@ def build_score(document: EnigmaDocument) -> Score:
     if headers and numbers:
         where = SCORE_WIDE_STAFF, numbers[0]
         expressions[where] = headers + expressions.get(where, ())
+    notes = page_notes(document)
+    last_page = max(
+        (
+            page
+            for r in document.others.of_tag("pageTextAssign")
+            if (page := field_int(r.attrs.get("cmper")))
+        ),
+        default=0,
+    )
+    for page, note in notes:
+        # Page coordinates cannot be mapped to a bar without page layout, but a
+        # note on the first page heads the piece and one on the last page ends it
+        # (Memories of Green's echo hint and "octave lower on repeat").
+        if not numbers or page not in {1, last_page}:
+            continue
+        where = SCORE_WIDE_STAFF, numbers[0] if page == 1 else numbers[-1]
+        expressions[where] = expressions.get(where, ()) + (Expression(note, ""),)
     ignored_shapes, diagnostics = stale_smart_shapes(document, numbers)
     lines, line_diagnostics = lines_by_staff(document, ignored_shapes=ignored_shapes)
     diagnostics += line_diagnostics

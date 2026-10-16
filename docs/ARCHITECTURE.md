@@ -2238,6 +2238,17 @@ GetUseCustomFont0x5BB3A anchor the fields. Tremolo recovery uses only establishe
 inherited Maestro half-heads, excluding custom fonts. Packed note IDs can repeat
 in retained source records; do not let one erase its neighboring modification.
 
+#### Memories of Green's ossia (2026-10-16, audit T18)
+
+Staff 3 holds the two-bar echo pattern the PDF prints as a small ossia under system
+1, but it is in no per-system staff list (`instUsed` cmper 1-7 all list staves 1-2),
+so Finale lays it out in no system: the printed ossia is a page-placed graphic of
+those bars, which MusicXML cannot express. The staff stays a hidden part. Its two
+instructions are page texts placed by coordinates alone (flags 256); `page_notes`
+reads such notes, and the reader attaches a page-1 note to the first bar and a
+last-page note to the last bar ("Play both hands an octave lower on repeat" sits
+under the final bar). Notes on other pages need page layout and are not placed.
+
 #### Note glyphs in text (2026-10-16, audit T13)
 
 Tempo and swing marks set note glyphs in text fonts: MaestroTimes uses Œ quarter,

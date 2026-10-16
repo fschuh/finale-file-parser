@@ -24,7 +24,7 @@ import re
 from finale_file_parser.enigma.document import EnigmaDocument, field_int
 from finale_file_parser.enigma.text import file_info, plain_text, text_block
 
-__all__ = ["page_header"]
+__all__ = ["page_header", "page_notes"]
 
 _INSERTS = {
     "99": "title",
@@ -110,6 +110,31 @@ def page_header(document: EnigmaDocument) -> dict[str, str]:
         if role not in out and info.get(role):
             out[role] = info[role].replace("\r\n", "\n").replace("\r", "\n")
     return out
+
+
+_PAGE_NOTE = 256
+"""A text placed by page coordinates alone (Memories of Green's performance notes)."""
+
+
+def page_notes(document: EnigmaDocument) -> tuple[tuple[int, str], ...]:
+    """(page, text) for page-placed performance notes that are not title-block text."""
+    info = file_info(document)
+    out = []
+    for record in document.others.of_tag("pageTextAssign"):
+        if "part" in record.attrs or "postIt" in record.fields:
+            continue
+        page = field_int(record.attrs.get("cmper"))
+        if not page or field_int(record.attrs.get("sourceFlags")) != _PAGE_NOTE:
+            continue
+        number = field_int(record.fields.get("block"))
+        markup = text_block(document, number) if number else None
+        if not markup:
+            continue
+        lines = _lines(markup, info)
+        if not lines or any(hint or _role(line) or _TEMPO.search(line) for line, hint in lines):
+            continue
+        out.append((page, " ".join(line for line, _ in lines)))
+    return tuple(out)
 
 
 def _insert_roles(markup: str) -> set[str]:

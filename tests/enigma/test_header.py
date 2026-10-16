@@ -106,3 +106,18 @@ def test_the_header_reaches_identification_and_placed_credits() -> None:
     }
     assert all(w.get("default-y") for w in root.iter("credit-words"))
     assert root.find("defaults/page-layout/page-height") is not None
+
+
+def test_page_placed_performance_notes_are_kept_apart_from_the_title_block() -> None:
+    from finale_file_parser.enigma.header import page_notes
+
+    doc = _document(
+        [
+            ("^legacycmd(99,)", 40, 0),
+            ("Optional: Echo the\r\nsecond eighth", 256, 1947),
+            ("Arranged by Sam Waetford", 256, 1800),
+        ],
+        {"title": '"Memories of Green"'},
+    )
+    assert page_notes(doc) == ((1, "Optional: Echo the second eighth"),)
+    assert page_header(doc)["arranger"] == "Arranged by Sam Waetford"
