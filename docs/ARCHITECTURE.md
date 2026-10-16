@@ -2238,6 +2238,17 @@ GetUseCustomFont0x5BB3A anchor the fields. Tremolo recovery uses only establishe
 inherited Maestro half-heads, excluding custom fonts. Packed note IDs can repeat
 in retained source records; do not let one erase its neighboring modification.
 
+#### Leftover tie stops (2026-10-16, audit T6)
+
+148 note tie-end flags in 25 corpus scores have no tie start on the same pitch
+before them; all sit mid-bar (none at a repeat or ending boundary). Crash Man's
+F#3 still carries one directly after an F3, a leftover of editing. Finale draws no
+tie for such a flag, and its MIDI re-attacks those notes (SMB2 Ground bar 15 plays
+G4/E5 again on beat 3, swung). The IR keeps the source flags; the exporter writes a
+stop only when a start on the same sounding pitch, in any voice of the part, ends
+exactly where the stopped note begins. Unclosed tie starts (12 in 6 scores) are
+kept as Finale draws them.
+
 #### Printed time signatures (2026-10-16, audit T5/T9)
 
 `measSpec` +12/+14 hold the display signature's beats/divbeat; in the u16 at +16,

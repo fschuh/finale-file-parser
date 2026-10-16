@@ -148,7 +148,7 @@ def to_musicxml(score: Score) -> bytes:
         ExportError: a duration has no MusicXML note type, or the divisions
             needed to express the score's durations exceed the guard.
     """
-    score = _pickup_display(score)
+    score = matched_ties(_pickup_display(score))
     root = ET.Element("score-partwise", version=MUSICXML_VERSION)
     _append_identification(root, score)
     if any(
@@ -200,6 +200,82 @@ def _append_measure_labels(root: ET.Element, bundles: tuple[tuple[Part, ...], ..
                 xml.set("number", measure.display_number or "0")
                 if not measure.display_number:
                     xml.set("implicit", "yes")
+
+
+def matched_ties(score: Score) -> Score:
+    """Drop tie stops that no tie start reaches.
+
+    Finale keeps a note's tie-end flag after the note it was tied from is changed
+    or deleted -- Crash Man's F#3 still carries one behind an F3 -- and neither
+    draws a tie for it nor holds it in playback. A stop is kept when a start on the
+    same sounding pitch, in any voice of the part, ends exactly where it begins.
+    """
+    semitone = {"C": 0, "D": 2, "E": 4, "F": 5, "G": 7, "A": 9, "B": 11}
+
+    def key(pitch: Pitch) -> int:
+        return 12 * pitch.octave + semitone[pitch.step] + pitch.alteration
+
+    def flags(event: Event) -> tuple[NoteTies, ...]:
+        # A length mismatch is left for `_append_event` to reject.
+        if event.note_ties and len(event.note_ties) != len(event.pitches):
+            return ()
+        return event.note_ties or tuple(
+            NoteTies(event.tie_start, event.tie_end) for _ in event.pitches
+        )
+
+    parts = []
+    for part in score.parts:
+        timed: list[tuple[int, int, int, Fraction]] = []
+        starts: set[tuple[Fraction, int]] = set()
+        origin = Fraction(0)
+        for m_index, measure in enumerate(part.measures):
+            extent = Fraction(0)
+            for v_index, voice in enumerate(measure.voices):
+                onset = origin + voice.start_offset
+                for e_index, event in enumerate(voice.events):
+                    end = onset if event.is_grace else onset + event.duration
+                    for pitch, tie in zip(event.pitches, flags(event), strict=False):
+                        if tie.start:
+                            starts.add((end, key(pitch)))
+                    timed.append((m_index, v_index, e_index, onset))
+                    onset = end
+                extent = max(extent, onset - origin)
+            origin += extent
+        changes: dict[tuple[int, int, int], Event] = {}
+        for m_index, v_index, e_index, onset in timed:
+            event = part.measures[m_index].voices[v_index].events[e_index]
+            ties = flags(event)
+            if not ties:
+                continue
+            kept = tuple(
+                replace(tie, stop=tie.stop and (onset, key(pitch)) in starts)
+                for pitch, tie in zip(event.pitches, ties, strict=True)
+            )
+            if kept != ties:
+                changes[m_index, v_index, e_index] = replace(
+                    event, note_ties=kept, tie_end=any(t.stop for t in kept)
+                )
+        if not changes:
+            parts.append(part)
+            continue
+        measures = tuple(
+            replace(
+                measure,
+                voices=tuple(
+                    replace(
+                        voice,
+                        events=tuple(
+                            changes.get((m_index, v_index, e_index), event)
+                            for e_index, event in enumerate(voice.events)
+                        ),
+                    )
+                    for v_index, voice in enumerate(measure.voices)
+                ),
+            )
+            for m_index, measure in enumerate(part.measures)
+        )
+        parts.append(replace(part, measures=measures))
+    return replace(score, parts=tuple(parts))
 
 
 def _pickup_offset(value: Fraction, spacer: Fraction) -> Fraction:

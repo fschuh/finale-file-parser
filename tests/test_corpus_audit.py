@@ -229,7 +229,7 @@ def test_alignment_work_cap_is_checked_before_allocation(monkeypatch: pytest.Mon
 
 
 def test_written_projection_preserves_silent_tie_notation_without_sound_ties() -> None:
-    score = _score((replace(_note(), playback=False, note_ties=(NoteTies(False, True),)),))
+    score = _score((replace(_note(), playback=False, note_ties=(NoteTies(True, False),)),))
     xml = ET.fromstring(to_musicxml(score))
     assert check_projection(score, xml)["source_written_notes_and_rests"] == 1
     assert xml.find(".//note/tie") is None and xml.find(".//notations/tied") is not None

@@ -53,13 +53,13 @@ def _note(level: int, flags: str = "", alteration: int = 0) -> str:
 
 
 @pytest.mark.parametrize(
-    ("flag", "ties", "xml_type"),
-    [("tieStart", NoteTies(start=True), "start"), ("tieEnd", NoteTies(stop=True), "stop")],
+    ("flag", "ties", "xml_types"),
+    [("tieStart", NoteTies(start=True), ["start"]), ("tieEnd", NoteTies(stop=True), [])],
 )
 def test_a_tie_on_one_chord_pitch_does_not_spread_to_the_others(
-    flag: str, ties: NoteTies, xml_type: str
+    flag: str, ties: NoteTies, xml_types: list[str]
 ) -> None:
-    """Also preserve an unmatched stop: repairing source ties is not the reader's job."""
+    """The IR preserves an unmatched stop; MusicXML omits it, as no start reaches it."""
     score = _score(_note(0), _note(2), _note(4, f"<{flag}/>"))
     event = score.parts[0].measures[0].voices[0].events[0]
     assert event.note_ties == (NoteTies(), NoteTies(), ties)
@@ -71,7 +71,7 @@ def test_a_tie_on_one_chord_pitch_does_not_spread_to_the_others(
         assert [[tie.get("type") for tie in note.findall(path)] for note in notes] == [
             [],
             [],
-            [xml_type],
+            xml_types,
         ]
 
 

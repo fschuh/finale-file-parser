@@ -27,7 +27,8 @@ def test_silent_chord_retains_full_size_visual_ties_and_exact_rhythm() -> None:
         note_type = note.find("type")
         assert note_type is not None and note_type.get("size") == "full"
     assert not root.findall(".//tie")
-    assert [t.get("type") for t in root.findall(".//tied")] == ["start", "stop"]
+    # E's stop has no start reaching it, so only C's start is drawn.
+    assert [t.get("type") for t in root.findall(".//tied")] == ["start"]
     assert all(n.find("pitch") is not None and n.find("rest") is None for n in notes)
 
 

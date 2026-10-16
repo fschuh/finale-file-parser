@@ -5,6 +5,7 @@ from collections import Counter
 from fractions import Fraction
 from xml.etree.ElementTree import Element
 
+from finale_file_parser.export.musicxml import matched_ties
 from finale_file_parser.ir import Pitch, Score
 
 from .attacks import midi_pitch
@@ -15,6 +16,8 @@ _Note = tuple[int, Fraction, int | None, Fraction, bool, bool, tuple[str, ...]]
 def check_projection(score: Score, xml: Element) -> dict[str, int]:
     expected: Counter[_Note] = Counter()
     actual: Counter[_Note] = Counter()
+    # MusicXML writes only the tie stops a start reaches; compare against that.
+    score = matched_ties(score)
     for part in score.parts:
         for measure in part.measures:
             for voice in measure.voices:

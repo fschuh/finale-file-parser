@@ -155,25 +155,29 @@ def test_ties_emit_both_sound_and_notation() -> None:
 
     Most applications need both for a tie to survive a round trip.
     """
-    root = _tree(_score(_note(tie_start=True, tie_end=True)))
-    note = root.find("./part/measure/note")
+    root = _tree(_score(_note(tie_start=True), _note(tie_start=True, tie_end=True)))
+    note = root.findall("./part/measure/note")[1]
     assert note is not None
     assert {t.get("type") for t in note.findall("tie")} == {"start", "stop"}
     assert {t.get("type") for t in note.findall("./notations/tied")} == {"start", "stop"}
 
 
 def test_a_chord_can_have_different_ties_on_each_pitch() -> None:
+    chord = (Pitch("C", 4, 0), Pitch("E", 4, 0), Pitch("G", 4, 0))
     root = _tree(
         _score(
             _note(
-                pitches=(Pitch("C", 4, 0), Pitch("E", 4, 0), Pitch("G", 4, 0)),
+                pitches=chord, note_ties=(NoteTies(), NoteTies(start=True), NoteTies(start=True))
+            ),
+            _note(
+                pitches=chord,
                 tie_start=True,
                 tie_end=True,
                 note_ties=(NoteTies(), NoteTies(stop=True), NoteTies(start=True, stop=True)),
-            )
+            ),
         )
     )
-    notes = root.findall("./part/measure/note")
+    notes = root.findall("./part/measure/note")[3:]
     expected = [[], ["stop"], ["stop", "start"]]
     assert [[tie.get("type") for tie in note.findall("tie")] for note in notes] == expected
     assert [

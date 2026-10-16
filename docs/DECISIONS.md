@@ -1381,3 +1381,18 @@ too broad. An unproved layer/style/print-selection policy or reference version
 may explain it. Preserve the encoded notes and flag the discrepancy; do not
 deduce a deletion rule from the PDF or the reference MIDI's earlier ending.
 
+
+## 2026-10-16 — DECIDED: export only the tie stops a start reaches
+
+**Context.** The 2026-10-08 decision preserves unmatched source ties in the IR. The
+audit of the 105 NinSheetMusic scores found 148 tie-end flags in 25 scores with no
+start before them, all mid-bar leftovers of editing (Crash Man's F#3 after an F3).
+Finale draws no tie for them and its MIDI re-attacks the notes.
+
+**Decision.** The IR still preserves every source flag. `to_musicxml` writes a
+`<tie>`/`<tied>` stop only when a start on the same sounding pitch, in any voice of
+the part, ends where the stopped note begins (`matched_ties`). Unreached starts are
+still written. The corpus-audit projection compares against the same matching.
+
+**Consequence.** A lone stop on an authored event no longer reaches MusicXML;
+tests that exercised stop emission now tie from a preceding note.

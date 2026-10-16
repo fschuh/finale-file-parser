@@ -96,7 +96,8 @@ def test_every_pitch_of_a_rolled_chord_has_an_arpeggiate_without_an_arrow() -> N
         == len(root.findall(".//lyric"))
         == 1
     )
-    assert [tie.get("type") for tie in root.findall(".//tied")] == ["start", "stop"]
+    # The stop on G has no start reaching it, so only the start is drawn.
+    assert [tie.get("type") for tie in root.findall(".//tied")] == ["start"]
     assert [note.findtext("duration") for note in notes] == ["1"] * 3
 
 
