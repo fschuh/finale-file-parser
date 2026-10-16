@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import copy
 import math
+import re
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass, replace
 from decimal import Decimal
@@ -657,6 +658,8 @@ def _duration_in_divisions(duration: Fraction, divisions: int) -> int:
         raise ExportError(f"duration {duration} is not expressible in {divisions} divisions")
     return int(value)
 
+
+_PARENTHESIZED = re.compile(r"\(\s*\S+\s*\)")
 
 _ACCIDENTALS = {-2: "flat-flat", -1: "flat", 0: "natural", 1: "sharp", 2: "double-sharp"}
 
@@ -1701,7 +1704,11 @@ def _append_expressions(element: ET.Element, measure: Measure, divisions: int) -
         elif expression.marking:
             direction = ET.SubElement(element, "direction", placement=_DYNAMICS_PLACEMENT)
             dynamics = ET.SubElement(ET.SubElement(direction, "direction-type"), "dynamics")
-            if expression.marking in _MUSICXML_DYNAMICS:
+            if _PARENTHESIZED.fullmatch(expression.text):
+                # <dynamics> takes no parentheses; MuseScore reads this other-dynamics
+                # as the same dynamic drawn inside them.
+                ET.SubElement(dynamics, "other-dynamics").text = f"({expression.marking})"
+            elif expression.marking in _MUSICXML_DYNAMICS:
                 ET.SubElement(dynamics, expression.marking)
             else:
                 ET.SubElement(dynamics, "other-dynamics").text = expression.marking
