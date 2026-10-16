@@ -657,6 +657,24 @@ def _measure_rest(signature: EnigmaTimeSignature | None) -> Event:
     )
 
 
+def _drawn_clef_changes(
+    positions: tuple[ClefPosition, ...], in_force: int | None
+) -> tuple[ClefPosition, ...]:
+    """The clef changes Finale draws: those that change the clef in force.
+
+    A measure's clef list opens with an entry at offset 0 restating its clef, and
+    a list that changes back and forth restates the clef the previous bar ended
+    in. Finale draws neither; exported, each printed a redundant clef (The Moon
+    bar 23, Steel Samurai bar 10).
+    """
+    drawn = []
+    for position in positions:
+        if position.index != in_force:
+            drawn.append(position)
+        in_force = position.index
+    return tuple(drawn)
+
+
 def _carried_clefs(
     document: EnigmaDocument,
     staves: list[int],
@@ -1056,7 +1074,10 @@ def _measure(
         clef_line=_clef_line(clef)
         if clef_changed and clef and not (clef_changes or {}).get((staff, number))
         else None,
-        clef_changes=_timed_clefs((clef_changes or {}).get((staff, number), ()), clef_table),
+        clef_changes=_timed_clefs(
+            _drawn_clef_changes((clef_changes or {}).get((staff, number), ()), previous_clef_index),
+            clef_table,
+        ),
         # Repeats belong to the measure, not the staff: every part carries the
         # same barline, which is what a reader of one part expects to see.
         # A marking belongs to the measure, so every part shows it -- which is

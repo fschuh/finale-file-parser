@@ -147,3 +147,18 @@ def test_non_numeric_definition_field_raises() -> None:
     document = _document(options=[_clef_options({"clefChar": "treble"})])
     with pytest.raises(CorruptScoreError, match="not an integer"):
         clef_definitions(document)
+
+
+def test_only_clef_changes_that_change_the_clef_are_drawn() -> None:
+    from fractions import Fraction
+
+    from finale_file_parser.enigma.clef import ClefPosition
+    from finale_file_parser.enigma.to_ir import _drawn_clef_changes
+
+    treble, bass = 0, 3
+    restated = (ClefPosition(Fraction(0), treble), ClefPosition(Fraction(1, 8), bass))
+    # The bar opens by restating the treble the previous bar ended in.
+    assert _drawn_clef_changes(restated, treble) == (restated[1],)
+    assert _drawn_clef_changes(restated, bass) == restated
+    flips = (ClefPosition(Fraction(0), bass), ClefPosition(Fraction(1, 4), bass))
+    assert _drawn_clef_changes(flips, treble) == (flips[0],)
