@@ -802,7 +802,8 @@ def _event(
     duration = Fraction(sounded_edu) / _WHOLE_EDU
     # A ratio of 1 means no tuplet; recording it anyway would make every note
     # carry a pointless <time-modification>.
-    ratio = duration / written if written and duration != written else None
+    # A grace note sounds for no time, which is not a tuplet ratio of zero.
+    ratio = duration / written if written and duration and duration != written else None
     if ornaments and entry.notes:
         ornaments = tuple(
             _resolve_ornament(ornament, entry.notes, key, transposition) for ornament in ornaments

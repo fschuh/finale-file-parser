@@ -85,3 +85,21 @@ def test_unbeamed_tuplets_are_bracketed_and_beamed_ones_are_not() -> None:
     }
     beamed = (note(True, False, "begin"), note(False, False, "continue"), note(False, True, "end"))
     assert _tuplet_notations(beamed)[0] == (("start", 1, False, "actual"),)
+
+
+def test_a_grace_note_has_no_time_modification() -> None:
+    graced = parse_enigma(
+        b"<finale><others><staffSpec cmper='1'/>"
+        b"<measSpec cmper='1'><beats>1</beats><divbeat>1024</divbeat></measSpec>"
+        b"<frameSpec cmper='1'><startEntry>1</startEntry><endEntry>2</endEntry></frameSpec>"
+        b"</others><details><gfhold cmper1='1' cmper2='1'><frame1>1</frame1></gfhold>"
+        b"</details><entries>"
+        b"<entry entnum='1' prev='0' next='2'><dura>512</dura><numNotes>1</numNotes>"
+        b"<graceNote/><note id='1'><harmLev>1</harmLev><harmAlt>0</harmAlt></note></entry>"
+        b"<entry entnum='2' prev='1' next='0'><dura>1024</dura><numNotes>1</numNotes>"
+        b"<note id='1'><harmLev>0</harmLev><harmAlt>0</harmAlt></note></entry>"
+        b"</entries></finale>"
+    )
+    root = ET.fromstring(to_musicxml(build_score(graced)))
+    assert root.find(".//note/grace") is not None
+    assert root.find(".//time-modification") is None
