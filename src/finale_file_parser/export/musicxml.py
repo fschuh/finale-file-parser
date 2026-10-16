@@ -811,6 +811,13 @@ def _staff_bundles(score: Score) -> tuple[tuple[Part, ...], ...]:
                             raise ExportError("an arpeggio span must name consecutive score parts")
                         for index in indices[:-1]:
                             joined[index] = True
+    for group in score.groups:
+        if not group.instrument or not all(p in positions for p in group.part_ids):
+            continue
+        indices = [positions[part_id] for part_id in group.part_ids]
+        if len(indices) > 1 and indices == list(range(indices[0], indices[0] + len(indices))):
+            for index in indices[:-1]:
+                joined[index] = True
     bundles: list[tuple[Part, ...]] = []
     start = 0
     for index, connected in enumerate(joined):
@@ -836,7 +843,21 @@ def _part_list_layout(score: Score, bundles: tuple[tuple[Part, ...], ...]) -> Sc
             # This group's symbol now belongs to the multi-staff part itself.
             continue
         groups.append(replace(group, part_ids=members))
-    return replace(score, parts=tuple(bundle[0] for bundle in bundles), groups=tuple(groups))
+    parts = []
+    for bundle in bundles:
+        group = _bundle_group(bundle, score.groups) if len(bundle) > 1 else None
+        if group is not None and group.instrument and group.name:
+            # The instrument's name ("Piano") labels its multi-staff part.
+            parts.append(
+                replace(
+                    bundle[0],
+                    name=group.name,
+                    abbreviation=group.abbreviation or bundle[0].abbreviation,
+                )
+            )
+        else:
+            parts.append(bundle[0])
+    return replace(score, parts=tuple(parts), groups=tuple(groups))
 
 
 def _bundle_group(parts: tuple[Part, ...], groups: tuple[PartGroup, ...]) -> PartGroup | None:

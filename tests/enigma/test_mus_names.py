@@ -228,7 +228,10 @@ def test_staff_and_group_labels_keep_their_distinct_roles_in_musicxml() -> None:
     assert [p.name for p in score.parts] == ["Right hand", "Staff 2", "Flute"]
     assert score.groups[0].name == "Grand piano"
     root = ET.fromstring(to_musicxml(score))
-    assert root.findtext("part-list/part-group/group-name") == "Grand piano"
-    assert root.findtext("part-list/part-group/group-abbreviation") == "Pno."
-    assert root.findtext("part-list/score-part/part-name") == "Right hand"
-    assert root.findtext("part-list/score-part/part-abbreviation") == "RH"
+    # The piano brace makes staves 1-2 one part, labelled by the group.
+    assert root.findall("part-list/part-group") == []
+    names = [
+        (p.findtext("part-name"), p.findtext("part-abbreviation"))
+        for p in root.findall("part-list/score-part")
+    ]
+    assert names[0] == ("Grand piano", "Pno.") and names[1][0] == "Flute"

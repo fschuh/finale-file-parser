@@ -47,9 +47,11 @@ def test_a_resting_active_staff_survives_ir_and_musicxml() -> None:
     assert [m.number for m in bass.measures] == [1, 2]
     assert all(m.voices[0].events[0].is_measure_rest for m in bass.measures)
     root = ET.fromstring(to_musicxml(score))
-    assert len(root.findall("part")) == 2
-    assert root.findtext("part[@id='P2']/measure/attributes/clef/sign") == "F"
-    assert len(root.findall("part[@id='P2']/measure/note/rest[@measure='yes']")) == 2
+    # The piano brace joins the staves; the resting bass is staff 2 of the part.
+    assert len(root.findall("part")) == 1
+    assert root.findtext("part/measure/attributes/clef[@number='2']/sign") == "F"
+    rests = [n for n in root.iter("note") if n.find("rest[@measure='yes']") is not None]
+    assert [n.findtext("staff") for n in rests].count("2") == 2
     assert [
         n.findtext("pitch/step") for n in root.findall(".//note") if n.find("pitch") is not None
     ] == ["C", "D"]

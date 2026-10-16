@@ -2238,6 +2238,16 @@ GetUseCustomFont0x5BB3A anchor the fields. Tremolo recovery uses only establishe
 inherited Maestro half-heads, excluding custom fonts. Packed note IDs can repeat
 in retained source records; do not let one erase its neighboring modification.
 
+#### Piano braces make one part (2026-10-16, audit T11)
+
+etfspec.pdf names bracket 3 the piano brace, and all 132 corpus braces span exactly
+two staves. In ~24 scores those two staves carry different playback instruments, so
+the exporter wrote them as two parts labelled "Staff 1"/"Staff 2" under a part-group,
+while the PDF shows one Piano. `PartGroup.instrument` now marks a piano brace as one
+instrument; the exporter joins its staves into one multi-staff part named by the
+group's own text ("Piano", resolved through `fullID`). Authored groups keep the old
+behaviour unless they set the flag.
+
 #### Fixed accidentals (2026-10-16, audit T8)
 
 The `.mus` note flag now surfaces eeppd.txt's ACCIBIT 0x01000000 (`showAcci`),

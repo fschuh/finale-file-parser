@@ -870,6 +870,11 @@ class PartGroup:
     name: str = ""
     abbreviation: str = ""
 
+    instrument: bool = False
+    """The staves are one instrument -- a grand staff -- rather than separate
+    parts that happen to be grouped. An exporter writes them as one part with
+    several staves, named by the group."""
+
 
 @dataclass(frozen=True)
 class ScoreDiagnostic:

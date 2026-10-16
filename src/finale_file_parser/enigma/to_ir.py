@@ -719,6 +719,7 @@ def _groups(document: EnigmaDocument, part_ids: list[str]) -> tuple[PartGroup, .
                 barline=group.barline,
                 name=group.name,
                 abbreviation=group.abbreviation,
+                instrument=group.instrument,
             )
         )
     return tuple(out)

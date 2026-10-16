@@ -121,8 +121,10 @@ def test_linked_part_group_is_retained_but_does_not_brace_the_score(same_key: bo
     score = build_score(document)
     assert [(g.part_ids, g.name) for g in score.groups] == [(("P1", "P2"), "Piano")]
     root = ET.fromstring(to_musicxml(score))
-    assert len(root.findall("part-list/part-group[@type='start']")) == 1
-    assert root.findtext("part-list/part-group/group-name") == "Piano"
+    # A piano brace makes its staves one part, named by the group.
+    assert root.findall("part-list/part-group") == []
+    assert root.findtext("part-list/score-part/part-name") == "Piano"
+    assert root.findtext("part/measure/attributes/staves") == "2"
     assert len(root.findall("part/measure/note")) == 4
 
 
@@ -133,7 +135,10 @@ def test_equal_score_spans_keep_legitimately_distinct_groups() -> None:
         ("bracket", "Linked part name"),
     ]
     root = ET.fromstring(to_musicxml(score))
-    assert len(root.findall("part-list/part-group[@type='start']")) == 2
+    # The brace becomes the "Piano" part itself; the bracket still groups it.
+    assert len(root.findall("part-list/part-group[@type='start']")) == 1
+    assert root.findtext("part-list/part-group/group-name") == "Linked part name"
+    assert root.findtext("part-list/score-part/part-name") == "Piano"
 
 
 def test_nested_score_groups_survive_part_filtering() -> None:

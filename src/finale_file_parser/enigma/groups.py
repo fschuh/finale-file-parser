@@ -54,6 +54,9 @@ _SCORE_LIST = "0"
 """`staffGroup.cmper1` and `instUsed.cmper` both name an instrument list; 0 is
 the score's own. Every corpus group uses it."""
 
+_PIANO_BRACE = 3
+"""etfspec.pdf: "bracket type: 3 (piano brace)" -- one instrument on two staves."""
+
 BRACKET_SYMBOLS = {3: "brace", 6: "bracket"}
 """Finale bracket id -> MusicXML `<group-symbol>`.
 
@@ -79,6 +82,8 @@ class StaffGroup:
 
     name: str = ""
     abbreviation: str = ""
+    instrument: bool = False
+    """A piano brace: the staves are one instrument."""
 
 
 def staff_order(document: EnigmaDocument) -> tuple[int, ...]:
@@ -156,6 +161,7 @@ def staff_groups(document: EnigmaDocument) -> tuple[StaffGroup, ...]:
                 barline=record.fields.get("groupBarlineStyle") == _GROUP_BARLINE,
                 name=_name(document, record.fields.get("fullID")),
                 abbreviation=_name(document, record.fields.get("abbrvID")),
+                instrument=_bracket_id(record) == _PIANO_BRACE,
             )
         )
     # Outermost first, so an exporter opening groups in this order nests them
