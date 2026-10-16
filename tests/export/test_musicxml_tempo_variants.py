@@ -28,7 +28,8 @@ def test_multiple_equivalent_marks_have_a_single_identical_playback_rate() -> No
         equivalents=(Tempo(Fraction(1, 8), Fraction(360)),),
     )
     root = DET.fromstring(_xml(tempo))
-    assert [m.findtext("beat-unit") for m in root.findall(".//metronome")] == ["quarter", "eighth"]
-    assert [m.findtext("per-minute") for m in root.findall(".//metronome")] == ["180", "360"]
+    # MuseScore keeps one <metronome> per direction, so the equivalence prints
+    # as words while the single rate plays through <sound tempo>.
+    assert root.findall(".//metronome") == []
     assert root.find(".//sound").get("tempo") == "180"  # type: ignore[union-attr]
-    assert [w.text for w in root.findall(".//words")] == ["Bright"]
+    assert [w.text for w in root.findall(".//words")] == ["Bright \u2669 = 180 (\u266a = 360)"]

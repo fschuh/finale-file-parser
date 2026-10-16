@@ -1813,6 +1813,18 @@ def _append_tempo(element: ET.Element, tempo: Tempo) -> ET.Element:
     if tempo.beat_unit.numerator != 1 or unit is None:
         raise ExportError(f"tempo beat unit {tempo.beat_unit} has no MusicXML type")
     direction = ET.SubElement(element, "direction", placement="above")
+    if tempo.equivalents and tempo.upper_per_minute is None:
+        # "♩ = 180 (♪ = 360)": MuseScore keeps one <metronome> per direction and
+        # reorders words around it, so an equivalence prints as words, and the
+        # rate still plays through <sound tempo>.
+        for value in tempo.equivalents:
+            if value.quarter_bpm != tempo.quarter_bpm or value.equivalents:
+                raise ExportError("equivalent tempos must have the same rate and not be nested")
+        marks = [_tempo_text(tempo), *(f"({_tempo_text(v)})" for v in tempo.equivalents)]
+        words = " ".join([tempo.words, *marks]) if tempo.words else " ".join(marks)
+        ET.SubElement(ET.SubElement(direction, "direction-type"), "words").text = words
+        ET.SubElement(direction, "sound", tempo=_decimal_number(tempo.quarter_bpm))
+        return direction
     if tempo.words:
         ET.SubElement(ET.SubElement(direction, "direction-type"), "words").text = tempo.words
     for value in (tempo, *tempo.equivalents):
@@ -1834,6 +1846,22 @@ def _append_tempo(element: ET.Element, tempo: Tempo) -> ET.Element:
     if tempo.upper_per_minute is None:
         ET.SubElement(direction, "sound", tempo=_decimal_number(tempo.quarter_bpm))
     return direction
+
+
+_TEMPO_NOTES = {
+    Fraction(1): "\U0001d15d",
+    Fraction(1, 2): "\U0001d15e",
+    Fraction(1, 4): "\u2669",
+    Fraction(1, 8): "\u266a",
+    Fraction(1, 16): "\U0001d161",
+}
+
+
+def _tempo_text(tempo: Tempo) -> str:
+    note = _TEMPO_NOTES.get(tempo.beat_unit)
+    if note is None:
+        raise ExportError(f"tempo beat unit {tempo.beat_unit} has no note symbol")
+    return f"{note}{'.' * tempo.dots} = {_decimal_number(tempo.per_minute)}"
 
 
 def prints_as_words(expression: Expression) -> bool:
