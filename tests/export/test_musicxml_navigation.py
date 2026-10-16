@@ -198,3 +198,45 @@ def test_to_coda_keeps_words_only_pass_condition_and_real_destination() -> None:
     assert marker is not None and marker.find("direction-type/coda") is not None
     marker_sound = marker.find("sound")
     assert marker_sound is not None and marker_sound.attrib == {"coda": "authored-coda"}
+
+
+def test_jump_to_an_unmarked_bar_gets_a_hidden_segno_instead_of_being_dropped() -> None:
+    # Finale's D.C. may return to the bar after a pickup; a plain da capo would
+    # replay the pickup, so the destination gets its own hidden marker.
+    jump = Navigation("D.C.", playback=RepeatPlayback("jumpAbsolute", "onPass", 2, 1))
+    root = DET.fromstring(
+        to_musicxml(
+            _score(
+                Measure(1, (Voice(1, (NOTE,)),)),
+                Measure(2, (Voice(1, (NOTE,)),)),
+                Measure(3, (Voice(1, (NOTE,)),), navigation=(jump,)),
+            )
+        )
+    )
+    target = root.find("part/measure[@number='2']/direction")
+    assert target is not None
+    hidden = target.find("direction-type/other-direction")
+    assert hidden is not None and hidden.get("print-object") == "no"
+    marker = target.find("sound")
+    assert marker is not None and marker.attrib == {"segno": "jump-target-2"}
+    sound = root.find("part/measure[@number='3']/direction/sound")
+    assert sound is not None and sound.attrib == {"dalsegno": "jump-target-2", "time-only": "1"}
+    assert root.findtext("part/measure[@number='3']/direction/direction-type/words") == "D.C."
+    assert root.find(".//segno") is None
+
+
+def test_forward_jump_to_an_unmarked_bar_gets_a_hidden_coda() -> None:
+    jump = Navigation("To bar 3", playback=RepeatPlayback("jumpAbsolute", "onPass", 3, 1))
+    root = DET.fromstring(
+        to_musicxml(
+            _score(
+                Measure(1, (Voice(1, (NOTE,)),), navigation=(jump,)),
+                Measure(2, (Voice(1, (NOTE,)),)),
+                Measure(3, (Voice(1, (NOTE,)),)),
+            )
+        )
+    )
+    marker = root.find("part/measure[@number='3']/direction/sound")
+    assert marker is not None and marker.attrib == {"coda": "jump-target-3"}
+    sound = root.find("part/measure[@number='1']//sound[@tocoda]")
+    assert sound is not None and sound.get("tocoda") == "jump-target-3"

@@ -3301,6 +3301,22 @@ or fit a substitute route from MIDI. The named raw source trace is
 new-route-evidence.log in generated validation artifacts. Initial MIDI program/
 bank/CC7/10 observations are recorded; their source field joins remain unproven.
 
+Spear's reference MIDI settles target0 for that score (audit T2, 2026-10-16): after
+the bar-48 repeat it plays bar49 and stops, so Finale's own playback ignores the
+target0 D.C. Exporting the words with no `<sound>` jump therefore matches Finale.
+
+#### Jumps to unmarked bars (2026-10-16, audit T2)
+
+MusicXML jumps only to the start (`dacapo`) or to a `segno`/`coda` id, while
+Finale's jumpAbsolute names any bar. Battle to the Death's D.C. (bar47) targets
+measure2, the first bar after its half-bar pickup; Finale's MIDI confirms it,
+replaying bar1 straight after bar46 without the pickup tremolo, although the PDF
+prints a plain "D.C.". The exporter used to drop such a jump entirely. A target
+that is neither the first bar nor a placed marker now gets a hidden marker
+(`other-direction print-object="no"` + `<sound segno|coda>`), and the jump points at
+it. MuseScore 4.7.5 with text-type inference imports it as an invisible segno
+Marker plus a "D.C." Jump to it and plays all 1998 reference notes.
+
 #### Engraver half-notehead tremolo in the expanded corpus (2026-10-12, F17)
 
 The added Battle to the Death score uses exactly the hidden-tuplet pair

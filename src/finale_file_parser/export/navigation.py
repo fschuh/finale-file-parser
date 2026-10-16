@@ -12,15 +12,25 @@ def append_navigation(root: ET.Element, score: Score) -> None:
         return
     part = score.parts[0]
     references, marker_ids = _marker_placements(part)
+    unmarked = _unmarked_targets(part)
     element = root.find("part")
     if element is None:
         return
     divisions = 1
     for measure, xml in zip(part.measures, element.findall("measure"), strict=True):
         divisions = int(xml.findtext("attributes/divisions", str(divisions)))
+        if measure.number in unmarked:
+            _append_hidden_marker(xml, *unmarked[measure.number])
         for mark in measure.navigation:
             reference = (measure.number, mark.kind, mark.mark_id) in references
-            attrs = _sound(part, measure.number, mark, reference=reference, marker_ids=marker_ids)
+            attrs = _sound(
+                part,
+                measure.number,
+                mark,
+                reference=reference,
+                marker_ids=marker_ids,
+                unmarked=unmarked,
+            )
             if mark.kind == "unknown-glyph" and not attrs:
                 continue
             direction = ET.Element("direction", placement="above", system="only-top")
@@ -79,6 +89,7 @@ def _sound(
     *,
     reference: bool = False,
     marker_ids: dict[tuple[int, str, str], str] | None = None,
+    unmarked: dict[int, tuple[str, str]] | None = None,
 ) -> dict[str, str]:
     if mark.kind in {"segno", "coda"}:
         if reference:
@@ -105,17 +116,61 @@ def _sound(
                 for n in m.navigation
                 if n.kind in {"segno", "coda"}
             ]
-            if len(targets) != 1:
+            if not targets and target in (unmarked or {}):
+                identifier = (unmarked or {})[target][1]
+            elif len(targets) == 1:
+                marker = targets[0]
+                identifier = (marker_ids or {}).get(
+                    (target, marker.kind, marker.mark_id), marker.mark_id
+                )
+            else:
                 return {}
-            marker = targets[0]
-            attrs["tocoda" if target > number else "dalsegno"] = (marker_ids or {}).get(
-                (target, marker.kind, marker.mark_id), marker.mark_id
-            )
+            attrs["tocoda" if target > number else "dalsegno"] = identifier
     if rule.trigger == "onPass":
         attrs["time-only"] = str(rule.passes)
     elif rule.trigger == "untilPass" and rule.passes > 1:
         attrs["time-only"] = ",".join(str(p) for p in range(1, min(rule.passes, 32768)))
     return attrs
+
+
+def _unmarked_targets(part: Part) -> dict[int, tuple[str, str]]:
+    """Jump destinations that are neither the first bar nor a placed segno or coda.
+
+    Finale jumps to any bar number, while MusicXML jumps only to the start or to a
+    marker. Battle to the Death's D.C. returns to the first bar after its pickup,
+    for example, which a plain da capo would not reproduce. Such a destination gets
+    a hidden marker of its own: a segno for a jump back, a coda for a jump forward.
+    """
+    if not part.measures:
+        return {}
+    first = part.measures[0].number
+    marked = {m.number for m in part.measures for n in m.navigation if n.kind in {"segno", "coda"}}
+    result: dict[int, tuple[str, str]] = {}
+    for measure in part.measures:
+        for mark in measure.navigation:
+            rule = mark.playback
+            if mark.kind in {"segno", "coda"} or rule is None or rule.action in {"noJump", "stop"}:
+                continue
+            try:
+                target = navigation_target(part, measure.number, mark)
+            except PlaybackError:
+                continue
+            if target == first or target in marked:
+                continue
+            kind = "coda" if target > measure.number else "segno"
+            result.setdefault(target, (kind, f"jump-target-{target}"))
+    return result
+
+
+def _append_hidden_marker(xml: ET.Element, kind: str, identifier: str) -> None:
+    direction = ET.Element("direction", placement="above", system="only-top")
+    kind_element = ET.SubElement(direction, "direction-type")
+    ET.SubElement(kind_element, "other-direction", {"print-object": "no"}).text = kind
+    ET.SubElement(direction, "sound", {kind: identifier})
+    position = next(
+        (i for i, e in enumerate(xml) if e.tag not in {"attributes", "barline"}), len(xml)
+    )
+    xml.insert(position, direction)
 
 
 def _positioning(mark: Navigation) -> dict[str, str]:
