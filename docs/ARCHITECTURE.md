@@ -2238,6 +2238,18 @@ GetUseCustomFont0x5BB3A anchor the fields. Tremolo recovery uses only establishe
 inherited Maestro half-heads, excluding custom fonts. Packed note IDs can repeat
 in retained source records; do not let one erase its neighboring modification.
 
+#### Tuplet notation (2026-10-16, audit T7)
+
+Events now carry their source tuplets (`TupletMark`) unreduced: FF4 Battle 1's
+6x256 in 1x1024 exports as 6:4 and Battle 2's 9x256 in 1x1536 as 9:6, where the
+reduced sounded ratio (3:2) made MuseScore draw triplets. Positions come from the
+same chain walk as sounded durations; `normal-type` is written only when the counted
+unit differs from the note's own value. The tupletDef word at +18 gives the number
+(low nibble: 0 none, 1 the count, 2 a ratio) and a bracket style (bits 12-13, values
+0 and 2 in the corpus). Both styles print beamed groups with a bare number (Hikari
+bar 4 is style 0) and SMB Game Over's unbeamed style-2 quarter triplet is bracketed,
+so the exporter brackets exactly the groups that are not beamed together.
+
 #### Leftover tie stops (2026-10-16, audit T6)
 
 148 note tie-end flags in 25 corpus scores have no tie start on the same pitch

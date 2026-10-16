@@ -54,6 +54,7 @@ __all__ = [
     "Tempo",
     "TimeSignature",
     "Tremolo",
+    "TupletMark",
     "Voice",
 ]
 
@@ -133,6 +134,26 @@ class TimeSignature:
 
     beats: int
     beat_type: int
+
+
+@dataclass(frozen=True)
+class TupletMark:
+    """One tuplet an event belongs to: `actual` notes in the time of `normal`.
+
+    Kept unreduced -- six sixteenths in the time of four is a sextuplet, which a
+    reduced 3:2 would print as two triplets. `unit` is the written length the two
+    counts are measured in.
+    """
+
+    actual: int
+    normal: int
+    unit: Fraction
+    start: bool = False
+    """This event opens the tuplet."""
+    stop: bool = False
+    """This event closes it."""
+    show_number: str = "actual"
+    """MusicXML show-number: ``actual``, ``both`` (as a ratio) or ``none``."""
 
 
 @dataclass(frozen=True)
@@ -257,6 +278,10 @@ class Event:
     tuplet_ratio: Fraction | None = None
     """Sounded over written, when this event is inside a tuplet. 2/3 for a
     triplet. None outside one."""
+
+    tuplets: tuple[TupletMark, ...] = ()
+    """The tuplets this event belongs to, outermost first, where the source
+    defines them; their ratios multiply to `tuplet_ratio`."""
 
     lyrics: tuple[Lyric, ...] = ()
     """Syllables sung on this event, one per verse, in verse order."""

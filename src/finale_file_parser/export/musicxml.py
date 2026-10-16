@@ -584,6 +584,54 @@ def _duration_in_divisions(duration: Fraction, divisions: int) -> int:
     return int(value)
 
 
+_TupletNotation = tuple[str, int, bool, str]
+"""(start or stop, nesting level, bracket, show-number) for one `<tuplet>`."""
+
+
+def _tuplet_notations(events: tuple[Event, ...]) -> dict[int, tuple[_TupletNotation, ...]]:
+    """`<tuplet>` starts and stops by event index, for the tuplets the voice closes.
+
+    Finale brackets a tuplet only where its notes are not beamed together: every
+    corpus PDF shows beamed triplets with a bare number (Hikari bar 4, under either
+    bracket style) and unbeamed ones bracketed (SMB Game Over bar 2).
+    """
+    result: dict[int, list[_TupletNotation]] = {}
+    opened: dict[int, int] = {}
+    for index, event in enumerate(events):
+        for level, mark in enumerate(event.tuplets, start=1):
+            if mark.start:
+                opened[level] = index
+            if mark.stop and level in opened:
+                first = opened.pop(level)
+                group = [e for e in events[first : index + 1] if not e.is_grace]
+                bracket = not all(e.beams and not e.is_rest for e in group)
+                show = events[first].tuplets[level - 1].show_number
+                result.setdefault(first, []).append(("start", level, bracket, show))
+                result.setdefault(index, []).append(("stop", level, bracket, show))
+    return {index: tuple(marks) for index, marks in result.items()}
+
+
+def _time_modification(event: Event) -> tuple[int, int, str | None]:
+    """actual-notes, normal-notes and normal-type for an event in a tuplet.
+
+    Source tuplets keep their own counts -- six in the time of four, not 3:2 --
+    so a reader rebuilds a sextuplet rather than two triplets. Without them the
+    sounded ratio is inverted: a triplet sounds 2/3, so 3 notes in the time of 2.
+    """
+    assert event.tuplet_ratio is not None
+    if event.tuplets:
+        actual = normal = 1
+        for mark in event.tuplets:
+            actual *= mark.actual
+            normal *= mark.normal
+        if Fraction(normal, actual) == event.tuplet_ratio:
+            unit = event.tuplets[-1].unit
+            base = event.written_duration / (2 - Fraction(1, 2**event.dots))
+            name = _NOTE_TYPES.get(unit.denominator) if unit.numerator == 1 else None
+            return actual, normal, name if name is not None and unit != base else None
+    return event.tuplet_ratio.denominator, event.tuplet_ratio.numerator, None
+
+
 def _note_type(event: Event) -> str:
     """MusicXML note type from the written duration, undotting first.
 
@@ -1841,6 +1889,7 @@ def _append_measure(
             ET.SubElement(forward, "voice").text = str(order.get(voice.number, voice.number))
         onset = voice.start_offset
         written = replace(voice, number=order[voice.number]) if voice.number in order else voice
+        tuplet_marks = _tuplet_notations(voice.events)
         for event_index, event in enumerate(voice.events):
             numbers = (
                 ()
@@ -1862,6 +1911,7 @@ def _append_measure(
                 divisions,
                 arpeggio_numbers=numbers,
                 slurs=slurs,
+                tuplets=tuplet_marks.get(event_index, ()),
                 octave_displacement=displacement,
                 display_staves=display_staves,
                 tremolo=(tremolo_notations or {}).get(
@@ -2059,6 +2109,7 @@ def _append_event(
     tremolo: tuple[str, int] | None = None,
     glissandi: tuple[tuple[_GlissandoNotation, ...], ...] = (),
     display_staves: dict[str, int] | None = None,
+    tuplets: tuple[_TupletNotation, ...] = (),
 ) -> None:
     if not voice.playback:
         event = replace(event, playback=False)
@@ -2088,7 +2139,16 @@ def _append_event(
             raise ExportError("a notehead enclosure requires both parentheses")
     legacy_ties = NoteTies(event.tie_start, event.tie_end)
     if event.is_rest:
-        _append_note(element, event, voice, divisions, pitch=None, chord=False, ties=legacy_ties)
+        _append_note(
+            element,
+            event,
+            voice,
+            divisions,
+            pitch=None,
+            chord=False,
+            ties=legacy_ties,
+            tuplets=tuplets,
+        )
         return
     for index, pitch in enumerate(event.pitches):
         pitch = replace(pitch, octave=pitch.octave + octave_displacement)
@@ -2106,6 +2166,7 @@ def _append_event(
             ties=ties,
             arpeggio_numbers=arpeggio_numbers,
             slurs=slurs if not index else (),
+            tuplets=tuplets if not index else (),
             ornaments=tuple(mark for mark in event.ornaments if mark.pitch_index == index),
             tremolo=tremolo if not index else None,
             glissandi=glissandi[index] if glissandi else (),
@@ -2136,6 +2197,7 @@ def _append_note(
     tremolo: tuple[str, int] | None = None,
     glissandi: tuple[_GlissandoNotation, ...] = (),
     display_staff: int | None = None,
+    tuplets: tuple[_TupletNotation, ...] = (),
 ) -> None:
     note = ET.SubElement(element, "note")
     if not event.visible:
@@ -2196,10 +2258,11 @@ def _append_note(
         ET.SubElement(note, "dot")
     if event.tuplet_ratio is not None:
         modification = ET.SubElement(note, "time-modification")
-        # actual-notes over normal-notes is the inverse of the sounded ratio: a
-        # triplet sounds 2/3, and is 3 notes in the time of 2.
-        ET.SubElement(modification, "actual-notes").text = str(event.tuplet_ratio.denominator)
-        ET.SubElement(modification, "normal-notes").text = str(event.tuplet_ratio.numerator)
+        actual, normal, normal_type = _time_modification(event)
+        ET.SubElement(modification, "actual-notes").text = str(actual)
+        ET.SubElement(modification, "normal-notes").text = str(normal)
+        if normal_type is not None:
+            ET.SubElement(modification, "normal-type").text = normal_type
     if pitch is not None and event.stem is not None:
         # Schema order: <stem> after <time-modification>, before <notehead>.
         ET.SubElement(note, "stem").text = event.stem
@@ -2251,6 +2314,7 @@ def _append_note(
         or tremolo
         or glissandi
         or drawn_parentheses
+        or tuplets
     ):
         notations = ET.SubElement(note, "notations")
         if ties.stop:
@@ -2267,6 +2331,17 @@ def _append_note(
             if slur.y_offset:
                 attrs["relative-y"] = _decimal_number(slur.y_offset * 10)
             ET.SubElement(notations, "slur", attrs)
+        for kind, number, bracket, show in tuplets:
+            ET.SubElement(
+                notations,
+                "tuplet",
+                {
+                    "type": kind,
+                    "number": str(number),
+                    "bracket": "yes" if bracket else "no",
+                    "show-number": show,
+                },
+            )
         for glissando in glissandi:
             attrs = {
                 "type": glissando.type,

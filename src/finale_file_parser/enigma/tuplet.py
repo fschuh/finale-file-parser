@@ -31,6 +31,7 @@ __all__ = [
     "Tuplet",
     "read_tuplet",
     "sounded_durations",
+    "tuplet_positions",
     "tuplets_by_entry",
 ]
 
@@ -59,6 +60,8 @@ class Tuplet:
     symbolic_duration: int
     reference_number: int
     reference_duration: int
+    number_style: int | None = None
+    """The printed number: 0 none, 1 the symbolic count, 2 a ratio; None unknown."""
 
     @property
     def ratio(self) -> Fraction:
@@ -117,11 +120,13 @@ def read_tuplet(record: Record) -> Tuplet:
             raise CorruptScoreError(f"tupletDef {name}={value} must be positive")
         return value
 
+    style = _scalar(record, "numberStyle")
     return Tuplet(
         symbolic_number=field("symbolicNum"),
         symbolic_duration=field("symbolicDur"),
         reference_number=field("refNum"),
         reference_duration=field("refDur"),
+        number_style=int(style) if style is not None and style.isdigit() else None,
     )
 
 
@@ -192,6 +197,39 @@ def sounded_durations(
             (tuplet_ratio, remaining - written)
             for tuplet_ratio, remaining in active
             if remaining - written > 0
+        ]
+    return out
+
+
+def tuplet_positions(
+    chain: EntryChain,
+    tuplets: Mapping[int, Sequence[Tuplet]],
+) -> dict[int, tuple[tuple[Tuplet, bool, bool], ...]]:
+    """The tuplets each entry belongs to, outermost first, as (tuplet, first, last).
+
+    The same walk as `sounded_durations`: a tuplet opens on its defining entry and
+    closes on the entry that consumes the last of its written span. Grace notes
+    belong to none.
+    """
+    active: list[tuple[Tuplet, int]] = []  # (tuplet, remaining written EDU)
+    out: dict[int, tuple[tuple[Tuplet, bool, bool], ...]] = {}
+    for entnum in chain.order:
+        written = chain.written_edu.get(entnum)
+        if written is None:
+            raise CorruptScoreError(f"entry {entnum} has no written duration")
+        if entnum in chain.grace_notes:
+            continue
+        opened = tuple(tuplets.get(entnum, ()))
+        active.extend((tuplet, tuplet.span) for tuplet in opened)
+        start = len(active) - len(opened)
+        marks = tuple(
+            (tuplet, index >= start, remaining - written <= 0)
+            for index, (tuplet, remaining) in enumerate(active)
+        )
+        if marks:
+            out[entnum] = marks
+        active = [
+            (tuplet, remaining - written) for tuplet, remaining in active if remaining - written > 0
         ]
     return out
 

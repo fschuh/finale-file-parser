@@ -73,7 +73,13 @@ from finale_file_parser.enigma.timesig import (
 )
 from finale_file_parser.enigma.timesig import TimeSignature as EnigmaTimeSignature
 from finale_file_parser.enigma.tremolos import recover_tremolos
-from finale_file_parser.enigma.tuplet import entry_chain, sounded_durations, tuplets_by_entry
+from finale_file_parser.enigma.tuplet import (
+    Tuplet,
+    entry_chain,
+    sounded_durations,
+    tuplet_positions,
+    tuplets_by_entry,
+)
 from finale_file_parser.ir import (
     Arpeggio,
     ArticulationPlayback,
@@ -97,6 +103,7 @@ from finale_file_parser.ir import (
     ScoreDiagnostic,
     SlurEndpoint,
     TimeSignature,
+    TupletMark,
     Voice,
 )
 from finale_file_parser.playback import PlaybackError, navigation_target
@@ -161,7 +168,9 @@ def build_score(document: EnigmaDocument) -> Score:
     """
     location = locate_entries(document, include_reserved_staff=False)
     chain = entry_chain(document)
-    sounded = sounded_durations(chain, tuplets_by_entry(document))
+    tuplet_defs = tuplets_by_entry(document)
+    sounded = sounded_durations(chain, tuplet_defs)
+    positions = tuplet_positions(chain, tuplet_defs)
     records = {int(r.attrs["entnum"]): r for r in document.entries.of_tag("entry")}
     transpositions = _transpositions(document)
     lyrics = lyrics_by_entry(document)
@@ -227,6 +236,7 @@ def build_score(document: EnigmaDocument) -> Score:
                     noteheads=noteheads.get(entnum, ()),
                     cross_staff=cross_staff.get(entnum, ()),
                     enharmonic=enharmonic.get(entnum, frozenset()),
+                    tuplets=_tuplet_marks(positions.get(entnum, ())),
                 )
             )
 
@@ -239,7 +249,11 @@ def build_score(document: EnigmaDocument) -> Score:
             events = cells[staff, measure].events_by_layer[endpoint.voice]
             event = events[endpoint.event_index]
             events[endpoint.event_index] = replace(
-                event, written_duration=written, tuplet_ratio=event.duration / written, beams=()
+                event,
+                written_duration=written,
+                tuplet_ratio=event.duration / written,
+                beams=(),
+                tuplets=(),
             )
     rest_options = rest_beams(document)
     fixed_layers = layer_stems(document)
@@ -760,6 +774,7 @@ def _event(
     noteheads: tuple[Notehead, ...] = (),
     cross_staff: tuple[CrossStaff, ...] = (),
     enharmonic: frozenset[int] = frozenset(),
+    tuplets: tuple[TupletMark, ...] = (),
 ) -> Event:
     entry = read_entry(record)
     key = decode_key(key_raw)
@@ -794,6 +809,7 @@ def _event(
         tie_end=any(note.tie_end for note in entry.notes),
         note_ties=tuple(NoteTies(note.tie_start, note.tie_end) for note in entry.notes),
         tuplet_ratio=ratio,
+        tuplets=tuplets if ratio is not None and _ratio_of(tuplets) == ratio else (),
         is_grace="graceNote" in record.fields,
         playback=entry.playback,
         visible=entry.visible,
@@ -824,6 +840,39 @@ def _event(
         cross_staff=cross_staff,
         stem=frozen_stem(record) if pitches else None,
     )
+
+
+def _tuplet_marks(positions: tuple[tuple[Tuplet, bool, bool], ...]) -> tuple[TupletMark, ...]:
+    """Unreduced tuplet counts, or none where a count is not a whole number of units."""
+    marks = []
+    for tuplet, first, last in positions:
+        normal, remainder = divmod(
+            tuplet.reference_number * tuplet.reference_duration, tuplet.symbolic_duration
+        )
+        if remainder or not normal:
+            return ()
+        marks.append(
+            TupletMark(
+                actual=tuplet.symbolic_number,
+                normal=normal,
+                unit=Fraction(tuplet.symbolic_duration, _WHOLE_EDU),
+                start=first,
+                stop=last,
+                show_number="actual"
+                if tuplet.number_style is None
+                else {0: "none", 2: "both"}.get(tuplet.number_style, "actual"),
+            )
+        )
+    return tuple(marks)
+
+
+def _ratio_of(marks: tuple[TupletMark, ...]) -> Fraction | None:
+    if not marks:
+        return None
+    ratio = Fraction(1)
+    for mark in marks:
+        ratio *= Fraction(mark.normal, mark.actual)
+    return ratio
 
 
 def _resolve_ornament(
